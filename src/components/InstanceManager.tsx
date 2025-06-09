@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,15 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2 } from 'lucide-react';
-import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
+import { EvolutionApiService } from '@/services/EvolutionApiService';
 
-// Update the local Instance interface to match InstanceInfo
+// Update the local Instance interface to match what we actually receive
 interface Instance {
   instanceName: string;
   status: string;
-  serverUrl: string;
-  apikey: string;
-  owner: string;
+  serverUrl?: string;
+  apikey?: string;
+  owner?: string;
   profileName?: string;
   profilePictureUrl?: string;
   integration?: string;
@@ -61,8 +60,8 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       const result = await service.listInstances();
       
       if (result.success && result.instances) {
-        // Convert InstanceInfo[] to Instance[] format
-        const mappedInstances: Instance[] = result.instances.map((instance: InstanceInfo) => ({
+        // Convert the instances to our local format
+        const mappedInstances: Instance[] = result.instances.map((instance: any) => ({
           instanceName: instance.instanceName,
           status: instance.status,
           serverUrl: instance.serverUrl || '',

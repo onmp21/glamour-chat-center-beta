@@ -1,3 +1,4 @@
+
 import { supabase } from '../integrations/supabase/client';
 
 export interface WebSocketConfig {
@@ -26,13 +27,6 @@ export interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
   instanceName: string;
-}
-
-export interface InstanceInfo {
-  instanceName: string;
-  profileName: string;
-  number: string;
-  status: string;
 }
 
 export class EvolutionApiService {
@@ -81,7 +75,7 @@ export class EvolutionApiService {
     }
   }
 
-  async listInstances(): Promise<{ success: boolean; instances?: InstanceInfo[]; error?: string }> {
+  async listInstances(): Promise<{ success: boolean; instances?: any[]; error?: string }> {
     try {
       console.log(`📋 [EVOLUTION_API] Listando instâncias em: ${this.config.baseUrl}`);
 
@@ -101,11 +95,16 @@ export class EvolutionApiService {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        const instances: InstanceInfo[] = data.map((item: any) => ({
+        const instances: any[] = data.map((item: any) => ({
           instanceName: item.instanceName,
           profileName: item.profileName,
           number: item.number,
-          status: item.status
+          status: item.status,
+          serverUrl: item.serverUrl,
+          apikey: item.apikey,
+          owner: item.owner,
+          profilePictureUrl: item.profilePictureUrl,
+          integration: item.integration
         }));
         console.log(`✅ [EVOLUTION_API] Instâncias encontradas:`, instances);
         return { success: true, instances };
@@ -253,6 +252,173 @@ export class EvolutionApiService {
       }
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao obter QR Code:', error);
+      return { success: false, error: `${error}` };
+    }
+  }
+
+  async getQRCode(): Promise<{ success: boolean; qrCode?: string; error?: string }> {
+    return this.getQRCodeForInstance(this.config.instanceName);
+  }
+
+  async getConnectionStatus(): Promise<{ state: string }> {
+    try {
+      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
+      console.log(`🔍 [EVOLUTION_API] Verificando status de conexão para: ${normalizedName}`);
+
+      const response = await fetch(`${this.config.baseUrl}/instance/connectionState/${normalizedName}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`❌ [EVOLUTION_API] Erro ao verificar status: ${response.status}`);
+        return { state: 'close' };
+      }
+
+      const data = await response.json();
+      console.log(`📡 [EVOLUTION_API] Status da conexão:`, data);
+      
+      return { state: data.instance?.state || data.state || 'close' };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao verificar status:', error);
+      return { state: 'close' };
+    }
+  }
+
+  async sendTextMessage(phoneNumber: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
+      console.log(`📤 [EVOLUTION_API] Enviando texto para ${phoneNumber}`);
+
+      const response = await fetch(`${this.config.baseUrl}/message/sendText/${normalizedName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          text: message,
+          delay: 1200
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'success' || data.key) {
+        console.log('✅ [EVOLUTION_API] Texto enviado com sucesso');
+        return { success: true, messageId: data.key?.id || data.id };
+      } else {
+        throw new Error(data.message || 'Falha ao enviar texto');
+      }
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao enviar texto:', error);
+      return { success: false, error: `${error}` };
+    }
+  }
+
+  async sendMediaMessage(
+    phoneNumber: string, 
+    mediaBase64: string, 
+    mediaType: 'image' | 'audio' | 'video' | 'document',
+    caption?: string,
+    fileName?: string
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
+      console.log(`📤 [EVOLUTION_API] Enviando ${mediaType} para ${phoneNumber}`);
+
+      let endpoint = '';
+      let payload: any = {};
+
+      if (mediaType === 'audio') {
+        endpoint = `/message/sendWhatsAppAudio/${normalizedName}`;
+        payload = {
+          number: phoneNumber,
+          audio: mediaBase64,
+          delay: 1200
+        };
+      } else {
+        endpoint = `/message/sendMedia/${normalizedName}`;
+        payload = {
+          number: phoneNumber,
+          mediatype: mediaType,
+          media: mediaBase64,
+          caption: caption || '',
+          fileName: fileName || `file.${mediaType}`,
+          delay: 1200
+        };
+      }
+
+      const response = await fetch(`${this.config.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'success' || data.key) {
+        console.log(`✅ [EVOLUTION_API] ${mediaType} enviado com sucesso`);
+        return { success: true, messageId: data.key?.id || data.id };
+      } else {
+        throw new Error(data.message || `Falha ao enviar ${mediaType}`);
+      }
+    } catch (error) {
+      console.error(`❌ [EVOLUTION_API] Erro ao enviar ${mediaType}:`, error);
+      return { success: false, error: `${error}` };
+    }
+  }
+
+  async sendSticker(phoneNumber: string, stickerBase64: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
+      console.log(`📤 [EVOLUTION_API] Enviando sticker para ${phoneNumber}`);
+
+      const response = await fetch(`${this.config.baseUrl}/message/sendSticker/${normalizedName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify({
+          number: phoneNumber,
+          sticker: stickerBase64,
+          delay: 1200
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'success' || data.key) {
+        console.log('✅ [EVOLUTION_API] Sticker enviado com sucesso');
+        return { success: true, messageId: data.key?.id || data.id };
+      } else {
+        throw new Error(data.message || 'Falha ao enviar sticker');
+      }
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao enviar sticker:', error);
       return { success: false, error: `${error}` };
     }
   }
