@@ -1,0 +1,12 @@
+
+/* Import base styles and Tailwind */
+@import './styles/base.css';
+
+/* Import theme variables */
+@import './styles/theme.css';
+
+/* Import chat-specific styles */
+@import './styles/chat.css';
+
+/* Import animations */
+@import './styles/animations.css';

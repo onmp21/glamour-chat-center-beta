@@ -1,0 +1,509 @@
+/* CHAT STYLES FIXED - WALLPAPER E MÍDIAS CORRIGIDAS */
+@layer utilities {
+  /* Headers padronizados */
+  .chat-header-height {
+    height: 72px;
+    min-height: 72px;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  /* WALLPAPER CORRIGIDO - USANDO ASSETS LOCAIS */
+  .chat-messages-container {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    overflow-anchor: none;
+    position: relative;
+    /* Wallpaper modo claro - Asset local */
+    background-image: url('/src/assets/fundomodoclaro.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: local;
+  }
+
+  /* Overlay para wallpaper modo claro */
+  .chat-messages-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Wallpaper modo escuro */
+  .dark .chat-messages-container {
+    background-image: url('/src/assets/fundomodoescuro.jpg');
+  }
+
+  .dark .chat-messages-container::before {
+    background-color: rgba(9, 9, 11, 0.6);
+  }
+
+  /* Scrollbar customizada */
+  .chat-messages-container::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .chat-messages-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .chat-messages-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+
+  .dark .chat-messages-container::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  /* CORES MODO ESCURO */
+  .dark .chat-container {
+    background-color: #09090b;
+  }
+
+  .dark .chat-sidebar {
+    background-color: #09090b;
+    border-color: #3f3f46;
+  }
+
+  .dark .chat-header {
+    background-color: #18181b;
+    border-color: #3f3f46;
+  }
+
+  /* MENSAGENS MODO ESCURO - CLIENTE #242626 */
+  .dark .chat-message-received,
+  .dark .chat-message-whatsapp.received {
+    background-color: #242626 !important;
+    border-color: #3f3f46 !important;
+    color: #fafafa !important;
+  }
+
+  /* MENSAGENS MODO ESCURO - CANAL #6d0d30 */
+  .dark .chat-message-sent,
+  .dark .chat-message-whatsapp.sent {
+    background-color: #6d0d30 !important;
+    color: white !important;
+  }
+
+  /* INPUT MODO ESCURO */
+  .dark .chat-input {
+    background-color: #18181b;
+    border-color: #3f3f46;
+    color: #fafafa;
+  }
+
+  .dark .chat-input::placeholder {
+    color: #a1a1aa;
+  }
+
+  /* CORES MODO CLARO */
+  .chat-container {
+    background-color: #ffffff;
+  }
+
+  .chat-sidebar {
+    background-color: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  .chat-header {
+    background-color: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  /* MENSAGENS MODO CLARO - CLIENTE #ffffff */
+  .chat-message-received,
+  .chat-message-whatsapp.received {
+    background-color: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #374151 !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* MENSAGENS MODO CLARO - CANAL #d1114c */
+  .chat-message-sent,
+  .chat-message-whatsapp.sent {
+    background-color: #d1114c !important;
+    color: white !important;
+  }
+
+  /* INPUT MODO CLARO */
+  .chat-input {
+    background-color: #f9fafb;
+    border-color: #e5e7eb;
+  }
+
+  /* LAYOUT MENSAGENS */
+  .chat-messages-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    max-width: 100%;
+    background-color: transparent;
+    position: relative;
+    z-index: 1;
+  }
+
+  .chat-message-row {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 4px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* POSICIONAMENTO - CLIENTE ESQUERDA */
+  .chat-message-row.received {
+    align-items: flex-start;
+  }
+
+  /* POSICIONAMENTO - CANAL DIREITA (FORÇADO) */
+  .chat-message-row.sent {
+    align-items: flex-end !important;
+  }
+
+  /* BALÕES DE MENSAGEM CORRIGIDOS */
+  .chat-message-whatsapp {
+    position: relative;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    display: block;
+    max-width: 75%;
+    min-width: 120px;
+    width: fit-content;
+    z-index: 3;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* CLIENTE - ESQUERDA */
+  .chat-message-whatsapp.received {
+    background-color: #ffffff !important;
+    color: #374151 !important;
+    border-top-left-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    align-self: flex-start !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+
+  .dark .chat-message-whatsapp.received {
+    background-color: #242626 !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* CANAL - DIREITA (FORÇADO) */
+  .chat-message-whatsapp.sent {
+    background-color: #d1114c !important;
+    color: #ffffff !important;
+    border-top-right-radius: 4px;
+    align-self: flex-end !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
+
+  .dark .chat-message-whatsapp.sent {
+    background-color: #6d0d30 !important;
+    color: #ffffff !important;
+  }
+
+  /* MÍDIA RESPONSIVA CORRIGIDA */
+  .chat-message-media {
+    max-width: 320px;
+    max-height: 320px;
+    min-width: 200px;
+    min-height: 150px;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    object-fit: cover;
+    display: block;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .chat-message-media:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  /* ÁUDIO PLAYER CORRIGIDO */
+  .chat-message-audio {
+    width: 100%;
+    min-width: 280px;
+    max-width: 320px;
+    margin: 4px 0;
+    border-radius: 12px;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 8px;
+  }
+
+  .dark .chat-message-audio {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* DOCUMENTOS CORRIGIDOS */
+  .chat-message-document {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+    margin: 6px 0;
+    transition: all 0.2s ease;
+    min-width: 220px;
+    max-width: 320px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .chat-message-document:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark .chat-message-document {
+    background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .chat-message-document:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* TEXTO DAS MENSAGENS */
+  .chat-message-text {
+    word-break: break-word;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: block;
+    margin: 0;
+    padding: 0;
+    max-width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* TIMESTAMP */
+  .chat-message-timestamp {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    margin-top: 4px;
+    display: block;
+    text-align: right;
+    line-height: 1;
+    color: inherit;
+  }
+
+  .chat-message-timestamp .checkmark {
+    margin-left: 4px;
+    font-size: 0.6rem;
+  }
+
+  /* SENDER NAME */
+  .chat-message-sender {
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: rgba(55, 65, 81, 0.8);
+    display: block;
+    line-height: 1.2;
+  }
+
+  .dark .chat-message-sender {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* OVERLAY PARA MÍDIA */
+  .media-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .media-overlay-content {
+    max-width: 95vw;
+    max-height: 95vh;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .media-overlay-image,
+  .media-overlay-video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .media-overlay-close {
+    position: absolute;
+    top: -60px;
+    right: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+  }
+
+  .media-overlay-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+  }
+
+  /* ANIMAÇÕES */
+  .animate-fade-in {
+    animation: fadeInOverlay 0.25s ease-out;
+  }
+
+  @keyframes fadeInOverlay {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* RESPONSIVIDADE */
+  @media (max-width: 640px) {
+    .chat-message-whatsapp {
+      max-width: 80%;
+      padding: 8px 12px;
+    }
+    
+    .chat-message-media {
+      max-width: 280px;
+      max-height: 280px;
+      min-width: 180px;
+      min-height: 120px;
+    }
+
+    .chat-message-audio {
+      min-width: 240px;
+      max-width: 280px;
+    }
+    
+    .chat-message-document {
+      min-width: 200px;
+      max-width: 280px;
+      padding: 10px;
+    }
+
+    .chat-messages-wrapper {
+      padding: 12px;
+      gap: 8px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .chat-message-whatsapp {
+      max-width: 85%;
+      padding: 6px 10px;
+    }
+
+    .chat-message-media {
+      max-width: 240px;
+      max-height: 240px;
+      min-width: 160px;
+      min-height: 100px;
+    }
+
+    .chat-message-audio {
+      min-width: 200px;
+      max-width: 240px;
+    }
+    
+    .chat-message-document {
+      min-width: 180px;
+      max-width: 240px;
+      padding: 8px;
+    }
+  }
+
+  /* ESTADOS DE LOADING E ERROR */
+  .media-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .dark .media-loading {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .media-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    text-align: center;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .media-error:hover {
+    background-color: rgba(239, 68, 68, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .dark .media-error {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .dark .media-error:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+}
+

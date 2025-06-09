@@ -1,0 +1,42 @@
+
+project_id = "uxccfhptochnfomurulr"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54322
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://uxccfhptochnfomurulr.supabase.co"]
+jwt_expiry = 3600
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[functions.whatsapp-webhook-andressa]
+verify_jwt = false
+
+[functions.whatsapp-webhook-canarana]
+verify_jwt = false
+
+[functions.whatsapp-webhook-souto-soares]
+verify_jwt = false
+
+[functions.whatsapp-webhook-joao-dourado]
+verify_jwt = false
+
+[functions.whatsapp-webhook-america-dourada]
+verify_jwt = false
+
+[functions.whatsapp-webhook-gustavo]
+verify_jwt = false
+
+[functions.whatsapp-webhook-yelena]
+verify_jwt = false
+
+[functions.whatsapp-webhook-universal]
+verify_jwt = false

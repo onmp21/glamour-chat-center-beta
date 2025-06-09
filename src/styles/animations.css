@@ -1,0 +1,111 @@
+
+@layer utilities {
+  /* Animações minimalistas */
+  .mono-fade-in {
+    animation: monoFadeIn 0.2s ease-out;
+  }
+  
+  @keyframes monoFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Animações para botões */
+  .btn-animate {
+    transition: all 0.2s ease-out;
+  }
+  
+  .btn-animate:hover {
+    transform: translateY(-1px);
+  }
+  
+  .btn-animate:active {
+    transform: translateY(0);
+  }
+
+  /* Animação para botões pequenos */
+  .btn-animate-sm {
+    transition: all 0.15s ease-out;
+  }
+  
+  .btn-animate-sm:hover {
+    transform: scale(1.05);
+  }
+  
+  .btn-animate-sm:active {
+    transform: scale(0.98);
+  }
+
+  /* Animação para botões de ícone */
+  .btn-animate-icon {
+    transition: all 0.2s ease-out;
+  }
+  
+  .btn-animate-icon:hover {
+    transform: scale(1.1) rotate(5deg);
+  }
+  
+  .btn-animate-icon:active {
+    transform: scale(0.95);
+  }
+
+  /* Animação para cards */
+  .card-animate {
+    transition: all 0.15s ease-out;
+  }
+  
+  .card-animate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Animação para elementos interativos */
+  .interactive-animate {
+    transition: all 0.2s ease-out;
+  }
+  
+  .interactive-animate:hover {
+    transform: scale(1.02);
+  }
+  
+  .interactive-animate:active {
+    transform: scale(0.98);
+  }
+
+  /* Animação para botões flutuantes */
+  .btn-float {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .btn-float:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+  
+  .btn-float:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Animação para elementos que aparecem */
+  .appear-animate {
+    animation: appearIn 0.3s ease-out;
+  }
+  
+  @keyframes appearIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
