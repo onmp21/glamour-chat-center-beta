@@ -358,6 +358,10 @@ export class EvolutionWebSocketService {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
+  isConnectionActive(): boolean {
+    return this.isConnected();
+  }
+
   getConnectionState(): string {
     if (!this.ws) return 'DISCONNECTED';
     
@@ -416,4 +420,3 @@ export class EvolutionWebSocketManager {
 }
 
 export const evolutionWebSocketManager = new EvolutionWebSocketManager();
-

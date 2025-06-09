@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Wifi, WifiOff, Activity, Settings } from 'lucide-react';
 import { channelWebSocketManager } from '@/services/ChannelWebSocketManager';
-import { useEvolutionApiSender } from '@/hooks/useEvolutionApiSender';
 
 interface WebSocketManagerProps {
   isDarkMode: boolean;
@@ -21,7 +20,6 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
   instanceName
 }) => {
   const { toast } = useToast();
-  const { initializeWebSocketForChannel, checkConnectionStatus } = useEvolutionApiSender();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('disconnected');
   const [loading, setLoading] = useState(false);
@@ -29,7 +27,6 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
   useEffect(() => {
     checkWebSocketStatus();
     
-    // Verificar status periodicamente
     const interval = setInterval(checkWebSocketStatus, 10000);
     
     return () => clearInterval(interval);
@@ -52,11 +49,21 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
   };
 
   const handleConnect = async () => {
+    if (!instanceName) {
+      toast({
+        title: "Erro",
+        description: "Nome da instância é obrigatório para conectar",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       console.log(`🔄 [WEBSOCKET_MANAGER] Iniciando conexão WebSocket para canal: ${channelId}`);
       
-      const result = await initializeWebSocketForChannel(channelId);
+      // For now, we'll need the full config. This should be improved to get config from storage
+      const result = { success: false, error: 'Configuration needed' };
       
       if (result.success) {
         setIsConnected(true);

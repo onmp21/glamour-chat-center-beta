@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X } from 'lucide-react';
-import { EvolutionApiService, EvolutionApiConfig, evolutionApiManager, InstanceInfo } from '@/services/EvolutionApiService';
+import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService';
 import { EvolutionWebSocketService, evolutionWebSocketManager } from '@/services/EvolutionWebSocketService';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
 
