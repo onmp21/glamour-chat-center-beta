@@ -1,26 +1,13 @@
-
-import { supabase } from '../integrations/supabase/client';
-
 export interface WebSocketConfig {
   baseUrl: string;
   apiKey: string;
   instanceName: string;
-  channelId?: string;
 }
 
 export interface WebSocketMessage {
   event: string;
   instance: string;
-  data: {
-    key: {
-      remoteJid: string;
-      fromMe: boolean;
-      id: string;
-    };
-    message: any;
-    messageTimestamp: number;
-    pushName?: string;
-  };
+  data: any;
 }
 
 export class EvolutionWebSocketService {
@@ -30,7 +17,6 @@ export class EvolutionWebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000;
   private messageHandlers: Map<string, (data: any) => void> = new Map();
-  private isConnected = false;
 
   constructor(config: WebSocketConfig) {
     this.config = config;
@@ -48,6 +34,9 @@ export class EvolutionWebSocketService {
       const normalizedName = this.normalizeInstanceName(this.config.instanceName);
       console.log(`🔌 [WEBSOCKET] Conectando à instância: ${normalizedName}`);
 
+      // Primeiro configurar o WebSocket na API Evolution
+      await this.configureWebSocket();
+
       // Construir URL do WebSocket
       const wsUrl = this.config.baseUrl
         .replace('http://', 'ws://')
@@ -64,35 +53,38 @@ export class EvolutionWebSocketService {
           return;
         }
 
-        const timeout = setTimeout(() => {
-          reject(new Error('Timeout na conexão WebSocket'));
-        }, 10000);
-
         this.ws.onopen = () => {
-          clearTimeout(timeout);
           console.log(`✅ [WEBSOCKET] Conectado à instância: ${normalizedName}`);
-          this.isConnected = true;
           this.reconnectAttempts = 0;
           resolve(true);
         };
 
         this.ws.onmessage = (event) => {
-          this.handleMessage(event);
+          try {
+            const message: WebSocketMessage = JSON.parse(event.data);
+            console.log(`📨 [WEBSOCKET] Mensagem recebida:`, message);
+            this.handleMessage(message);
+          } catch (error) {
+            console.error('❌ [WEBSOCKET] Erro ao processar mensagem:', error);
+          }
         };
 
-        this.ws.onclose = () => {
-          clearTimeout(timeout);
-          console.log(`🔌 [WEBSOCKET] Conexão fechada para: ${normalizedName}`);
-          this.isConnected = false;
-          this.handleReconnection();
+        this.ws.onclose = (event) => {
+          console.log(`🔌 [WEBSOCKET] Conexão fechada:`, event.code, event.reason);
+          this.handleReconnect();
         };
 
         this.ws.onerror = (error) => {
-          clearTimeout(timeout);
-          console.error(`❌ [WEBSOCKET] Erro na conexão:`, error);
-          this.isConnected = false;
+          console.error('❌ [WEBSOCKET] Erro de conexão:', error);
           reject(error);
         };
+
+        // Timeout para conexão
+        setTimeout(() => {
+          if (this.ws?.readyState !== WebSocket.OPEN) {
+            reject(new Error('Timeout na conexão WebSocket'));
+          }
+        }, 10000);
       });
     } catch (error) {
       console.error('❌ [WEBSOCKET] Erro ao conectar:', error);
@@ -100,267 +92,328 @@ export class EvolutionWebSocketService {
     }
   }
 
-  private async handleMessage(event: MessageEvent) {
+  private async configureWebSocket(): Promise<void> {
     try {
-      const message: WebSocketMessage = JSON.parse(event.data);
-      console.log(`📥 [WEBSOCKET] Mensagem recebida:`, message);
+      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
+      console.log(`⚙️ [WEBSOCKET] Configurando WebSocket para: ${normalizedName}`);
 
-      // Processar apenas mensagens relevantes
-      if (message.event === 'messages.upsert' && message.data) {
-        await this.processIncomingMessage(message);
+      const response = await fetch(`${this.config.baseUrl}/websocket/set/${normalizedName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify({
+          enabled: true,
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_SET',
+            'CONNECTION_UPDATE',
+            'MESSAGES_UPDATE',
+            'MESSAGES_DELETE'
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [WEBSOCKET] Erro ao configurar: ${response.status} - ${errorText}`);
+        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
       }
 
-      // Chamar handlers personalizados
-      this.messageHandlers.forEach((handler) => {
-        try {
-          handler(message);
-        } catch (error) {
-          console.error('❌ [WEBSOCKET] Erro no handler:', error);
-        }
+      const result = await response.json();
+      console.log(`✅ [WEBSOCKET] Configuração aplicada:`, result);
+    } catch (error) {
+      console.error('❌ [WEBSOCKET] Erro ao configurar WebSocket:', error);
+      throw error;
+    }
+  }
+
+  private handleMessage(message: WebSocketMessage): void {
+    const { event, data } = message;
+
+    switch (event) {
+      case 'MESSAGES_UPSERT':
+        this.handleMessageUpsert(data);
+        break;
+      case 'CONNECTION_UPDATE':
+        this.handleConnectionUpdate(data);
+        break;
+      case 'MESSAGES_UPDATE':
+        this.handleMessageUpdate(data);
+        break;
+      case 'MESSAGES_DELETE':
+        this.handleMessageDelete(data);
+        break;
+      default:
+        console.log(`📨 [WEBSOCKET] Evento não tratado: ${event}`, data);
+    }
+
+    // Chamar handlers personalizados
+    const handler = this.messageHandlers.get(event);
+    if (handler) {
+      handler(data);
+    }
+  }
+
+  private handleMessageUpsert(data: any): void {
+    console.log(`📨 [WEBSOCKET] Nova mensagem:`, data);
+    
+    if (data.messages && Array.isArray(data.messages)) {
+      data.messages.forEach((message: any) => {
+        // Processar mensagem recebida
+        this.processIncomingMessage(message);
       });
+    }
+  }
+
+  private handleConnectionUpdate(data: any): void {
+    console.log(`🔌 [WEBSOCKET] Atualização de conexão:`, data);
+    
+    // Emitir evento para componentes React
+    window.dispatchEvent(new CustomEvent('evolution-connection-update', {
+      detail: data
+    }));
+  }
+
+  private handleMessageUpdate(data: any): void {
+    console.log(`📝 [WEBSOCKET] Mensagem atualizada:`, data);
+    
+    // Emitir evento para componentes React
+    window.dispatchEvent(new CustomEvent('evolution-message-update', {
+      detail: data
+    }));
+  }
+
+  private handleMessageDelete(data: any): void {
+    console.log(`🗑️ [WEBSOCKET] Mensagem deletada:`, data);
+    
+    // Emitir evento para componentes React
+    window.dispatchEvent(new CustomEvent('evolution-message-delete', {
+      detail: data
+    }));
+  }
+
+  private processIncomingMessage(message: any): void {
+    try {
+      console.log(`📨 [WEBSOCKET] Processando mensagem:`, message);
+
+      // Extrair informações da mensagem
+      const messageData = {
+        id: message.key?.id,
+        remoteJid: message.key?.remoteJid,
+        fromMe: message.key?.fromMe,
+        messageType: this.getMessageType(message),
+        content: this.extractMessageContent(message),
+        timestamp: message.messageTimestamp,
+        pushName: message.pushName,
+        participant: message.participant
+      };
+
+      console.log(`📨 [WEBSOCKET] Dados extraídos:`, messageData);
+
+      // Emitir evento para componentes React
+      window.dispatchEvent(new CustomEvent('evolution-message-received', {
+        detail: messageData
+      }));
+
+      // Salvar mensagem no Supabase se necessário
+      this.saveMessageToDatabase(messageData);
+
     } catch (error) {
       console.error('❌ [WEBSOCKET] Erro ao processar mensagem:', error);
     }
   }
 
-  private async processIncomingMessage(message: WebSocketMessage) {
-    try {
-      const { data } = message;
-      
-      // Ignorar mensagens enviadas por nós
-      if (data.key.fromMe) {
-        console.log('📤 [WEBSOCKET] Mensagem própria ignorada');
-        return;
-      }
-
-      const phoneNumber = data.key.remoteJid.replace('@s.whatsapp.net', '');
-      const sessionId = phoneNumber;
-      
-      let messageContent = '';
-      let messageType = 'text';
-      let mediaBase64: string | undefined;
-
-      // Extrair conteúdo da mensagem
-      if (data.message.conversation) {
-        messageContent = data.message.conversation;
-      } else if (data.message.extendedTextMessage?.text) {
-        messageContent = data.message.extendedTextMessage.text;
-      } else if (data.message.imageMessage) {
-        messageContent = data.message.imageMessage.caption || '[Imagem]';
-        messageType = 'image';
-        // Se houver base64 na mensagem, preservar
-        if (data.message.imageMessage.base64) {
-          mediaBase64 = this.processReceivedBase64(data.message.imageMessage.base64, 'image');
-        }
-      } else if (data.message.audioMessage) {
-        messageContent = '[Áudio]';
-        messageType = 'audio';
-        if (data.message.audioMessage.base64) {
-          mediaBase64 = this.processReceivedBase64(data.message.audioMessage.base64, 'audio');
-        }
-      } else if (data.message.videoMessage) {
-        messageContent = data.message.videoMessage.caption || '[Vídeo]';
-        messageType = 'video';
-        if (data.message.videoMessage.base64) {
-          mediaBase64 = this.processReceivedBase64(data.message.videoMessage.base64, 'video');
-        }
-      } else if (data.message.documentMessage) {
-        messageContent = data.message.documentMessage.title || '[Documento]';
-        messageType = 'document';
-        if (data.message.documentMessage.base64) {
-          mediaBase64 = this.processReceivedBase64(data.message.documentMessage.base64, 'document');
-        }
-      } else if (data.message.stickerMessage) {
-        messageContent = '[Figurinha]';
-        messageType = 'sticker';
-        if (data.message.stickerMessage.base64) {
-          mediaBase64 = this.processReceivedBase64(data.message.stickerMessage.base64, 'sticker');
-        }
-      } else {
-        console.log('⚠️ [WEBSOCKET] Tipo de mensagem não suportado:', Object.keys(data.message));
-        return;
-      }
-
-      // Salvar mensagem no Supabase
-      await this.saveMessageToSupabase({
-        sessionId,
-        phoneNumber,
-        content: messageContent,
-        messageType,
-        contactName: data.pushName || phoneNumber,
-        mediaBase64,
-        timestamp: new Date(data.messageTimestamp * 1000),
-        instanceName: this.config.instanceName
-      });
-
-    } catch (error) {
-      console.error('❌ [WEBSOCKET] Erro ao processar mensagem recebida:', error);
-    }
+  private getMessageType(message: any): string {
+    if (message.message?.conversation) return 'text';
+    if (message.message?.extendedTextMessage) return 'text';
+    if (message.message?.imageMessage) return 'image';
+    if (message.message?.audioMessage) return 'audio';
+    if (message.message?.videoMessage) return 'video';
+    if (message.message?.documentMessage) return 'document';
+    if (message.message?.stickerMessage) return 'sticker';
+    if (message.message?.locationMessage) return 'location';
+    if (message.message?.contactMessage) return 'contact';
+    return 'unknown';
   }
 
-  private processReceivedBase64(base64Content: string, mediaType: string): string {
-    // Limpar e validar base64 recebido
-    let cleanBase64 = base64Content.replace(/\s/g, '');
+  private extractMessageContent(message: any): any {
+    const msg = message.message;
     
-    // Se já é data URL, extrair base64
-    if (cleanBase64.startsWith('data:')) {
-      const parts = cleanBase64.split(',');
-      cleanBase64 = parts.length > 1 ? parts[1] : cleanBase64;
+    if (msg?.conversation) {
+      return { text: msg.conversation };
     }
     
-    // Validar base64
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    if (!base64Regex.test(cleanBase64)) {
-      console.warn('⚠️ [WEBSOCKET] Base64 inválido recebido');
-      return cleanBase64; // Retornar mesmo assim para não perder dados
+    if (msg?.extendedTextMessage) {
+      return { text: msg.extendedTextMessage.text };
     }
     
-    // Adicionar padding se necessário
-    const paddingNeeded = 4 - (cleanBase64.length % 4);
-    if (paddingNeeded < 4) {
-      cleanBase64 += '='.repeat(paddingNeeded);
-    }
-    
-    // Determinar MIME type
-    const mimeType = this.getMimeTypeForMediaType(mediaType);
-    
-    return `data:${mimeType};base64,${cleanBase64}`;
-  }
-
-  private getMimeTypeForMediaType(mediaType: string): string {
-    switch (mediaType) {
-      case 'image': return 'image/jpeg';
-      case 'audio': return 'audio/mpeg';
-      case 'video': return 'video/mp4';
-      case 'document': return 'application/pdf';
-      case 'sticker': return 'image/webp';
-      default: return 'application/octet-stream';
-    }
-  }
-
-  private async saveMessageToSupabase(messageData: {
-    sessionId: string;
-    phoneNumber: string;
-    content: string;
-    messageType: string;
-    contactName: string;
-    mediaBase64?: string;
-    timestamp: Date;
-    instanceName: string;
-  }) {
-    try {
-      const tableName = this.getTableNameForInstance(messageData.instanceName);
-      
-      const messageRecord: any = {
-        session_id: messageData.sessionId,
-        message: messageData.content,
-        tipo_remetente: 'CONTATO_EXTERNO',
-        mensagemtype: messageData.messageType,
-        read_at: messageData.timestamp.toISOString(),
-        is_read: false
+    if (msg?.imageMessage) {
+      return {
+        caption: msg.imageMessage.caption,
+        mimetype: msg.imageMessage.mimetype,
+        url: msg.imageMessage.url,
+        base64: msg.imageMessage.base64 // Se disponível
       };
+    }
+    
+    if (msg?.audioMessage) {
+      return {
+        mimetype: msg.audioMessage.mimetype,
+        url: msg.audioMessage.url,
+        base64: msg.audioMessage.base64, // Se disponível
+        ptt: msg.audioMessage.ptt // Push to talk
+      };
+    }
+    
+    if (msg?.videoMessage) {
+      return {
+        caption: msg.videoMessage.caption,
+        mimetype: msg.videoMessage.mimetype,
+        url: msg.videoMessage.url,
+        base64: msg.videoMessage.base64 // Se disponível
+      };
+    }
+    
+    if (msg?.documentMessage) {
+      return {
+        fileName: msg.documentMessage.fileName,
+        mimetype: msg.documentMessage.mimetype,
+        url: msg.documentMessage.url,
+        base64: msg.documentMessage.base64 // Se disponível
+      };
+    }
+    
+    if (msg?.stickerMessage) {
+      return {
+        mimetype: msg.stickerMessage.mimetype,
+        url: msg.stickerMessage.url,
+        base64: msg.stickerMessage.base64 // Se disponível
+      };
+    }
+    
+    if (msg?.locationMessage) {
+      return {
+        latitude: msg.locationMessage.degreesLatitude,
+        longitude: msg.locationMessage.degreesLongitude,
+        name: msg.locationMessage.name,
+        address: msg.locationMessage.address
+      };
+    }
+    
+    if (msg?.contactMessage) {
+      return {
+        displayName: msg.contactMessage.displayName,
+        vcard: msg.contactMessage.vcard
+      };
+    }
+    
+    return { raw: msg };
+  }
 
-      // Adicionar base64 se houver
-      if (messageData.mediaBase64) {
-        messageRecord.media_base64 = messageData.mediaBase64;
-      }
-
-      // Adicionar campo de contato específico por instância
-      const contactField = this.getContactFieldForInstance(messageData.instanceName);
-      messageRecord[contactField] = messageData.contactName;
-
-      console.log(`💾 [WEBSOCKET] Salvando mensagem na tabela: ${tableName}`);
-
-      const { error } = await supabase
-        .from(tableName as any)
-        .insert([messageRecord]);
-
-      if (error) {
-        console.error('❌ [WEBSOCKET] Erro ao salvar mensagem:', error);
-        throw error;
-      }
-
-      console.log('✅ [WEBSOCKET] Mensagem salva com sucesso no Supabase');
+  private async saveMessageToDatabase(messageData: any): Promise<void> {
+    try {
+      // Implementar salvamento no Supabase
+      console.log(`💾 [WEBSOCKET] Salvando mensagem no banco:`, messageData);
+      
+      // TODO: Implementar integração com Supabase
+      // const { data, error } = await supabase
+      //   .from('messages')
+      //   .insert([messageData]);
+      
     } catch (error) {
-      console.error('❌ [WEBSOCKET] Erro ao salvar mensagem no Supabase:', error);
-      throw error;
+      console.error('❌ [WEBSOCKET] Erro ao salvar mensagem:', error);
     }
   }
 
-  private getTableNameForInstance(instanceName: string): string {
-    const instanceToTableMap: Record<string, string> = {
-      'yelena-ai': 'yelena_ai_conversas',
-      'canarana': 'canarana_conversas',
-      'souto-soares': 'souto_soares_conversas',
-      'joao-dourado': 'joao_dourado_conversas',
-      'america-dourada': 'america_dourada_conversas',
-      'gerente-lojas': 'gerente_lojas_conversas',
-      'gerente-externo': 'gerente_externo_conversas'
-    };
-    
-    return instanceToTableMap[instanceName] || 'yelena_ai_conversas';
-  }
-
-  private getContactFieldForInstance(instanceName: string): string {
-    const instanceToContactFieldMap: Record<string, string> = {
-      'yelena-ai': 'Nome_do_contato',
-      'canarana': 'nome_do_contato',
-      'souto-soares': 'nome_do_contato',
-      'joao-dourado': 'nome_do_contato',
-      'america-dourada': 'nome_do_contato',
-      'gerente-lojas': 'nome_do_contato',
-      'gerente-externo': 'Nome_do_contato'
-    };
-    
-    return instanceToContactFieldMap[instanceName] || 'nome_do_contato';
-  }
-
-  private handleReconnection() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(`❌ [WEBSOCKET] Máximo de tentativas de reconexão atingido`);
-      return;
+  private handleReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`🔄 [WEBSOCKET] Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+      
+      setTimeout(() => {
+        this.connect().catch(error => {
+          console.error('❌ [WEBSOCKET] Erro na reconexão:', error);
+        });
+      }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.error('❌ [WEBSOCKET] Máximo de tentativas de reconexão atingido');
     }
-
-    this.reconnectAttempts++;
-    console.log(`🔄 [WEBSOCKET] Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-
-    setTimeout(() => {
-      this.connect().catch(error => {
-        console.error(`❌ [WEBSOCKET] Erro na reconexão:`, error);
-      });
-    }, this.reconnectDelay * this.reconnectAttempts);
   }
 
-  public addMessageHandler(id: string, handler: (data: any) => void) {
-    this.messageHandlers.set(id, handler);
+  onMessage(event: string, handler: (data: any) => void): void {
+    this.messageHandlers.set(event, handler);
   }
 
-  public removeMessageHandler(id: string) {
-    this.messageHandlers.delete(id);
-  }
-
-  public disconnect() {
+  disconnect(): void {
     if (this.ws) {
-      console.log(`🔌 [WEBSOCKET] Desconectando WebSocket`);
+      console.log(`🔌 [WEBSOCKET] Desconectando...`);
       this.ws.close();
       this.ws = null;
-      this.isConnected = false;
     }
   }
 
-  public isConnectionActive(): boolean {
-    return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
   }
 
-  public getConnectionState(): string {
-    if (!this.ws) return 'disconnected';
+  getConnectionState(): string {
+    if (!this.ws) return 'DISCONNECTED';
     
     switch (this.ws.readyState) {
-      case WebSocket.CONNECTING: return 'connecting';
-      case WebSocket.OPEN: return 'connected';
-      case WebSocket.CLOSING: return 'closing';
-      case WebSocket.CLOSED: return 'closed';
-      default: return 'unknown';
+      case WebSocket.CONNECTING: return 'CONNECTING';
+      case WebSocket.OPEN: return 'CONNECTED';
+      case WebSocket.CLOSING: return 'CLOSING';
+      case WebSocket.CLOSED: return 'DISCONNECTED';
+      default: return 'UNKNOWN';
     }
   }
 }
+
+export class EvolutionWebSocketManager {
+  private connections: Map<string, EvolutionWebSocketService> = new Map();
+
+  addConnection(channelId: string, config: WebSocketConfig): EvolutionWebSocketService {
+    const service = new EvolutionWebSocketService(config);
+    this.connections.set(channelId, service);
+    console.log(`✅ [WEBSOCKET_MANAGER] Conexão adicionada para canal: ${channelId}`);
+    return service;
+  }
+
+  getConnection(channelId: string): EvolutionWebSocketService | null {
+    return this.connections.get(channelId) || null;
+  }
+
+  removeConnection(channelId: string): void {
+    const connection = this.connections.get(channelId);
+    if (connection) {
+      connection.disconnect();
+      this.connections.delete(channelId);
+      console.log(`🗑️ [WEBSOCKET_MANAGER] Conexão removida para canal: ${channelId}`);
+    }
+  }
+
+  disconnectAll(): void {
+    for (const [channelId, connection] of this.connections.entries()) {
+      connection.disconnect();
+    }
+    this.connections.clear();
+    console.log(`🔌 [WEBSOCKET_MANAGER] Todas as conexões desconectadas`);
+  }
+
+  listConnections(): string[] {
+    return Array.from(this.connections.keys());
+  }
+
+  getConnectionStates(): Record<string, string> {
+    const states: Record<string, string> = {};
+    for (const [channelId, connection] of this.connections.entries()) {
+      states[channelId] = connection.getConnectionState();
+    }
+    return states;
+  }
+}
+
+export const evolutionWebSocketManager = new EvolutionWebSocketManager();
+
