@@ -13,14 +13,23 @@ export interface ChannelConversation {
   updated_at: string;
 }
 
+type ConversationTable = 
+  | 'yelena_ai_conversas'
+  | 'canarana_conversas'
+  | 'souto_soares_conversas'
+  | 'joao_dourado_conversas'
+  | 'america_dourada_conversas'
+  | 'gerente_lojas_conversas'
+  | 'gerente_externo_conversas';
+
 export function useChannelConversations(channelId: string) {
   const [conversations, setConversations] = useState<ChannelConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Mapear canais para tabelas do banco de dados
-  const getTableNameForChannel = useCallback((channelId: string): string => {
-    const channelTableMapping: Record<string, string> = {
+  const getTableNameForChannel = useCallback((channelId: string): ConversationTable => {
+    const channelTableMapping: Record<string, ConversationTable> = {
       'chat': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
       'souto-soares': 'souto_soares_conversas',
