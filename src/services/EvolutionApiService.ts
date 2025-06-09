@@ -1,3 +1,4 @@
+
 import { supabase } from '../integrations/supabase/client';
 
 export interface WebSocketConfig {
@@ -58,10 +59,9 @@ export class EvolutionApiService {
     try {
       console.log(`🔍 [EVOLUTION_API] Validando API em: ${this.config.baseUrl}`);
 
-      const response = await fetch(`${this.config.baseUrl}/check-token`, {
+      const response = await fetch(`${this.config.baseUrl}/instance/fetchInstances`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         }
       });
@@ -72,14 +72,8 @@ export class EvolutionApiService {
       }
 
       const data = await response.json();
-
-      if (data.status === 'CONNECTED') {
-        console.log('✅ [EVOLUTION_API] API validada com sucesso!');
-        return { success: true };
-      } else {
-        console.error('❌ [EVOLUTION_API] Falha na validação:', data);
-        return { success: false, error: 'Falha ao validar a API' };
-      }
+      console.log('✅ [EVOLUTION_API] API validada com sucesso!', data);
+      return { success: true };
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao validar API:', error);
       return { success: false, error: `${error}` };
@@ -90,10 +84,9 @@ export class EvolutionApiService {
     try {
       console.log(`📋 [EVOLUTION_API] Listando instâncias em: ${this.config.baseUrl}`);
 
-      const response = await fetch(`${this.config.baseUrl}/instances`, {
+      const response = await fetch(`${this.config.baseUrl}/instance/fetchInstances`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         }
       });
@@ -107,15 +100,15 @@ export class EvolutionApiService {
 
       if (Array.isArray(data)) {
         const instances: InstanceInfo[] = data.map((item: any) => ({
-          instanceName: item.instanceName,
-          profileName: item.profileName,
-          number: item.number,
-          status: item.status,
-          serverUrl: item.serverUrl,
-          apikey: item.apikey,
-          owner: item.owner,
-          profilePictureUrl: item.profilePictureUrl,
-          integration: item.integration
+          instanceName: item.instance?.instanceName || item.instanceName,
+          profileName: item.instance?.profileName,
+          number: item.instance?.ownerJid?.replace('@s.whatsapp.net', ''),
+          status: item.instance?.connectionStatus || item.connectionStatus || 'close',
+          serverUrl: this.config.baseUrl,
+          apikey: this.config.apiKey,
+          owner: item.instance?.ownerJid || '',
+          profilePictureUrl: item.instance?.profilePicUrl,
+          integration: item.instance?.integration || 'WHATSAPP-BAILEYS'
         }));
         console.log(`✅ [EVOLUTION_API] Instâncias encontradas:`, instances);
         return { success: true, instances };
@@ -140,7 +133,11 @@ export class EvolutionApiService {
           'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         },
-        body: JSON.stringify({ instanceName: normalizedName })
+        body: JSON.stringify({ 
+          instanceName: normalizedName,
+          qrcode: true,
+          integration: 'WHATSAPP-BAILEYS'
+        })
       });
 
       if (!response.ok) {
@@ -149,14 +146,8 @@ export class EvolutionApiService {
       }
 
       const data = await response.json();
-
-      if (data.status === 'success') {
-        console.log(`✅ [EVOLUTION_API] Instância criada com sucesso: ${normalizedName}`);
-        return { success: true };
-      } else {
-        console.error('❌ [EVOLUTION_API] Falha ao criar instância:', data);
-        return { success: false, error: data.message || 'Falha ao criar instância' };
-      }
+      console.log(`✅ [EVOLUTION_API] Instância criada com sucesso: ${normalizedName}`, data);
+      return { success: true };
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao criar instância:', error);
       return { success: false, error: `${error}` };
@@ -168,13 +159,11 @@ export class EvolutionApiService {
       const normalizedName = this.normalizeInstanceName(instanceName);
       console.log(`🗑️ [EVOLUTION_API] Excluindo instância: ${normalizedName}`);
 
-      const response = await fetch(`${this.config.baseUrl}/instance/delete`, {
-        method: 'POST',
+      const response = await fetch(`${this.config.baseUrl}/instance/delete/${normalizedName}`, {
+        method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
           'apikey': this.config.apiKey
-        },
-        body: JSON.stringify({ instanceName: normalizedName })
+        }
       });
 
       if (!response.ok) {
@@ -183,14 +172,8 @@ export class EvolutionApiService {
       }
 
       const data = await response.json();
-
-      if (data.status === 'success') {
-        console.log(`✅ [EVOLUTION_API] Instância excluída com sucesso: ${normalizedName}`);
-        return { success: true };
-      } else {
-        console.error('❌ [EVOLUTION_API] Falha ao excluir instância:', data);
-        return { success: false, error: data.message || 'Falha ao excluir instância' };
-      }
+      console.log(`✅ [EVOLUTION_API] Instância excluída com sucesso: ${normalizedName}`, data);
+      return { success: true };
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao excluir instância:', error);
       return { success: false, error: `${error}` };
@@ -202,15 +185,21 @@ export class EvolutionApiService {
       const normalizedName = this.normalizeInstanceName(instanceName);
       console.log(`⚙️ [EVOLUTION_API] Configurando WebSocket para instância: ${normalizedName}`);
 
-      const response = await fetch(`${this.config.baseUrl}/webhook/config`, {
+      const response = await fetch(`${this.config.baseUrl}/websocket/set/${normalizedName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         },
         body: JSON.stringify({
-          instanceName: normalizedName,
-          webhook: 'false' // Desabilitar webhook
+          enabled: true,
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_SET',
+            'CONNECTION_UPDATE',
+            'MESSAGES_UPDATE',
+            'MESSAGES_DELETE'
+          ]
         })
       });
 
@@ -220,14 +209,8 @@ export class EvolutionApiService {
       }
 
       const data = await response.json();
-
-      if (data.status === 'success') {
-        console.log(`✅ [EVOLUTION_API] WebSocket configurado com sucesso para: ${normalizedName}`);
-        return { success: true };
-      } else {
-        console.error('❌ [EVOLUTION_API] Falha ao configurar WebSocket:', data);
-        return { success: false, error: data.message || 'Falha ao configurar WebSocket' };
-      }
+      console.log(`✅ [EVOLUTION_API] WebSocket configurado com sucesso para: ${normalizedName}`, data);
+      return { success: true };
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao configurar WebSocket:', error);
       return { success: false, error: `${error}` };
@@ -242,7 +225,6 @@ export class EvolutionApiService {
       const response = await fetch(`${this.config.baseUrl}/instance/connect/${normalizedName}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         }
       });
@@ -253,10 +235,18 @@ export class EvolutionApiService {
       }
 
       const data = await response.json();
+      console.log('✅ [EVOLUTION_API] Resposta do QR Code:', data);
       
+      // Verificar se já está conectado
+      if (data.instance?.connectionStatus === 'open') {
+        return { success: true, connected: true };
+      }
+      
+      // Processar QR Code sem alterar o base64
       if (data.base64) {
-        console.log('✅ [EVOLUTION_API] QR Code obtido com sucesso');
         return { success: true, qrCode: data.base64 };
+      } else if (data.code) {
+        return { success: true, qrCode: data.code };
       } else {
         console.log('⚠️ [EVOLUTION_API] QR Code não disponível na resposta');
         return { success: false, error: 'QR Code não disponível' };
@@ -279,7 +269,6 @@ export class EvolutionApiService {
       const response = await fetch(`${this.config.baseUrl}/instance/connectionState/${normalizedName}`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'apikey': this.config.apiKey
         }
       });
@@ -324,9 +313,9 @@ export class EvolutionApiService {
 
       const data = await response.json();
       
-      if (data.status === 'success' || data.key) {
+      if (data.key) {
         console.log('✅ [EVOLUTION_API] Texto enviado com sucesso');
-        return { success: true, messageId: data.key?.id || data.id };
+        return { success: true, messageId: data.key.id };
       } else {
         throw new Error(data.message || 'Falha ao enviar texto');
       }
@@ -385,9 +374,9 @@ export class EvolutionApiService {
 
       const data = await response.json();
       
-      if (data.status === 'success' || data.key) {
+      if (data.key) {
         console.log(`✅ [EVOLUTION_API] ${mediaType} enviado com sucesso`);
-        return { success: true, messageId: data.key?.id || data.id };
+        return { success: true, messageId: data.key.id };
       } else {
         throw new Error(data.message || `Falha ao enviar ${mediaType}`);
       }
@@ -422,9 +411,9 @@ export class EvolutionApiService {
 
       const data = await response.json();
       
-      if (data.status === 'success' || data.key) {
+      if (data.key) {
         console.log('✅ [EVOLUTION_API] Sticker enviado com sucesso');
-        return { success: true, messageId: data.key?.id || data.id };
+        return { success: true, messageId: data.key.id };
       } else {
         throw new Error(data.message || 'Falha ao enviar sticker');
       }
@@ -465,11 +454,8 @@ export const evolutionApiManager = {
         },
         body: JSON.stringify({
           number: chatId,
-          options: {
-            delay: 1200,
-            presence: 'composing'
-          },
-          text: message
+          text: message,
+          delay: 1200
         })
       });
 
@@ -479,7 +465,7 @@ export const evolutionApiManager = {
       }
 
       const data = await response.json();
-      if (data.status === 'success') {
+      if (data.key) {
         console.log(`Mensagem enviada para ${chatId} com sucesso.`);
         return true;
       } else {
