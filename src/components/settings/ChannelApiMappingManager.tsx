@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
 import { EvolutionApiService } from '../../services/EvolutionApiService';
-import { channelWebSocketManager } from '../../services/ChannelWebSocketManager';
+import { evolutionWebSocketManager } from '../../services/EvolutionWebSocketService';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -62,18 +61,18 @@ export const ChannelApiMappingManager: React.FC = () => {
         } else {
           console.log(`✅ [WEBSOCKET] WebSocket configurado para instância: ${instance.instance_name}`);
           
-          // Estabelecer conexão WebSocket usando o channelWebSocketManager
-          const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel, {
+          // Estabelecer conexão WebSocket
+          const wsService = evolutionWebSocketManager.addConnection(selectedChannel, {
             baseUrl: instance.base_url,
             apiKey: instance.api_key,
-            instanceName: instance.instance_name,
-            channelId: selectedChannel
+            instanceName: instance.instance_name
           });
 
-          if (wsResult.success) {
+          try {
+            await wsService.connect();
             console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${channel.name}`);
-          } else {
-            console.warn("Falha ao conectar WebSocket:", wsResult.error);
+          } catch (wsError) {
+            console.warn("Falha ao conectar WebSocket:", wsError);
           }
         }
       }
@@ -96,10 +95,10 @@ export const ChannelApiMappingManager: React.FC = () => {
 
         await deleteMapping(channelId);
 
-        // Desconectar WebSocket usando o novo manager
+        // Desconectar WebSocket (substitui desabilitar webhook)
         if (instance && channel && channel.name !== 'Yelena-AI') {
           console.log(`🔌 [WEBSOCKET] Desconectando WebSocket para canal: ${channel.name}`);
-          await channelWebSocketManager.disconnectChannelWebSocket(channelId);
+          evolutionWebSocketManager.removeConnection(channelId);
           console.log(`✅ [WEBSOCKET] WebSocket desconectado para canal: ${channel.name}`);
         }
       }
@@ -118,7 +117,9 @@ export const ChannelApiMappingManager: React.FC = () => {
   };
 
   const getWebSocketStatus = (channelId: string) => {
-    return channelWebSocketManager.getConnectionStatus(channelId);
+    const connection = evolutionWebSocketManager.getConnection(channelId);
+    if (!connection) return 'disconnected';
+    return connection.getConnectionState().toLowerCase();
   };
 
   const getWebSocketStatusBadge = (channelId: string) => {
@@ -293,3 +294,4 @@ export const ChannelApiMappingManager: React.FC = () => {
     </div>
   );
 };
+
