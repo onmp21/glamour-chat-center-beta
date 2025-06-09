@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
 import { EvolutionApiService } from '../../services/EvolutionApiService';
-import { evolutionWebSocketManager } from '../../services/EvolutionWebSocketService';
+import { channelWebSocketManager } from '../../services/ChannelWebSocketManager';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -20,67 +21,59 @@ export const ChannelApiMappingManager: React.FC = () => {
   // Filtrar canais ativos
   const activeChannels = channels.filter(channel => channel.isActive);
 
-  // Mapear canais para IDs legados
-  const getChannelLegacyId = (channel: any) => {
-    const nameToId: Record<string, string> = {
-      'Yelena-AI': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-      'Canarana': '011b69ba-cf25-4f63-af2e-4ad0260d9516',
-      'Souto Soares': 'b7996f75-41a7-4725-8229-564f31868027',
-      'João Dourado': '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
-      'América Dourada': '64d8acad-c645-4544-a1e6-2f0825fae00b',
-      'Gustavo Gerente das Lojas': 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
-      'Andressa Gerente Externo': 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7'
-    };
-    return nameToId[channel.name] || channel.id;
-  };
-
   const handleSaveMapping = async () => {
     if (!selectedChannel || !selectedInstance) return;
 
     setSaving(true);
     try {
+      console.log(`🔗 [MAPPING] Vinculando canal ${selectedChannel} à instância ${selectedInstance}`);
+      
       await upsertMapping(selectedChannel, selectedInstance);
 
-      // Configurar WebSocket na API Evolution (substitui webhook)
+      // Configurar WebSocket automaticamente
       const instance = instances.find(inst => inst.id === selectedInstance);
       const channel = activeChannels.find(ch => ch.id === selectedChannel);
 
-      if (instance && channel && channel.name !== 'Yelena-AI') {
+      if (instance && channel) {
         console.log(`🔌 [WEBSOCKET] Configurando WebSocket para canal: ${channel.name} → instância: ${instance.instance_name}`);
         
-        // Configurar WebSocket na instância
-        const service = new EvolutionApiService({
-          baseUrl: instance.base_url,
-          apiKey: instance.api_key,
-          instanceName: instance.instance_name
-        });
-
-        const configResult = await service.configureWebSocket(instance.instance_name);
-        if (!configResult.success) {
-          console.warn("Falha ao configurar WebSocket para a instância:", instance.instance_name);
-        } else {
-          console.log(`✅ [WEBSOCKET] WebSocket configurado para instância: ${instance.instance_name}`);
-          
-          // Estabelecer conexão WebSocket
-          const wsService = evolutionWebSocketManager.addConnection(selectedChannel, {
+        try {
+          // Configurar WebSocket na instância da API Evolution
+          const service = new EvolutionApiService({
             baseUrl: instance.base_url,
             apiKey: instance.api_key,
             instanceName: instance.instance_name
           });
 
-          try {
-            await wsService.connect();
-            console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${channel.name}`);
-          } catch (wsError) {
-            console.warn("Falha ao conectar WebSocket:", wsError);
+          const configResult = await service.configureWebSocket(instance.instance_name);
+          if (!configResult.success) {
+            console.warn("⚠️ [WEBSOCKET] Falha ao configurar WebSocket:", configResult.error);
+          } else {
+            console.log(`✅ [WEBSOCKET] WebSocket configurado na API Evolution`);
           }
+
+          // Estabelecer conexão WebSocket local
+          const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel, {
+            baseUrl: instance.base_url,
+            apiKey: instance.api_key,
+            instanceName: instance.instance_name
+          });
+
+          if (wsResult.success) {
+            console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${channel.name}`);
+          } else {
+            console.warn("⚠️ [WEBSOCKET] Falha ao estabelecer conexão:", wsResult.error);
+          }
+
+        } catch (wsError) {
+          console.warn("⚠️ [WEBSOCKET] Erro durante configuração WebSocket:", wsError);
         }
       }
 
       setSelectedChannel("");
       setSelectedInstance("");
     } catch (error) {
-      console.error('Erro ao salvar mapeamento:', error);
+      console.error('❌ [MAPPING] Erro ao salvar mapeamento:', error);
     } finally {
       setSaving(false);
     }
@@ -88,22 +81,24 @@ export const ChannelApiMappingManager: React.FC = () => {
 
   const handleDeleteMapping = async (channelId: string) => {
     try {
+      console.log(`🗑️ [MAPPING] Removendo mapeamento para canal: ${channelId}`);
+      
       const mapping = mappings.find(m => m.channel_id === channelId);
       if (mapping) {
         const instance = instances.find(inst => inst.id === mapping.api_instance_id);
-        const channel = activeChannels.find(ch => getChannelLegacyId(ch) === channelId);
+        const channel = activeChannels.find(ch => ch.id === channelId);
 
         await deleteMapping(channelId);
 
-        // Desconectar WebSocket (substitui desabilitar webhook)
-        if (instance && channel && channel.name !== 'Yelena-AI') {
+        // Desconectar WebSocket
+        if (instance && channel) {
           console.log(`🔌 [WEBSOCKET] Desconectando WebSocket para canal: ${channel.name}`);
-          evolutionWebSocketManager.removeConnection(channelId);
+          await channelWebSocketManager.disconnectChannelWebSocket(channelId);
           console.log(`✅ [WEBSOCKET] WebSocket desconectado para canal: ${channel.name}`);
         }
       }
     } catch (error) {
-      console.error('Erro ao deletar mapeamento:', error);
+      console.error('❌ [MAPPING] Erro ao deletar mapeamento:', error);
     }
   };
 
@@ -117,26 +112,16 @@ export const ChannelApiMappingManager: React.FC = () => {
   };
 
   const getWebSocketStatus = (channelId: string) => {
-    const connection = evolutionWebSocketManager.getConnection(channelId);
-    if (!connection) return 'disconnected';
-    return connection.getConnectionState().toLowerCase();
+    return channelWebSocketManager.isChannelConnected(channelId);
   };
 
   const getWebSocketStatusBadge = (channelId: string) => {
-    const status = getWebSocketStatus(channelId);
-    const statusConfig = {
-      'connected': { color: 'text-green-600', text: 'WebSocket Ativo', icon: Wifi },
-      'connecting': { color: 'text-yellow-600', text: 'Conectando...', icon: Settings },
-      'disconnected': { color: 'text-red-600', text: 'Desconectado', icon: AlertCircle }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disconnected;
-    const Icon = config.icon;
-
+    const isConnected = getWebSocketStatus(channelId);
+    
     return (
-      <div className={`flex items-center gap-1 text-xs ${config.color}`}>
-        <Icon className="h-3 w-3" />
-        {config.text}
+      <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+        <Wifi className="h-3 w-3" />
+        {isConnected ? 'WebSocket Ativo' : 'Desconectado'}
       </div>
     );
   };
@@ -154,7 +139,7 @@ export const ChannelApiMappingManager: React.FC = () => {
       <div>
         <h3 className="text-lg font-semibold mb-2">Mapeamento Canal ↔ API Evolution</h3>
         <p className="text-gray-600 mb-4">
-          Vincule cada canal a uma instância específica da API Evolution com conexão WebSocket em tempo real.
+          Vincule cada canal a uma instância específica da API Evolution com conexão WebSocket automática.
         </p>
 
         {/* Formulário para novo mapeamento */}
@@ -172,10 +157,9 @@ export const ChannelApiMappingManager: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {activeChannels.map((channel) => {
-                      const channelId = channel.id;
-                      const hasMapping = getMappingForChannel(channelId);
+                      const hasMapping = getMappingForChannel(channel.id);
                       return (
-                        <SelectItem key={channelId} value={channelId}>
+                        <SelectItem key={channel.id} value={channel.id}>
                           <div className="flex items-center gap-2">
                             {channel.name}
                             {hasMapping && (
@@ -227,18 +211,17 @@ export const ChannelApiMappingManager: React.FC = () => {
           ) : (
             <div className="grid gap-3">
               {activeChannels.map((channel) => {
-                const channelId = channel.id;
-                const mapping = getMappingForChannel(channelId);
+                const mapping = getMappingForChannel(channel.id);
                 
                 return (
-                  <Card key={channelId} className="p-4">
+                  <Card key={channel.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <Link className="h-4 w-4 text-[#b5103c]" />
                         <div>
                           <p className="font-medium">{channel.name}</p>
                           <p className="text-sm text-gray-500">
-                            Canal ID: {channelId}
+                            Canal ID: {channel.id}
                           </p>
                         </div>
                       </div>
@@ -253,12 +236,12 @@ export const ChannelApiMappingManager: React.FC = () => {
                                   {getInstanceName(mapping.api_instance_id)}
                                 </span>
                               </div>
-                              {getWebSocketStatusBadge(channelId)}
+                              {getWebSocketStatusBadge(channel.id)}
                             </div>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteMapping(channelId)}
+                              onClick={() => handleDeleteMapping(channel.id)}
                               className="text-red-600 hover:text-red-700"
                             >
                               Remover
@@ -294,4 +277,3 @@ export const ChannelApiMappingManager: React.FC = () => {
     </div>
   );
 };
-
