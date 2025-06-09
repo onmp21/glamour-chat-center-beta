@@ -9,6 +9,15 @@ export interface ApiResponse {
   success: boolean;
   data?: any;
   error?: string;
+  instances?: InstanceInfo[];
+  qrCode?: string;
+}
+
+export interface InstanceInfo {
+  instanceName: string;
+  status: string;
+  profileName?: string;
+  number?: string;
 }
 
 export class EvolutionApiService {
@@ -52,6 +61,67 @@ export class EvolutionApiService {
     }
   }
 
+  async validateApi(): Promise<ApiResponse> {
+    try {
+      return this.makeRequest('/instance/fetchInstances', {
+        method: 'GET'
+      });
+    } catch (error) {
+      return {
+        success: false,
+        error: `Validation error: ${error}`
+      };
+    }
+  }
+
+  async listInstances(): Promise<ApiResponse> {
+    try {
+      const result = await this.makeRequest('/instance/fetchInstances', {
+        method: 'GET'
+      });
+
+      if (result.success && result.data) {
+        const instances: InstanceInfo[] = Array.isArray(result.data) 
+          ? result.data.map((instance: any) => ({
+              instanceName: instance.instance?.instanceName || instance.instanceName,
+              status: instance.instance?.state || instance.state || 'unknown',
+              profileName: instance.instance?.profileName || instance.profileName,
+              number: instance.instance?.number || instance.number
+            }))
+          : [];
+
+        return {
+          success: true,
+          instances
+        };
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: `Error listing instances: ${error}`
+      };
+    }
+  }
+
+  async createInstance(instanceName: string): Promise<ApiResponse> {
+    return this.makeRequest('/instance/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        instanceName,
+        qrcode: true,
+        integration: 'WHATSAPP-BAILEYS'
+      })
+    });
+  }
+
+  async deleteInstance(instanceName: string): Promise<ApiResponse> {
+    return this.makeRequest(`/instance/delete/${instanceName}`, {
+      method: 'DELETE'
+    });
+  }
+
   async sendTextMessage(phoneNumber: string, message: string): Promise<ApiResponse> {
     const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
     
@@ -79,9 +149,18 @@ export class EvolutionApiService {
   }
 
   async getQRCodeForInstance(instanceName: string): Promise<ApiResponse> {
-    return this.makeRequest(`/instance/connect/${instanceName}`, {
+    const result = await this.makeRequest(`/instance/connect/${instanceName}`, {
       method: 'GET'
     });
+
+    if (result.success && result.data) {
+      return {
+        ...result,
+        qrCode: result.data.code || result.data.qrCode || result.data.base64
+      };
+    }
+
+    return result;
   }
 
   async getConnectionStatus(): Promise<ApiResponse> {
