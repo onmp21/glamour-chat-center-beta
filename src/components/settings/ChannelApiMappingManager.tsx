@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -61,18 +62,18 @@ export const ChannelApiMappingManager: React.FC = () => {
         } else {
           console.log(`✅ [WEBSOCKET] WebSocket configurado para instância: ${instance.instance_name}`);
           
-          // Estabelecer conexão WebSocket
-          const wsService = evolutionWebSocketManager.addConnection(selectedChannel, {
+          // Estabelecer conexão WebSocket usando o channelWebSocketManager
+          const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel, {
             baseUrl: instance.base_url,
             apiKey: instance.api_key,
-            instanceName: instance.instance_name
+            instanceName: instance.instance_name,
+            channelId: selectedChannel
           });
 
-          try {
-            await wsService.connect();
+          if (wsResult.success) {
             console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${channel.name}`);
-          } catch (wsError) {
-            console.warn("Falha ao conectar WebSocket:", wsError);
+          } else {
+            console.warn("Falha ao conectar WebSocket:", wsResult.error);
           }
         }
       }

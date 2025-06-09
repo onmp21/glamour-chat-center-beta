@@ -259,6 +259,20 @@ export class EvolutionApiService {
 }
 
 export const evolutionApiManager = {
+  instances: new Map<string, EvolutionApiService>(),
+
+  getInstanceByConfig(config: EvolutionApiConfig): EvolutionApiService | null {
+    const key = `${config.baseUrl}-${config.instanceName}`;
+    let instance = this.instances.get(key);
+    
+    if (!instance) {
+      instance = new EvolutionApiService(config);
+      this.instances.set(key, instance);
+    }
+    
+    return instance;
+  },
+
   async sendMessage(config: EvolutionApiConfig, chatId: string, message: string): Promise<boolean> {
     try {
       const normalizedName = config.instanceName

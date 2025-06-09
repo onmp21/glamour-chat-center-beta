@@ -1,3 +1,4 @@
+
 export interface ApiInstance {
   id?: string;
   instance_name: string;
@@ -12,3 +13,14 @@ export interface ApiInstanceWithConnection extends ApiInstance {
   connection_status?: 'connected' | 'disconnected' | 'connecting';
 }
 
+export interface InstanceInfo {
+  instanceName: string;
+  profileName?: string;
+  number?: string;
+  status: string;
+  serverUrl?: string;
+  apikey?: string;
+  owner?: string;
+  profilePictureUrl?: string;
+  integration?: string;
+}

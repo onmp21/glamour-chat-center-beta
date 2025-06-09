@@ -65,9 +65,9 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         const mappedInstances: Instance[] = result.instances.map((instance: InstanceInfo) => ({
           instanceName: instance.instanceName,
           status: instance.status,
-          serverUrl: instance.serverUrl,
-          apikey: instance.apikey,
-          owner: instance.owner,
+          serverUrl: instance.serverUrl || '',
+          apikey: instance.apikey || '',
+          owner: instance.owner || '',
           profileName: instance.profileName,
           profilePictureUrl: instance.profilePictureUrl,
           integration: instance.integration,
