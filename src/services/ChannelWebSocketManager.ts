@@ -1,3 +1,4 @@
+
 import { EvolutionWebSocketService, WebSocketConfig } from './EvolutionWebSocketService';
 import { supabase } from '../integrations/supabase/client';
 
@@ -164,11 +165,11 @@ export class ChannelWebSocketManager {
       }
 
       for (const mapping of mappings) {
+        // Remove channelId from config since it's not part of WebSocketConfig
         const config: WebSocketConfig = {
           baseUrl: mapping.base_url,
           apiKey: mapping.api_key,
-          instanceName: mapping.instance_name,
-          channelId: mapping.channel_id
+          instanceName: mapping.instance_name
         };
 
         try {
@@ -187,7 +188,7 @@ export class ChannelWebSocketManager {
 
   isChannelConnected(channelId: string): boolean {
     const connection = this.connections.get(channelId);
-    return connection?.isActive && connection.webSocketService.isConnectionActive() || false;
+    return connection?.isActive && connection.webSocketService.isConnected() || false;
   }
 
   getConnectionStatus(channelId: string): string {

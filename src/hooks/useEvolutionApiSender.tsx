@@ -48,12 +48,10 @@ export const useEvolutionApiSender = () => {
         instanceName: apiInstance.instance_name
       });
 
-      // Send message
-      const result = await service.sendMessage({
+      // Send message using sendTextMessage method
+      const result = await service.sendTextMessage({
         number: messageData.phoneNumber,
-        text: messageData.message,
-        mediaBase64: messageData.mediaBase64,
-        fileName: messageData.fileName
+        text: messageData.message
       });
 
       if (result.success) {
@@ -132,7 +130,8 @@ export const useEvolutionApiSender = () => {
         instanceName: apiInstance.instance_name
       });
 
-      const result = await service.getInstanceInfo(apiInstance.instance_name);
+      // Use getInstanceConnectionStatus instead of getInstanceInfo
+      const result = await service.getInstanceConnectionStatus(apiInstance.instance_name);
       return result;
     } catch (error) {
       console.error('❌ [EVOLUTION_API_SENDER] Erro ao verificar status:', error);

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ApiInstanceList } from './ApiInstanceList';
 import { useApiInstances } from '../../hooks/useApiInstances';
@@ -10,8 +11,7 @@ export const ApiInstanceManager: React.FC = () => {
     error,
     createInstance,
     updateInstance,
-    deleteInstance,
-    getInstanceWithConnectionDetails
+    deleteInstance
   } = useApiInstances();
 
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
@@ -59,7 +59,8 @@ export const ApiInstanceManager: React.FC = () => {
   };
 
   const handleConnect = async (id: string) => {
-    return await getInstanceWithConnectionDetails(id);
+    // Basic connection logic - just return the instance for now
+    return instances.find(instance => instance.id === id);
   };
 
   if (loading) {
@@ -119,4 +120,3 @@ export const ApiInstanceManager: React.FC = () => {
     </div>
   );
 };
-

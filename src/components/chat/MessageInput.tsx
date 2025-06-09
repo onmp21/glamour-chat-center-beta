@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -115,15 +114,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         fileName = selectedFile.name;
       }
 
-      // Enviar mensagem usando o hook da Evolution API
+      // Enviar mensagem usando o hook da Evolution API - removido conversationId
       const success = await sendMessage({
         channelId,
-        conversationId,
-        content: content.trim() || (selectedFile ? `Arquivo: ${selectedFile.name}` : ''),
-        sender: 'agent',
-        agentName: 'Atendente',
+        phoneNumber: conversationId, // Usando conversationId como phoneNumber
+        message: content.trim() || (selectedFile ? `Arquivo: ${selectedFile.name}` : ''),
         messageType,
-        fileBase64,
+        mediaBase64: fileBase64,
         fileName
       });
       
