@@ -75,7 +75,7 @@ export const useMessageSenderExtended = () => {
       }
 
       const messageType = messageData.messageType || 'text';
-      const typeMessages = {
+      const typeMessages: Record<string, string> = {
         text: 'Mensagem enviada',
         file: 'Arquivo enviado',
         audio: 'Áudio enviado',
@@ -88,19 +88,14 @@ export const useMessageSenderExtended = () => {
         description: typeMessages[messageType] + " com sucesso",
       });
 
-      console.log(`✅ [USE_MESSAGE_SENDER] Mensagem enviada com sucesso`);
       return true;
     } catch (error) {
-      console.error('❌ [USE_MESSAGE_SENDER] Erro ao enviar mensagem:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      
+      console.error('Erro ao enviar mensagem:', error);
       toast({
         title: "Erro",
-        description: `Erro ao enviar mensagem: ${errorMessage}`,
+        description: "Erro ao enviar mensagem",
         variant: "destructive"
       });
-      
       return false;
     } finally {
       setSending(false);
