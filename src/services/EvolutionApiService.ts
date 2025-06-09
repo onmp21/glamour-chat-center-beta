@@ -603,7 +603,45 @@ export class EvolutionApiService {
       return { success: false, error: `Erro de conexão: ${error}` };
     }
   }
-
-
 }
 
+// Evolution API Manager class for managing multiple instances
+class EvolutionApiManager {
+  private instances: Map<string, EvolutionApiService> = new Map();
+
+  addInstance(key: string, config: EvolutionApiConfig): EvolutionApiService {
+    const service = new EvolutionApiService(config);
+    this.instances.set(key, service);
+    return service;
+  }
+
+  getInstance(key: string): EvolutionApiService | undefined {
+    return this.instances.get(key);
+  }
+
+  getInstanceByConfig(config: EvolutionApiConfig): EvolutionApiService {
+    const key = `${config.baseUrl}_${config.instanceName}`;
+    let instance = this.getInstance(key);
+    
+    if (!instance) {
+      instance = this.addInstance(key, config);
+    }
+    
+    return instance;
+  }
+
+  removeInstance(key: string): boolean {
+    return this.instances.delete(key);
+  }
+
+  getAllInstances(): EvolutionApiService[] {
+    return Array.from(this.instances.values());
+  }
+
+  clear(): void {
+    this.instances.clear();
+  }
+}
+
+// Export singleton instance
+export const evolutionApiManager = new EvolutionApiManager();

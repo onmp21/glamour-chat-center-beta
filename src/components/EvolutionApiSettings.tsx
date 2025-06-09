@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { EvolutionApiService, EvolutionApiConfig, evolutionApiManager, InstanceInfo } from '@/services/EvolutionApiService';
-import { EvolutionWebSocketService, evolutionWebSocketManager } from '@/services/EvolutionWebSocketService';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
 
 interface EvolutionApiSettingsProps {
@@ -355,20 +354,11 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         channel_id: selectedChannel.id,
         channel_name: selectedChannel.name,
         instance_id: selectedInstance.instanceName,
-        instance_name: selectedInstance.instanceName, // Corrigido para usar o nome da instância correto
+        instance_name: selectedInstance.instanceName,
         base_url: apiConnection.baseUrl,
         api_key: apiConnection.apiKey,
         is_active: true
       });
-
-      // Estabelecer conexão WebSocket
-      const wsService = evolutionWebSocketManager.addConnection(selectedChannel.id, {
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey,
-        instanceName: selectedInstance.instanceName
-      });
-
-      await wsService.connect();
 
       toast({
         title: "Sucesso",

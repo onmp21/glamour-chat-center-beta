@@ -193,15 +193,10 @@ export const useEvolutionApiSender = () => {
       if (status?.state === 'open') {
         console.log('✅ [EVOLUTION_SENDER] Instância já conectada, configurando webhook...');
         
-        // Configurar webhook automaticamente se já estiver conectado
-        const webhookResult = await WebhookConfigurationService.configureWebhook(service, instanceConfig.instanceName);
-        
-        if (webhookResult.success) {
-          toast({
-            title: "Sucesso",
-            description: "Instância já conectada e webhook configurado",
-          });
-        }
+        toast({
+          title: "Sucesso",
+          description: "Instância já conectada",
+        });
         
         return { 
           success: true, 
@@ -228,9 +223,6 @@ export const useEvolutionApiSender = () => {
       
       console.log('✅ [EVOLUTION_SENDER] QR code gerado com sucesso');
       
-      // Monitorar conexão para configurar webhook automaticamente
-      monitorConnectionForWebhook(service, instanceConfig.instanceName, channelId);
-      
       return result;
     } catch (error) {
       console.error('❌ [EVOLUTION_SENDER] Erro ao gerar QR code:', error);
@@ -244,52 +236,6 @@ export const useEvolutionApiSender = () => {
       return { success: false, error: `${error}` };
     }
   }, [toast]);
-
-  // Função para monitorar conexão e configurar webhook automaticamente
-  const monitorConnectionForWebhook = async (service: any, instanceName: string, channelId: string) => {
-    let attempts = 0;
-    const maxAttempts = 30; // 5 minutos (30 * 10 segundos)
-    
-    const checkConnection = async () => {
-      attempts++;
-      console.log(`🔍 [EVOLUTION_SENDER] Verificando conexão (tentativa ${attempts}/${maxAttempts})...`);
-      
-      try {
-        const status = await service.getConnectionStatus();
-        
-        if (status?.state === 'open') {
-          console.log('✅ [EVOLUTION_SENDER] Instância conectada! Configurando webhook...');
-          
-          const webhookResult = await WebhookConfigurationService.configureWebhook(service, instanceName);
-          
-          if (webhookResult.success) {
-            toast({
-              title: "Conexão Estabelecida",
-              description: "WhatsApp conectado e webhook configurado automaticamente",
-            });
-          } else {
-            console.warn('⚠️ [EVOLUTION_SENDER] Webhook não pôde ser configurado:', webhookResult.error);
-          }
-          
-          return; // Para o monitoramento
-        }
-        
-        if (attempts < maxAttempts) {
-          setTimeout(checkConnection, 10000); // Verificar novamente em 10 segundos
-        } else {
-          console.log('⏰ [EVOLUTION_SENDER] Timeout do monitoramento de conexão');
-        }
-      } catch (error) {
-        console.error('❌ [EVOLUTION_SENDER] Erro ao monitorar conexão:', error);
-        if (attempts < maxAttempts) {
-          setTimeout(checkConnection, 10000);
-        }
-      }
-    };
-    
-    // Iniciar monitoramento após 5 segundos
-    setTimeout(checkConnection, 5000);
-  };
 
   const checkConnectionStatus = useCallback(async (channelId: string) => {
     try {

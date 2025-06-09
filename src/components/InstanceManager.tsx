@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,17 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2 } from 'lucide-react';
-import { EvolutionApiService } from '@/services/EvolutionApiService';
+import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
 
+// Update the local Instance interface to match InstanceInfo
 interface Instance {
-  instance: {
-    instanceName: string;
-    state: 'open' | 'close' | 'connecting' | 'qr';
-  };
-  webhook?: {
-    url?: string;
-    enabled?: boolean;
-  };
+  instanceName: string;
+  status: string;
+  serverUrl: string;
+  apikey: string;
+  owner: string;
+  profileName?: string;
+  profilePictureUrl?: string;
+  integration?: string;
+  number?: string;
 }
 
 interface InstanceManagerProps {
@@ -58,12 +61,25 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       const result = await service.listInstances();
       
       if (result.success && result.instances) {
-        setInstances(result.instances);
-        console.log('📋 [INSTANCE_MANAGER] Instâncias carregadas:', result.instances.length);
+        // Convert InstanceInfo[] to Instance[] format
+        const mappedInstances: Instance[] = result.instances.map((instance: InstanceInfo) => ({
+          instanceName: instance.instanceName,
+          status: instance.status,
+          serverUrl: instance.serverUrl,
+          apikey: instance.apikey,
+          owner: instance.owner,
+          profileName: instance.profileName,
+          profilePictureUrl: instance.profilePictureUrl,
+          integration: instance.integration,
+          number: instance.number
+        }));
+        
+        setInstances(mappedInstances);
+        console.log('📋 [INSTANCE_MANAGER] Instâncias carregadas:', mappedInstances.length);
         
         toast({
           title: "Instâncias carregadas",
-          description: `${result.instances.length} instância(s) encontrada(s)`,
+          description: `${mappedInstances.length} instância(s) encontrada(s)`,
         });
       } else {
         throw new Error(result.error || 'Erro ao carregar instâncias');
@@ -225,31 +241,31 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         <div className="grid gap-3">
           {instances.map((instance) => (
             <Card
-              key={instance.instance.instanceName}
+              key={instance.instanceName}
               className={cn(
                 "transition-all duration-200 hover:shadow-md cursor-pointer",
                 isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200",
-                selectedInstance === instance.instance.instanceName && "ring-2 ring-blue-500"
+                selectedInstance === instance.instanceName && "ring-2 ring-blue-500"
               )}
-              onClick={() => handleInstanceSelect(instance.instance.instanceName)}
+              onClick={() => handleInstanceSelect(instance.instanceName)}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    {getStatusIcon(instance.instance.state)}
+                    {getStatusIcon(instance.status)}
                     
                     <div>
-                      <h4 className="font-medium">{instance.instance.instanceName}</h4>
+                      <h4 className="font-medium">{instance.instanceName}</h4>
                       <div className="flex items-center gap-2 mt-1">
                         <div className={cn(
                           "w-2 h-2 rounded-full",
-                          getStatusColor(instance.instance.state)
+                          getStatusColor(instance.status)
                         )} />
                         <span className={cn(
                           "text-xs",
                           isDarkMode ? "text-gray-400" : "text-gray-600"
                         )}>
-                          {getStatusText(instance.instance.state)}
+                          {getStatusText(instance.status)}
                         </span>
                       </div>
                     </div>
@@ -257,7 +273,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
 
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">
-                      {getStatusText(instance.instance.state)}
+                      {getStatusText(instance.status)}
                     </Badge>
                     
                     <Button
@@ -265,7 +281,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteInstance(instance.instance.instanceName);
+                        deleteInstance(instance.instanceName);
                       }}
                       className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                     >
@@ -274,17 +290,17 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                   </div>
                 </div>
 
-                {instance.webhook?.url && (
+                {instance.number && (
                   <div className={cn(
                     "mt-3 p-2 rounded text-xs",
                     isDarkMode ? "bg-gray-800" : "bg-gray-50"
                   )}>
-                    <span className="font-medium">Webhook: </span>
+                    <span className="font-medium">Número: </span>
                     <span className={cn(
                       "font-mono",
                       isDarkMode ? "text-gray-300" : "text-gray-600"
                     )}>
-                      {instance.webhook.url}
+                      {instance.number}
                     </span>
                   </div>
                 )}
@@ -314,4 +330,3 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     </div>
   );
 };
-
