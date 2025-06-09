@@ -55,14 +55,15 @@ export function useChannelConversations(channelId: string) {
       const tableName = getTableNameForChannel(channelId);
       console.log(`📋 [CONVERSATIONS] Carregando conversas da tabela: ${tableName} para canal: ${channelId}`);
 
-      // Use RPC function to safely query conversations from dynamic table names
-      const { data, error } = await supabase.rpc('get_conversations_for_table', {
-        table_name: tableName
-      });
+      // Query the table directly with proper typing
+      const { data, error } = await supabase
+        .from(tableName as any)
+        .select('*')
+        .order('id', { ascending: false });
 
       if (error) {
         console.error(`❌ [CONVERSATIONS] Erro ao carregar conversas:`, error);
-        // Fallback to mock data if RPC function doesn't exist
+        // Fallback to mock data if query fails
         const mockConversations: ChannelConversation[] = [
           {
             id: '1',
@@ -89,40 +90,42 @@ export function useChannelConversations(channelId: string) {
         return;
       }
 
-      // Process the data if RPC function exists
+      // Process the data if query succeeds
       const conversationMap = new Map<string, ChannelConversation>();
       
-      data?.forEach((message: any) => {
-        const sessionId = message.session_id;
-        const contactName = message.nome_do_contato || message.Nome_do_contato || 'Contato Anônimo';
-        
-        if (!conversationMap.has(sessionId)) {
-          conversationMap.set(sessionId, {
-            id: sessionId,
-            contact_name: contactName,
-            contact_phone: sessionId,
-            last_message: message.message || '[Mídia]',
-            last_message_time: message.read_at || new Date().toISOString(),
-            status: message.is_read ? 'resolved' : 'unread',
-            updated_at: message.read_at || new Date().toISOString(),
-            unread_count: message.is_read ? 0 : 1
-          });
-        } else {
-          // Atualizar com mensagem mais recente
-          const existing = conversationMap.get(sessionId)!;
-          if (new Date(message.read_at || 0) > new Date(existing.last_message_time || 0)) {
-            existing.last_message = message.message || '[Mídia]';
-            existing.last_message_time = message.read_at;
-            existing.updated_at = message.read_at;
-          }
+      if (data && Array.isArray(data)) {
+        data.forEach((message: any) => {
+          const sessionId = message.session_id;
+          const contactName = message.nome_do_contato || message.Nome_do_contato || 'Contato Anônimo';
           
-          // Contar mensagens não lidas
-          if (!message.is_read) {
-            existing.unread_count = (existing.unread_count || 0) + 1;
-            existing.status = 'unread';
+          if (!conversationMap.has(sessionId)) {
+            conversationMap.set(sessionId, {
+              id: sessionId,
+              contact_name: contactName,
+              contact_phone: sessionId,
+              last_message: message.message || '[Mídia]',
+              last_message_time: message.read_at || new Date().toISOString(),
+              status: message.is_read ? 'resolved' : 'unread',
+              updated_at: message.read_at || new Date().toISOString(),
+              unread_count: message.is_read ? 0 : 1
+            });
+          } else {
+            // Atualizar com mensagem mais recente
+            const existing = conversationMap.get(sessionId)!;
+            if (new Date(message.read_at || 0) > new Date(existing.last_message_time || 0)) {
+              existing.last_message = message.message || '[Mídia]';
+              existing.last_message_time = message.read_at;
+              existing.updated_at = message.read_at;
+            }
+            
+            // Contar mensagens não lidas
+            if (!message.is_read) {
+              existing.unread_count = (existing.unread_count || 0) + 1;
+              existing.status = 'unread';
+            }
           }
-        }
-      });
+        });
+      }
 
       const conversationsList = Array.from(conversationMap.values())
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
