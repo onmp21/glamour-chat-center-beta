@@ -116,7 +116,7 @@ export class Base64Utils {
   }
 
   /**
-   * Formata uma string base64 para garantir formato correto
+   * Formata uma string base64 para garantir formato correto SEM CORRUPÇÃO
    */
   static formatBase64String(base64Content: string): { isValid: boolean; formatted?: string; error?: string } {
     try {
@@ -133,18 +133,15 @@ export class Base64Utils {
         return { isValid: false, error: 'Data URL malformada' };
       }
 
-      // Limpar base64
-      let cleanBase64 = base64Content.replace(/\s/g, '');
+      // Limpar base64 CUIDADOSAMENTE para não corromper
+      let cleanBase64 = base64Content.trim(); // Apenas trim, não remover todos os espaços
+      
+      // Remover apenas quebras de linha e espaços no início/fim
+      cleanBase64 = cleanBase64.replace(/[\r\n]/g, '');
       
       // Verificar se é base64 válido
       if (!this.isValidBase64Raw(cleanBase64)) {
         return { isValid: false, error: 'Base64 inválido' };
-      }
-
-      // Adicionar padding se necessário
-      const paddingNeeded = 4 - (cleanBase64.length % 4);
-      if (paddingNeeded < 4) {
-        cleanBase64 += '='.repeat(paddingNeeded);
       }
 
       // Detectar MIME type e criar data URL
@@ -158,7 +155,7 @@ export class Base64Utils {
   }
 
   /**
-   * Extrai apenas o conteúdo base64 de uma data URL
+   * Extrai apenas o conteúdo base64 de uma data URL sem corromper
    */
   static extractBase64Content(dataUrl: string): string {
     if (dataUrl.startsWith('data:')) {
@@ -169,7 +166,66 @@ export class Base64Utils {
   }
 
   /**
-   * Baixa um arquivo base64 - CORRIGIDO
+   * Processa base64 para envio via Evolution API (sem corrupção)
+   */
+  static prepareForEvolutionApi(base64Content: string): string {
+    // Se já é data URL, extrair apenas o base64
+    let cleanBase64 = this.extractBase64Content(base64Content);
+    
+    // Remover apenas quebras de linha (preservar estrutura do base64)
+    cleanBase64 = cleanBase64.replace(/[\r\n]/g, '');
+    
+    // Verificar se precisa de padding (mas com cuidado)
+    const remainder = cleanBase64.length % 4;
+    if (remainder !== 0) {
+      const paddingNeeded = 4 - remainder;
+      cleanBase64 += '='.repeat(paddingNeeded);
+    }
+    
+    return cleanBase64;
+  }
+
+  /**
+   * Processa base64 recebido via WebSocket (preservar integridade)
+   */
+  static processReceivedBase64(base64Content: string, mediaType: string): string {
+    try {
+      // Extrair base64 se for data URL
+      let cleanBase64 = this.extractBase64Content(base64Content);
+      
+      // Limpar apenas caracteres problemáticos (não o conteúdo)
+      cleanBase64 = cleanBase64.replace(/[\r\n\t]/g, '');
+      
+      // Validar antes de processar
+      if (!this.isValidBase64Raw(cleanBase64)) {
+        console.warn('⚠️ [BASE64_UTILS] Base64 recebido pode estar corrompido');
+        // Não retornar erro, tentar preservar o máximo possível
+      }
+      
+      // Determinar MIME type
+      const mimeType = this.getMimeTypeForMediaType(mediaType);
+      
+      return `data:${mimeType};base64,${cleanBase64}`;
+    } catch (error) {
+      console.error('❌ [BASE64_UTILS] Erro ao processar base64 recebido:', error);
+      // Em caso de erro, retornar conteúdo original
+      return base64Content;
+    }
+  }
+
+  private static getMimeTypeForMediaType(mediaType: string): string {
+    switch (mediaType.toLowerCase()) {
+      case 'image': return 'image/jpeg';
+      case 'audio': return 'audio/mpeg';
+      case 'video': return 'video/mp4';
+      case 'document': return 'application/pdf';
+      case 'sticker': return 'image/webp';
+      default: return 'application/octet-stream';
+    }
+  }
+
+  /**
+   * Baixa um arquivo base64 - VERSÃO MELHORADA
    */
   static downloadBase64File(dataUrl: string, fileName: string, mimeType?: string): void {
     try {
@@ -186,7 +242,7 @@ export class Base64Utils {
       const finalMimeType = mimeType || this.detectMimeType(dataUrl);
       console.log('📥 [BASE64_UTILS] MIME type detectado:', finalMimeType);
       
-      // Converter para blob
+      // Converter para blob SEM CORROMPER
       const byteCharacters = atob(base64Data);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -235,6 +291,39 @@ export class Base64Utils {
       }
     } catch (error) {
       return 'Tamanho desconhecido';
+    }
+  }
+
+  /**
+   * Valida integridade do base64 antes do envio
+   */
+  static validateIntegrity(base64Content: string): { isValid: boolean; canSend: boolean; error?: string } {
+    try {
+      const cleanBase64 = this.extractBase64Content(base64Content);
+      
+      // Verificar se não está vazio
+      if (!cleanBase64 || cleanBase64.length < 4) {
+        return { isValid: false, canSend: false, error: 'Base64 vazio ou muito pequeno' };
+      }
+      
+      // Verificar caracteres válidos
+      const isValid = this.isValidBase64Raw(cleanBase64);
+      
+      // Verificar tamanho (limite razoável)
+      const sizeInBytes = (cleanBase64.length * 3) / 4;
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      
+      if (sizeInBytes > maxSize) {
+        return { isValid: true, canSend: false, error: 'Arquivo muito grande (>50MB)' };
+      }
+      
+      return { 
+        isValid, 
+        canSend: isValid, 
+        error: isValid ? undefined : 'Base64 inválido ou corrompido' 
+      };
+    } catch (error) {
+      return { isValid: false, canSend: false, error: `Erro na validação: ${error}` };
     }
   }
 }
