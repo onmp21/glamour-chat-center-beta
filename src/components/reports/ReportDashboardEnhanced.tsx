@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ import {
   Eye,
   BarChart3
 } from 'lucide-react';
-import { useTheme } from '@/hooks/useTheme';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
@@ -106,13 +104,13 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   ];
 
   return (
-    <div className={`min-h-screen p-6 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+    <div className="min-h-screen p-6 bg-background">
       {/* Header */}
       <div className="mb-8">
-        <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+        <h1 className="text-3xl font-bold mb-2 text-foreground">
           Central de Relatórios
         </h1>
-        <p className={`text-lg ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+        <p className="text-lg text-muted-foreground">
           Análises e relatórios detalhados do sistema
         </p>
       </div>
@@ -158,14 +156,14 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {stats.map((stat, index) => (
-          <Card key={index} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+          <Card key={index} className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <p className="text-sm font-medium text-muted-foreground">
                     {stat.title}
                   </p>
-                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <p className="text-2xl font-bold text-foreground">
                     {stat.value}
                   </p>
                   <Badge variant="secondary" className="mt-1 text-green-600">
@@ -181,9 +179,9 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Tipos de Relatórios */}
-        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className={isDarkMode ? 'text-white' : 'text-gray-900'}>
+            <CardTitle className="text-foreground">
               Tipos de Relatórios
             </CardTitle>
           </CardHeader>
@@ -191,19 +189,17 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
             {reportTypes.map((type, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg border ${
-                  isDarkMode ? 'border-gray-700 hover:border-gray-600' : 'border-gray-200 hover:border-gray-300'
-                } cursor-pointer transition-colors`}
+                className="p-4 rounded-lg border border-border hover:border-accent cursor-pointer transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <div className={`p-2 rounded-lg ${type.color}`}>
                     <type.icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1">
-                    <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <h3 className="font-semibold text-foreground">
                       {type.name}
                     </h3>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <p className="text-sm text-muted-foreground">
                       {type.description}
                     </p>
                   </div>
@@ -217,9 +213,9 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         </Card>
 
         {/* Relatórios Recentes */}
-        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+        <Card className="bg-card border-border">
           <CardHeader>
-            <CardTitle className={isDarkMode ? 'text-white' : 'text-gray-900'}>
+            <CardTitle className="text-foreground">
               Relatórios Recentes
             </CardTitle>
           </CardHeader>
@@ -228,12 +224,10 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               {recentReports.map((report) => (
                 <div
                   key={report.id}
-                  className={`p-4 rounded-lg border ${
-                    isDarkMode ? 'border-gray-700' : 'border-gray-200'
-                  }`}
+                  className="p-4 rounded-lg border border-border"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <h3 className="font-semibold text-foreground">
                       {report.name}
                     </h3>
                     <Badge
@@ -249,11 +243,11 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm">
-                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+                    <span className="text-muted-foreground">
                       <Calendar className="w-4 h-4 inline mr-1" />
                       {new Date(report.date).toLocaleDateString('pt-BR')}
                     </span>
-                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+                    <span className="text-muted-foreground">
                       {report.size}
                     </span>
                   </div>

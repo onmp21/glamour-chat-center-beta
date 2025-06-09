@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { ReportDashboardEnhanced } from './reports/ReportDashboardEnhanced';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '@/components/theme-provider';
 
 export const ReportCenter: React.FC = () => {
-  const { isDarkMode } = useTheme();
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   
   return (
     <div className="min-h-screen">
@@ -11,4 +13,3 @@ export const ReportCenter: React.FC = () => {
     </div>
   );
 };
-
