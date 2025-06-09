@@ -433,6 +433,45 @@ export class EvolutionApiService {
     }
   }
 
+  async sendSticker(phoneNumber: string, stickerBase64: string): Promise<MessageResponse> {
+    try {
+      console.log(`📤 [EVOLUTION_API] Enviando sticker para: ${phoneNumber}`);
+      
+      const formattedNumber = this.formatPhoneNumber(phoneNumber);
+      
+      const response = await fetch(`${this.config.baseUrl}/message/sendMedia/${this.config.instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify({
+          number: formattedNumber,
+          mediatype: 'sticker',
+          media: stickerBase64,
+          delay: 1200
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [EVOLUTION_API] Erro ao enviar sticker: ${response.status} - ${errorText}`);
+        return { success: false, error: `Erro HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log(`✅ [EVOLUTION_API] Sticker enviado:`, result);
+      
+      return {
+        success: true,
+        messageId: result.key?.id
+      };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao enviar sticker:', error);
+      return { success: false, error: `Erro de conexão: ${error}` };
+    }
+  }
+
   async sendMediaMessage(
     phoneNumber: string, 
     mediaBase64: string, 
