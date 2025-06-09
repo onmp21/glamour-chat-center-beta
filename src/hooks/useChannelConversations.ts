@@ -55,10 +55,11 @@ export function useChannelConversations(channelId: string) {
       const tableName = getTableNameForChannel(channelId);
       console.log(`📋 [CONVERSATIONS] Carregando conversas da tabela: ${tableName} para canal: ${channelId}`);
 
-      // Use RPC function to safely query conversations from dynamic table names
-      const { data, error } = await supabase.rpc('get_conversations_for_table', {
-        table_name: tableName
-      });
+      // Buscar diretamente da tabela específica do canal
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order('id', { ascending: false });
 
       if (error) {
         console.error(`❌ [CONVERSATIONS] Erro ao carregar conversas:`, error);
@@ -67,13 +68,13 @@ export function useChannelConversations(channelId: string) {
         return;
       }
 
-      // Process the data from RPC function
+      // Process the data
       const conversationMap = new Map<string, ChannelConversation>();
       
       if (data && Array.isArray(data)) {
         data.forEach((message: any) => {
           const sessionId = message.session_id;
-          const contactName = message.nome_do_contato || message.nome_do_contato || 'Contato Anônimo';
+          const contactName = message.nome_do_contato || message.Nome_do_contato || 'Contato Anônimo';
           
           if (!conversationMap.has(sessionId)) {
             conversationMap.set(sessionId, {

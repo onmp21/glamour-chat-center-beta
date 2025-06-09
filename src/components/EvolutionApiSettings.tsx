@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink,
 import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService';
 import { EvolutionWebSocketService, evolutionWebSocketManager } from '@/services/EvolutionWebSocketService';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
+import { channelWebSocketManager } from '@/services/ChannelWebSocketManager';
 
 interface EvolutionApiSettingsProps {
   isDarkMode: boolean;
@@ -339,37 +339,29 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         throw new Error('Canal ou instância não encontrados');
       }
 
-      // Configurar WebSocket na instância
-      const service = new EvolutionApiService({
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey,
-        instanceName: selectedInstance.instanceName
-      });
-
-      const configResult = await service.configureWebSocket(selectedInstance.instanceName);
-      if (!configResult.success) {
-        throw new Error(configResult.error || 'Erro ao configurar WebSocket');
-      }
-
       // Criar mapeamento no banco
       await channelMappingService.createMapping({
         channel_id: selectedChannel.id,
         channel_name: selectedChannel.name,
         instance_id: selectedInstance.instanceName,
-        instance_name: selectedInstance.instanceName, // Corrigido para usar o nome da instância correto
+        instance_name: selectedInstance.instanceName,
         base_url: apiConnection.baseUrl,
         api_key: apiConnection.apiKey,
         is_active: true
       });
 
-      // Estabelecer conexão WebSocket
-      const wsService = evolutionWebSocketManager.addConnection(selectedChannel.id, {
+      // Estabelecer conexão WebSocket diretamente
+      const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel.id, {
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
         instanceName: selectedInstance.instanceName
       });
 
-      await wsService.connect();
+      if (wsResult.success) {
+        console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${selectedChannel.name}`);
+      } else {
+        console.warn("⚠️ [WEBSOCKET] Falha ao estabelecer conexão:", wsResult.error);
+      }
 
       toast({
         title: "Sucesso",
@@ -399,7 +391,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       const mapping = channelMappings.find(m => m.id === mappingId);
       if (mapping) {
         // Desconectar WebSocket
-        evolutionWebSocketManager.removeConnection(mapping.channelId);
+        await channelWebSocketManager.disconnectChannelWebSocket(mapping.channelId);
       }
 
       await channelMappingService.deleteMapping(mappingId);
