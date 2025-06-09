@@ -180,10 +180,11 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
               isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
+              {/* Badge de Mensagens - Posição absoluta fixa */}
               {unreadNotifications > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                <Badge className="absolute -top-1 -right-1 bg-[#b5103c] text-white h-5 min-w-[20px] flex items-center justify-center text-xs font-bold px-1">
                   {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                </div>
+                </Badge>
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -206,6 +207,7 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
                 {counts.total}
               </Badge>
             ) : null}
+            {/* Pin Button - Só aparece no hover */}
             <button
               onClick={(e) => {
                 e.stopPropagation();

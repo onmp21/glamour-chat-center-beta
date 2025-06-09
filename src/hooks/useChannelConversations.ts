@@ -55,48 +55,25 @@ export function useChannelConversations(channelId: string) {
       const tableName = getTableNameForChannel(channelId);
       console.log(`📋 [CONVERSATIONS] Carregando conversas da tabela: ${tableName} para canal: ${channelId}`);
 
-      // Query the table directly with proper typing
-      const { data, error } = await supabase
-        .from(tableName as any)
-        .select('*')
-        .order('id', { ascending: false });
+      // Use RPC function to safely query conversations from dynamic table names
+      const { data, error } = await supabase.rpc('get_conversations_for_table', {
+        table_name: tableName
+      });
 
       if (error) {
         console.error(`❌ [CONVERSATIONS] Erro ao carregar conversas:`, error);
-        // Fallback to mock data if query fails
-        const mockConversations: ChannelConversation[] = [
-          {
-            id: '1',
-            contact_name: 'João Silva',
-            contact_phone: '+55 11 99999-9999',
-            last_message: 'Olá, gostaria de mais informações',
-            last_message_time: new Date().toISOString(),
-            status: 'unread',
-            unread_count: 3,
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2', 
-            contact_name: 'Maria Santos',
-            contact_phone: '+55 11 88888-8888',
-            last_message: 'Obrigada pelo atendimento',
-            last_message_time: new Date(Date.now() - 3600000).toISOString(),
-            status: 'resolved',
-            unread_count: 0,
-            updated_at: new Date().toISOString()
-          }
-        ];
-        setConversations(mockConversations);
+        setError(error.message);
+        setConversations([]);
         return;
       }
 
-      // Process the data if query succeeds
+      // Process the data from RPC function
       const conversationMap = new Map<string, ChannelConversation>();
       
       if (data && Array.isArray(data)) {
         data.forEach((message: any) => {
           const sessionId = message.session_id;
-          const contactName = message.nome_do_contato || message.Nome_do_contato || 'Contato Anônimo';
+          const contactName = message.nome_do_contato || message.nome_do_contato || 'Contato Anônimo';
           
           if (!conversationMap.has(sessionId)) {
             conversationMap.set(sessionId, {
@@ -179,7 +156,7 @@ export function useChannelConversations(channelId: string) {
     loadConversations();
   }, [loadConversations]);
 
-  // Configurar realtime para atualizações
+  // Configurar realtime para atualizações via WebSocket
   useEffect(() => {
     if (!channelId) return;
 

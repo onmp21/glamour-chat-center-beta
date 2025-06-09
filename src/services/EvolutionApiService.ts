@@ -168,21 +168,4 @@ export class EvolutionApiService {
       method: 'GET'
     });
   }
-
-  async configureWebSocket(instanceName: string): Promise<ApiResponse> {
-    return this.makeRequest(`/webhook/set/${instanceName}`, {
-      method: 'POST',
-      body: JSON.stringify({
-        enabled: true,
-        url: `https://uxccfhptochnfomurulr.supabase.co/functions/v1/whatsapp-webhook-${instanceName.toLowerCase()}`,
-        events: [
-          'MESSAGES_UPSERT',
-          'MESSAGES_UPDATE',
-          'MESSAGES_DELETE',
-          'CONNECTION_UPDATE'
-        ],
-        webhook_by_events: false
-      })
-    });
-  }
 }

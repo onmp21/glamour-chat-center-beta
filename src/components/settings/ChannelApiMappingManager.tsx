@@ -7,7 +7,6 @@ import { useApiInstances } from '../../hooks/useApiInstances';
 import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
-import { EvolutionApiService } from '../../services/EvolutionApiService';
 import { channelWebSocketManager } from '../../services/ChannelWebSocketManager';
 
 export const ChannelApiMappingManager: React.FC = () => {
@@ -30,7 +29,7 @@ export const ChannelApiMappingManager: React.FC = () => {
       
       await upsertMapping(selectedChannel, selectedInstance);
 
-      // Configurar WebSocket automaticamente
+      // Configurar WebSocket automaticamente (sem webhook)
       const instance = instances.find(inst => inst.id === selectedInstance);
       const channel = activeChannels.find(ch => ch.id === selectedChannel);
 
@@ -38,21 +37,7 @@ export const ChannelApiMappingManager: React.FC = () => {
         console.log(`🔌 [WEBSOCKET] Configurando WebSocket para canal: ${channel.name} → instância: ${instance.instance_name}`);
         
         try {
-          // Configurar WebSocket na instância da API Evolution
-          const service = new EvolutionApiService({
-            baseUrl: instance.base_url,
-            apiKey: instance.api_key,
-            instanceName: instance.instance_name
-          });
-
-          const configResult = await service.configureWebSocket(instance.instance_name);
-          if (!configResult.success) {
-            console.warn("⚠️ [WEBSOCKET] Falha ao configurar WebSocket:", configResult.error);
-          } else {
-            console.log(`✅ [WEBSOCKET] WebSocket configurado na API Evolution`);
-          }
-
-          // Estabelecer conexão WebSocket local
+          // Estabelecer conexão WebSocket local diretamente
           const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel, {
             baseUrl: instance.base_url,
             apiKey: instance.api_key,
