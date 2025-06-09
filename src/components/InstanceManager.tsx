@@ -167,7 +167,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         instanceName: instanceName
       });
 
-      const result = await service.deleteInstance();
+      const result = await service.deleteInstance(instanceName);
       
       if (result.success) {
         toast({
