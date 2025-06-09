@@ -75,7 +75,7 @@ export class ChannelWebSocketManager {
 
       const mappingData = {
         channel_id: channelId,
-        channel_name: channelId, // Pode ser melhorado para usar nome real do canal
+        channel_name: channelId,
         instance_id: config.instanceName,
         instance_name: config.instanceName,
         base_url: config.baseUrl,
@@ -165,7 +165,6 @@ export class ChannelWebSocketManager {
       }
 
       for (const mapping of mappings) {
-        // Remove channelId from config since it's not part of WebSocketConfig
         const config: WebSocketConfig = {
           baseUrl: mapping.base_url,
           apiKey: mapping.api_key,
@@ -188,15 +187,8 @@ export class ChannelWebSocketManager {
 
   isChannelConnected(channelId: string): boolean {
     const connection = this.connections.get(channelId);
-    return connection?.isActive && connection.webSocketService.isConnected() || false;
-  }
-
-  getConnectionStatus(channelId: string): string {
-    const connection = this.connections.get(channelId);
-    if (!connection) return 'disconnected';
-    return connection.webSocketService.getConnectionState();
+    return connection?.isActive ?? false;
   }
 }
 
-// Export singleton instance
 export const channelWebSocketManager = ChannelWebSocketManager.getInstance();
