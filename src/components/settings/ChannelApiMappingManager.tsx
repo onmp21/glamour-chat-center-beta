@@ -43,7 +43,7 @@ export const ChannelApiMappingManager: React.FC = () => {
 
       // Configurar WebSocket na API Evolution (substitui webhook)
       const instance = instances.find(inst => inst.id === selectedInstance);
-      const channel = activeChannels.find(ch => getChannelLegacyId(ch) === selectedChannel);
+      const channel = activeChannels.find(ch => ch.id === selectedChannel);
 
       if (instance && channel && channel.name !== 'Yelena-AI') {
         console.log(`🔌 [WEBSOCKET] Configurando WebSocket para canal: ${channel.name} → instância: ${instance.instance_name}`);
@@ -172,7 +172,7 @@ export const ChannelApiMappingManager: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {activeChannels.map((channel) => {
-                      const channelId = getChannelLegacyId(channel);
+                      const channelId = channel.id;
                       const hasMapping = getMappingForChannel(channelId);
                       return (
                         <SelectItem key={channelId} value={channelId}>
@@ -227,7 +227,7 @@ export const ChannelApiMappingManager: React.FC = () => {
           ) : (
             <div className="grid gap-3">
               {activeChannels.map((channel) => {
-                const channelId = getChannelLegacyId(channel);
+                const channelId = channel.id;
                 const mapping = getMappingForChannel(channelId);
                 
                 return (
