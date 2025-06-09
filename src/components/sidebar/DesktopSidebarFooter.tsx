@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserAvatarSection } from './UserAvatarSection';
+import { useTheme } from '@/components/theme-provider';
 
 interface DesktopSidebarFooterProps {
   isDarkMode: boolean;
@@ -16,16 +17,20 @@ export const DesktopSidebarFooter: React.FC<DesktopSidebarFooterProps> = ({
   toggleDarkMode
 }) => {
   const { logout, user } = useAuth();
+  const { theme } = useTheme();
 
   const handleLogout = () => {
     logout();
   };
 
+  // Usar o tema real do ThemeProvider
+  const isCurrentlyDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
   return (
-    <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+    <div className="p-4 border-t border-border space-y-4">
       {/* User Avatar Section */}
       <UserAvatarSection 
-        isDarkMode={isDarkMode}
+        isDarkMode={isCurrentlyDark}
         userName={user?.name || 'Usuário'}
       />
       
@@ -35,23 +40,17 @@ export const DesktopSidebarFooter: React.FC<DesktopSidebarFooterProps> = ({
           variant="ghost"
           size="sm"
           onClick={toggleDarkMode}
-          className={cn(
-            "flex-1 justify-start",
-            isDarkMode ? "hover:bg-zinc-800" : "hover:bg-gray-100"
-          )}
+          className="flex-1 justify-start hover:bg-accent"
         >
-          {isDarkMode ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-          {isDarkMode ? 'Modo Claro' : 'Modo Escuro'}
+          {isCurrentlyDark ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+          {isCurrentlyDark ? 'Modo Claro' : 'Modo Escuro'}
         </Button>
         
         <Button
           variant="ghost"
           size="sm"
           onClick={handleLogout}
-          className={cn(
-            "text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20",
-            isDarkMode ? "text-red-400" : "text-red-600"
-          )}
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           <LogOut className="h-4 w-4" />
         </Button>

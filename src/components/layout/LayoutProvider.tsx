@@ -1,5 +1,6 @@
 
 import React, { useState, createContext, useContext, ReactNode, useEffect } from 'react';
+import { useTheme } from '@/components/theme-provider';
 
 interface LayoutContextType {
   activeSection: string;
@@ -30,13 +31,15 @@ interface LayoutProviderProps {
 
 export const LayoutProvider: React.FC<LayoutProviderProps> = ({ children }) => {
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true); // Sempre true por padrão
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
-    return savedTheme === 'dark';
-  });
   const [urlParams, setUrlParams] = useState(new URLSearchParams(window.location.search));
+  
+  // Usar o ThemeProvider para gerenciar o tema
+  const { theme, setTheme } = useTheme();
+  
+  // Calcular se está em modo escuro baseado no tema atual
+  const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   // Detectar parâmetros da URL e definir seção ativa
   useEffect(() => {
@@ -67,9 +70,12 @@ export const LayoutProvider: React.FC<LayoutProviderProps> = ({ children }) => {
   }, []);
 
   const toggleDarkMode = () => {
-    const newTheme = !isDarkMode;
-    setIsDarkMode(newTheme);
-    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+    const newTheme = isDarkMode ? 'light' : 'dark';
+    setTheme(newTheme);
+  };
+
+  const setIsDarkMode = (dark: boolean) => {
+    setTheme(dark ? 'dark' : 'light');
   };
 
   const value = {

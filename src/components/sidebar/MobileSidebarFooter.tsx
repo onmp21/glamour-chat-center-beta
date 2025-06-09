@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { LogOut, Moon, Sun, User } from 'lucide-react';
+import { useTheme } from '@/components/theme-provider';
 
 interface MobileSidebarFooterProps {
   isDarkMode: boolean;
@@ -20,8 +21,12 @@ export const MobileSidebarFooter: React.FC<MobileSidebarFooterProps> = ({
 }) => {
   const { user, logout } = useAuth();
   const { getProfile } = useUserProfile();
+  const { theme } = useTheme();
   
   const profile = getProfile();
+
+  // Usar o tema real do ThemeProvider
+  const isCurrentlyDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   const getInitials = (name: string) => {
     return name
@@ -33,55 +38,34 @@ export const MobileSidebarFooter: React.FC<MobileSidebarFooterProps> = ({
   };
 
   return (
-    <div className={cn(
-      "p-3 border-t space-y-3"
-    )} style={{
-      borderColor: isDarkMode ? '#333333' : '#e5e7eb'
-    }}>
+    <div className="p-3 border-t border-border space-y-3">
       {/* Dark mode toggle */}
       <Button
         onClick={toggleDarkMode}
         variant="ghost"
         size="sm"
-        className={cn(
-          "w-full justify-start mobile-touch",
-          isDarkMode ? "text-gray-200" : "text-gray-700"
-        )}
+        className="w-full justify-start mobile-touch text-foreground"
       >
-        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-        <span className="ml-2">{isDarkMode ? 'Modo Claro' : 'Modo Escuro'}</span>
+        {isCurrentlyDark ? <Sun size={16} /> : <Moon size={16} />}
+        <span className="ml-2">{isCurrentlyDark ? 'Modo Claro' : 'Modo Escuro'}</span>
       </Button>
 
       {/* User info */}
       <button 
         onClick={onUserClick}
-        className={cn(
-          "w-full flex items-center space-x-3 px-3 py-3 rounded-md transition-colors cursor-pointer mobile-touch interactive-animate"
-        )} 
-        style={{
-          backgroundColor: isDarkMode ? '#333333' : '#f9fafb'
-        }}
+        className="w-full flex items-center space-x-3 px-3 py-3 rounded-md transition-colors cursor-pointer mobile-touch interactive-animate bg-accent hover:bg-accent/80"
       >
         <Avatar className="w-10 h-10">
           <AvatarImage src={profile?.profileImage || undefined} alt={user?.name} />
-          <AvatarFallback className={cn(
-            "text-sm font-medium",
-            "bg-[#b5103c] text-white"
-          )}>
+          <AvatarFallback className="bg-primary text-primary-foreground">
             {user?.name ? getInitials(user.name) : <User size={20} />}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0 text-left">
-          <p className={cn(
-            "text-sm font-medium truncate",
-            isDarkMode ? "text-white" : "text-gray-900"
-          )}>
+          <p className="text-sm font-medium truncate text-foreground">
             {user?.name}
           </p>
-          <p className={cn(
-            "text-xs truncate",
-            isDarkMode ? "text-gray-300" : "text-gray-600"
-          )}>
+          <p className="text-xs truncate text-muted-foreground">
             {user?.role?.replace('_', ' ')}
           </p>
         </div>
@@ -92,10 +76,7 @@ export const MobileSidebarFooter: React.FC<MobileSidebarFooterProps> = ({
         onClick={logout}
         variant="ghost"
         size="sm"
-        className={cn(
-          "w-full justify-start mobile-touch",
-          isDarkMode ? "text-gray-200" : "text-gray-700"
-        )}
+        className="w-full justify-start mobile-touch text-foreground"
       >
         <LogOut size={16} />
         <span className="ml-2">Sair</span>
