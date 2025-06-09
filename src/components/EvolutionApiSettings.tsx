@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -439,91 +440,9 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   };
 
   return (
-    <div className="space-y-8">
-      {/* SEÇÃO 1: Conectar API Evolution */}
-      <Card className={cn(
-        "border-2",
-        isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
-      )}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" />
-            Conectar API Evolution
-          </CardTitle>
-          <CardDescription>
-            Configure a URL e API Key para conectar com a Evolution API
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="baseUrl">URL Base da API</Label>
-              <Input
-                id="baseUrl"
-                placeholder="https://evolution.estudioonmp.com"
-                value={apiConnection.baseUrl}
-                onChange={(e) => setApiConnection(prev => ({
-                  ...prev,
-                  baseUrl: e.target.value,
-                  isValidated: false
-                }))}
-                disabled={validatingApi}
-                className={cn(
-                  isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                )}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="Sua API Key"
-                value={apiConnection.apiKey}
-                onChange={(e) => setApiConnection(prev => ({
-                  ...prev,
-                  apiKey: e.target.value,
-                  isValidated: false
-                }))}
-                disabled={validatingApi}
-                className={cn(
-                  isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                )}
-              />
-            </div>
-          </div>
-          <Button
-            onClick={validateApi}
-            disabled={validatingApi}
-            variant={apiConnection.isValidated ? "default" : "default"}
-            className={cn(
-              "w-full",
-              isDarkMode ? "text-white" : "text-white"
-            )}
-          >
-            {validatingApi ? (
-              <>
-                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                Validando...
-              </>
-            ) : apiConnection.isValidated ? (
-              <>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                API Validada
-              </>
-            ) : (
-              <>
-                <Wifi className="mr-2 h-4 w-4" />
-                Validar API
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* SEÇÃO 2: Gerenciar Instâncias */}
-      {apiConnection.isValidated && (
+    <>
+      <div className="space-y-8">
+        {/* SEÇÃO 1: Conectar API Evolution */}
         <Card className={cn(
           "border-2",
           isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
@@ -531,277 +450,357 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5" />
-              Gerenciar Instâncias
+              Conectar API Evolution
             </CardTitle>
             <CardDescription>
-              Crie novas instâncias ou visualize as existentes.
+              Configure a URL e API Key para conectar com a Evolution API
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Ex: minha-loja-principal"
-                value={newInstanceName}
-                onChange={(e) => setNewInstanceName(e.target.value)}
-                disabled={creatingInstance}
-                className={cn(
-                  "flex-grow",
-                  isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="baseUrl">URL Base da API</Label>
+                <Input
+                  id="baseUrl"
+                  placeholder="https://evolution.estudioonmp.com"
+                  value={apiConnection.baseUrl}
+                  onChange={(e) => setApiConnection(prev => ({
+                    ...prev,
+                    baseUrl: e.target.value,
+                    isValidated: false
+                  }))}
+                  disabled={validatingApi}
+                  className={cn(
+                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                  )}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="apiKey">API Key</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="Sua API Key"
+                  value={apiConnection.apiKey}
+                  onChange={(e) => setApiConnection(prev => ({
+                    ...prev,
+                    apiKey: e.target.value,
+                    isValidated: false
+                  }))}
+                  disabled={validatingApi}
+                  className={cn(
+                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                  )}
+                />
+              </div>
+            </div>
+            <Button
+              onClick={validateApi}
+              disabled={validatingApi}
+              variant={apiConnection.isValidated ? "default" : "default"}
+              className={cn(
+                "w-full",
+                isDarkMode ? "text-white" : "text-white"
+              )}
+            >
+              {validatingApi ? (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                  Validando...
+                </>
+              ) : apiConnection.isValidated ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  API Validada
+                </>
+              ) : (
+                <>
+                  <Wifi className="mr-2 h-4 w-4" />
+                  Validar API
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* SEÇÃO 2: Gerenciar Instâncias */}
+        {apiConnection.isValidated && (
+          <Card className={cn(
+            "border-2",
+            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+          )}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Gerenciar Instâncias
+              </CardTitle>
+              <CardDescription>
+                Crie novas instâncias ou visualize as existentes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Ex: minha-loja-principal"
+                  value={newInstanceName}
+                  onChange={(e) => setNewInstanceName(e.target.value)}
+                  disabled={creatingInstance}
+                  className={cn(
+                    "flex-grow",
+                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                  )}
+                />
+                <Button
+                  onClick={createNewInstance}
+                  disabled={creatingInstance}
+                  className={cn(
+                    "bg-blue-600 hover:bg-blue-700 text-white",
+                    creatingInstance && "bg-gray-400 hover:bg-gray-400"
+                  )}
+                >
+                  {creatingInstance ? (
+                    <>
+                      <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Criar Instância
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Instâncias Existentes:</Label>
+                {apiConnection.instances.length === 0 ? (
+                  <p className="text-gray-500">Nenhuma instância encontrada.</p>
+                ) : (
+                  apiConnection.instances.map((instance) => {
+                    console.log('🔍 [EVOLUTION_API_SETTINGS] Renderizando instância:', instance);
+                    return (
+                      <div
+                        key={instance.instanceName}
+                        className={cn(
+                          "flex items-center justify-between p-3 border rounded-md",
+                          isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(instance.status)}
+                          <span className="font-semibold">{instance.profileName || instance.instanceName}</span>
+                          {instance.number && (
+                            <span className="text-sm text-gray-500">({instance.number})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(instance.status === 'connecting' || instance.status === 'close' || instance.status === 'unknown') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                setQrCodeModal({
+                                  isOpen: true,
+                                  qrCode: '',
+                                  instanceName: instance.instanceName,
+                                  loading: true
+                                });
+                                
+                                try {
+                                  const service = new EvolutionApiService({
+                                    baseUrl: apiConnection.baseUrl,
+                                    apiKey: apiConnection.apiKey,
+                                    instanceName: instance.instanceName
+                                  });
+                                  
+                                  const qrResult = await service.getQRCodeForInstance(instance.instanceName);
+                                  if (qrResult.success && qrResult.qrCode) {
+                                    // Verificar se o QR Code já tem o prefixo data:image
+                                    const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
+                                      ? qrResult.qrCode 
+                                      : `data:image/png;base64,${qrResult.qrCode}`;
+                                    
+                                    setQrCodeModal(prev => ({
+                                      ...prev,
+                                      qrCode: qrCodeSrc,
+                                      loading: false
+                                    }));
+                                  } else {
+                                    setQrCodeModal(prev => ({ ...prev, loading: false }));
+                                    toast({
+                                      title: "Erro",
+                                      description: qrResult.error || "Erro ao obter QR Code",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                } catch (error) {
+                                  setQrCodeModal(prev => ({ ...prev, loading: false }));
+                                  toast({
+                                    title: "Erro",
+                                    description: `Erro ao obter QR Code: ${error}`,
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              className={cn(
+                                isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
+                              )}
+                            >
+                              <QrCode className="mr-2 h-4 w-4" />
+                              Ver QR Code
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteInstance(instance.instanceName)}
+                            disabled={deletingInstance === instance.instanceName}
+                          >
+                            {deletingInstance === instance.instanceName ? (
+                              <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            Excluir
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
-              />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* SEÇÃO 3: Vincular Canal à Instância */}
+        {apiConnection.isValidated && (
+          <Card className={cn(
+            "border-2",
+            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+          )}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link className="w-5 h-5" />
+                Vincular Canal à Instância
+              </CardTitle>
+              <CardDescription>
+                Associe um canal de comunicação a uma instância da API Evolution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div>
+                  <Label htmlFor="selectChannel">Selecionar Canal</Label>
+                  <Select
+                    onValueChange={setSelectedChannelForMapping}
+                    value={selectedChannelForMapping}
+                    disabled={linkingChannel}
+                  >
+                    <SelectTrigger
+                      id="selectChannel"
+                      className={cn(
+                        isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                      )}
+                    >
+                      <SelectValue placeholder="Selecione um canal" />
+                    </SelectTrigger>
+                    <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
+                      {availableChannels.map(channel => (
+                        <SelectItem key={channel.id} value={channel.id}>
+                          {channel.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="selectInstance">Selecionar Instância</Label>
+                  <Select
+                    onValueChange={setSelectedInstanceForMapping}
+                    value={selectedInstanceForMapping}
+                    disabled={linkingChannel}
+                  >
+                    <SelectTrigger
+                      id="selectInstance"
+                      className={cn(
+                        isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                      )}
+                    >
+                      <SelectValue placeholder="Selecione uma instância" />
+                    </SelectTrigger>
+                    <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
+                      {apiConnection.instances.map(instance => (
+                        <SelectItem key={instance.instanceName} value={instance.instanceName}>
+                          {instance.profileName || instance.instanceName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <Button
-                onClick={createNewInstance}
-                disabled={creatingInstance}
+                onClick={linkChannelToInstance}
+                disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
                 className={cn(
-                  "bg-blue-600 hover:bg-blue-700 text-white",
-                  creatingInstance && "bg-gray-400 hover:bg-gray-400"
+                  "w-full bg-green-600 hover:bg-green-700 text-white",
+                  (linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping) && "bg-gray-400 hover:bg-gray-400"
                 )}
               >
-                {creatingInstance ? (
+                {linkingChannel ? (
                   <>
                     <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                    Criando...
+                    Vinculando...
                   </>
                 ) : (
                   <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Criar Instância
+                    <Link className="mr-2 h-4 w-4" />
+                    Vincular Canal
                   </>
                 )}
               </Button>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Instâncias Existentes:</Label>
-              {apiConnection.instances.length === 0 ? (
-                <p className="text-gray-500">Nenhuma instância encontrada.</p>
-              ) : (
-                apiConnection.instances.map((instance) => {
-                  console.log('🔍 [EVOLUTION_API_SETTINGS] Renderizando instância:', instance);
-                  return (
+              <div className="space-y-2">
+                <Label>Canais Vinculados:</Label>
+                {channelMappings.length === 0 ? (
+                  <p className="text-gray-500">Nenhum canal vinculado.</p>
+                ) : (
+                  channelMappings.map((mapping) => (
                     <div
-                      key={instance.instanceName}
+                      key={mapping.id}
                       className={cn(
                         "flex items-center justify-between p-3 border rounded-md",
                         isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        {getStatusBadge(instance.status)}
-                        <span className="font-semibold">{instance.profileName || instance.instanceName}</span>
-                        {instance.number && (
-                          <span className="text-sm text-gray-500">({instance.number})</span>
-                        )}
+                        {getStatusBadge(mapping.isActive ? 'open' : 'close')}
+                        <span className="font-semibold">{mapping.channelName}</span>
+                        <span className="text-sm text-gray-500">({mapping.instanceName})</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {(instance.status === 'connecting' || instance.status === 'close' || instance.status === 'unknown') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                              setQrCodeModal({
-                                isOpen: true,
-                                qrCode: '',
-                                instanceName: instance.instanceName,
-                                loading: true
-                              });
-                              
-                              try {
-                                const service = new EvolutionApiService({
-                                  baseUrl: apiConnection.baseUrl,
-                                  apiKey: apiConnection.apiKey,
-                                  instanceName: instance.instanceName
-                                });
-                                
-                                const qrResult = await service.getQRCodeForInstance(instance.instanceName);
-                                if (qrResult.success && qrResult.qrCode) {
-                                  // Verificar se o QR Code já tem o prefixo data:image
-                                  const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
-                                    ? qrResult.qrCode 
-                                    : `data:image/png;base64,${qrResult.qrCode}`;
-                                  
-                                  setQrCodeModal(prev => ({
-                                    ...prev,
-                                    qrCode: qrCodeSrc,
-                                    loading: false
-                                  }));
-                                } else {
-                                  setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                  toast({
-                                    title: "Erro",
-                                    description: qrResult.error || "Erro ao obter QR Code",
-                                    variant: "destructive"
-                                  });
-                                }
-                              } catch (error) {
-                                setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                toast({
-                                  title: "Erro",
-                                  description: `Erro ao obter QR Code: ${error}`,
-                                  variant: "destructive"
-                                });
-                              }
-                            }}
-                            className={cn(
-                              isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
-                            )}
-                          >
-                            <QrCode className="mr-2 h-4 w-4" />
-                            Ver QR Code
-                          </Button>
-                        )}
                         <Button
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
-                          onClick={() => deleteInstance(instance.instanceName)}
-                          disabled={deletingInstance === instance.instanceName}
-                        >
-                          {deletingInstance === instance.instanceName ? (
-                            <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="mr-2 h-4 w-4" />
+                          onClick={() => unlinkChannel(mapping.id)}
+                          className={cn(
+                            isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
                           )}
-                          Excluir
+                        >
+                          <Unlink className="mr-2 h-4 w-4" />
+                          Desvincular
                         </Button>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* SEÇÃO 3: Vincular Canal à Instância */}
-      {apiConnection.isValidated && (
-        <Card className={cn(
-          "border-2",
-          isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
-        )}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Link className="w-5 h-5" />
-              Vincular Canal à Instância
-            </CardTitle>
-            <CardDescription>
-              Associe um canal de comunicação a uma instância da API Evolution.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="selectChannel">Selecionar Canal</Label>
-                <Select
-                  onValueChange={setSelectedChannelForMapping}
-                  value={selectedChannelForMapping}
-                  disabled={linkingChannel}
-                >
-                  <SelectTrigger
-                    id="selectChannel"
-                    className={cn(
-                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                    )}
-                  >
-                    <SelectValue placeholder="Selecione um canal" />
-                  </SelectTrigger>
-                  <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    {availableChannels.map(channel => (
-                      <SelectItem key={channel.id} value={channel.id}>
-                        {channel.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  ))
+                )}
               </div>
-              <div>
-                <Label htmlFor="selectInstance">Selecionar Instância</Label>
-                <Select
-                  onValueChange={setSelectedInstanceForMapping}
-                  value={selectedInstanceForMapping}
-                  disabled={linkingChannel}
-                >
-                  <SelectTrigger
-                    id="selectInstance"
-                    className={cn(
-                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                    )}
-                  >
-                    <SelectValue placeholder="Selecione uma instância" />
-                  </SelectTrigger>
-                  <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
-                    {apiConnection.instances.map(instance => (
-                      <SelectItem key={instance.instanceName} value={instance.instanceName}>
-                        {instance.profileName || instance.instanceName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button
-              onClick={linkChannelToInstance}
-              disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
-              className={cn(
-                "w-full bg-green-600 hover:bg-green-700 text-white",
-                (linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping) && "bg-gray-400 hover:bg-gray-400"
-              )}
-            >
-              {linkingChannel ? (
-                <>
-                  <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                  Vinculando...
-                </>
-              ) : (
-                <>
-                  <Link className="mr-2 h-4 w-4" />
-                  Vincular Canal
-                </>
-              )}
-            </Button>
-
-            <div className="space-y-2">
-              <Label>Canais Vinculados:</Label>
-              {channelMappings.length === 0 ? (
-                <p className="text-gray-500">Nenhum canal vinculado.</p>
-              ) : (
-                channelMappings.map((mapping) => (
-                  <div
-                    key={mapping.id}
-                    className={cn(
-                      "flex items-center justify-between p-3 border rounded-md",
-                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(mapping.isActive ? 'open' : 'close')}
-                      <span className="font-semibold">{mapping.channelName}</span>
-                      <span className="text-sm text-gray-500">({mapping.instanceName})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => unlinkChannel(mapping.id)}
-                        className={cn(
-                          isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
-                        )}
-                      >
-                        <Unlink className="mr-2 h-4 w-4" />
-                        Desvincular
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-};
-
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Modal QR Code */}
       <Dialog open={qrCodeModal.isOpen} onOpenChange={(open) => setQrCodeModal(prev => ({ ...prev, isOpen: open }))}>
@@ -837,7 +836,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
-
