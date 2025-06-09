@@ -189,6 +189,14 @@ export class ChannelWebSocketManager {
     const connection = this.connections.get(channelId);
     return connection?.isActive ?? false;
   }
+
+  getConnectionStatus(channelId: string): string {
+    const connection = this.connections.get(channelId);
+    if (!connection) {
+      return 'disconnected';
+    }
+    return connection.isActive ? 'connected' : 'disconnected';
+  }
 }
 
 export const channelWebSocketManager = ChannelWebSocketManager.getInstance();
