@@ -1,8 +1,8 @@
-
 import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { evolutionApiManager } from '@/services/EvolutionApiService';
-import { channelWebSocketManager } from '@/services/ChannelWebSocketManager';
+import { ChannelInstanceMappingService } from '@/services/ChannelInstanceMappingService';
+import { WebhookConfigurationService } from '@/services/WebhookConfigurationService';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface EvolutionMessageData {
@@ -19,6 +19,7 @@ export interface EvolutionMessageData {
 export const useEvolutionApiSender = () => {
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
+  const channelMappingService = new ChannelInstanceMappingService();
 
   const sendMessage = useCallback(async (messageData: EvolutionMessageData) => {
     setSending(true);
@@ -29,25 +30,13 @@ export const useEvolutionApiSender = () => {
         messageType: messageData.messageType || 'text'
       });
 
-      // Buscar configuração da instância para o canal
-      const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
-        .eq('channel_id', messageData.channelId)
-        .eq('is_active', true)
-        .single();
-
-      if (mappingError || !mapping) {
+      const instanceConfig = await channelMappingService.getEvolutionInstanceForChannel(messageData.channelId);
+      
+      if (!instanceConfig) {
         const errorMsg = `Nenhuma instância da Evolution API configurada para o canal: ${messageData.channelId}`;
         console.error('❌ [EVOLUTION_SENDER]', errorMsg);
         throw new Error(errorMsg);
       }
-
-      const instanceConfig = {
-        baseUrl: mapping.base_url,
-        apiKey: mapping.api_key,
-        instanceName: mapping.instance_name
-      };
 
       console.log('✅ [EVOLUTION_SENDER] Instância encontrada:', instanceConfig.instanceName);
 
@@ -139,7 +128,6 @@ export const useEvolutionApiSender = () => {
 
       console.log('✅ [EVOLUTION_SENDER] Mensagem enviada com sucesso:', result);
 
-      // Salvar mensagem no banco de dados
       await saveMessageToDatabase(messageData, result.messageId);
 
       const typeMessages = {
@@ -176,15 +164,9 @@ export const useEvolutionApiSender = () => {
     try {
       console.log('🔄 [EVOLUTION_SENDER] Gerando QR code para canal:', channelId);
       
-      // Buscar configuração da instância
-      const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
-        .eq('channel_id', channelId)
-        .eq('is_active', true)
-        .single();
-
-      if (mappingError || !mapping) {
+      const instanceConfig = await channelMappingService.getEvolutionInstanceForChannel(channelId);
+      
+      if (!instanceConfig) {
         const errorMsg = `Nenhuma instância da Evolution API configurada para o canal ${channelId}`;
         console.error('❌ [EVOLUTION_SENDER]', errorMsg);
         
@@ -196,12 +178,6 @@ export const useEvolutionApiSender = () => {
         
         return { success: false, error: errorMsg };
       }
-      
-      const instanceConfig = {
-        baseUrl: mapping.base_url,
-        apiKey: mapping.api_key,
-        instanceName: mapping.instance_name
-      };
       
       const service = evolutionApiManager.getInstanceByConfig(instanceConfig);
       
@@ -215,20 +191,17 @@ export const useEvolutionApiSender = () => {
       const status = await service.getConnectionStatus();
       
       if (status?.state === 'open') {
-        console.log('✅ [EVOLUTION_SENDER] Instância já conectada, iniciando WebSocket...');
+        console.log('✅ [EVOLUTION_SENDER] Instância já conectada, configurando webhook...');
         
-        // Inicializar WebSocket para receber mensagens
-        await channelWebSocketManager.initializeChannelWebSocket(channelId, {
-          baseUrl: mapping.base_url,
-          apiKey: mapping.api_key,
-          instanceName: mapping.instance_name,
-          channelId
-        });
+        // Configurar webhook automaticamente se já estiver conectado
+        const webhookResult = await WebhookConfigurationService.configureWebhook(service, instanceConfig.instanceName);
         
-        toast({
-          title: "Sucesso",
-          description: "Instância conectada e pronta para receber mensagens",
-        });
+        if (webhookResult.success) {
+          toast({
+            title: "Sucesso",
+            description: "Instância já conectada e webhook configurado",
+          });
+        }
         
         return { 
           success: true, 
@@ -255,6 +228,9 @@ export const useEvolutionApiSender = () => {
       
       console.log('✅ [EVOLUTION_SENDER] QR code gerado com sucesso');
       
+      // Monitorar conexão para configurar webhook automaticamente
+      monitorConnectionForWebhook(service, instanceConfig.instanceName, channelId);
+      
       return result;
     } catch (error) {
       console.error('❌ [EVOLUTION_SENDER] Erro ao gerar QR code:', error);
@@ -269,33 +245,60 @@ export const useEvolutionApiSender = () => {
     }
   }, [toast]);
 
+  // Função para monitorar conexão e configurar webhook automaticamente
+  const monitorConnectionForWebhook = async (service: any, instanceName: string, channelId: string) => {
+    let attempts = 0;
+    const maxAttempts = 30; // 5 minutos (30 * 10 segundos)
+    
+    const checkConnection = async () => {
+      attempts++;
+      console.log(`🔍 [EVOLUTION_SENDER] Verificando conexão (tentativa ${attempts}/${maxAttempts})...`);
+      
+      try {
+        const status = await service.getConnectionStatus();
+        
+        if (status?.state === 'open') {
+          console.log('✅ [EVOLUTION_SENDER] Instância conectada! Configurando webhook...');
+          
+          const webhookResult = await WebhookConfigurationService.configureWebhook(service, instanceName);
+          
+          if (webhookResult.success) {
+            toast({
+              title: "Conexão Estabelecida",
+              description: "WhatsApp conectado e webhook configurado automaticamente",
+            });
+          } else {
+            console.warn('⚠️ [EVOLUTION_SENDER] Webhook não pôde ser configurado:', webhookResult.error);
+          }
+          
+          return; // Para o monitoramento
+        }
+        
+        if (attempts < maxAttempts) {
+          setTimeout(checkConnection, 10000); // Verificar novamente em 10 segundos
+        } else {
+          console.log('⏰ [EVOLUTION_SENDER] Timeout do monitoramento de conexão');
+        }
+      } catch (error) {
+        console.error('❌ [EVOLUTION_SENDER] Erro ao monitorar conexão:', error);
+        if (attempts < maxAttempts) {
+          setTimeout(checkConnection, 10000);
+        }
+      }
+    };
+    
+    // Iniciar monitoramento após 5 segundos
+    setTimeout(checkConnection, 5000);
+  };
+
   const checkConnectionStatus = useCallback(async (channelId: string) => {
     try {
-      // Verificar se há WebSocket ativo para o canal
-      const isWebSocketConnected = channelWebSocketManager.isChannelConnected(channelId);
+      const instanceConfig = await channelMappingService.getEvolutionInstanceForChannel(channelId);
       
-      if (isWebSocketConnected) {
-        return { state: 'open', websocket: true };
-      }
-
-      // Verificar status da instância na Evolution API
-      const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
-        .eq('channel_id', channelId)
-        .eq('is_active', true)
-        .single();
-
-      if (mappingError || !mapping) {
+      if (!instanceConfig) {
         console.warn('⚠️ [EVOLUTION_SENDER] Nenhuma instância configurada para canal:', channelId);
         return { state: 'close' };
       }
-      
-      const instanceConfig = {
-        baseUrl: mapping.base_url,
-        apiKey: mapping.api_key,
-        instanceName: mapping.instance_name
-      };
       
       const service = evolutionApiManager.getInstanceByConfig(instanceConfig);
       
@@ -306,7 +309,6 @@ export const useEvolutionApiSender = () => {
       
       const status = await service.getConnectionStatus();
       console.log('📡 [EVOLUTION_SENDER] Status da conexão:', status);
-      
       return status || { state: 'close' };
     } catch (error) {
       console.error('❌ [EVOLUTION_SENDER] Erro ao verificar status:', error);
@@ -314,52 +316,19 @@ export const useEvolutionApiSender = () => {
     }
   }, []);
 
-  // Função para inicializar WebSocket após conectar instância
-  const initializeWebSocketForChannel = useCallback(async (channelId: string) => {
-    try {
-      const { data: mapping, error } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
-        .eq('channel_id', channelId)
-        .eq('is_active', true)
-        .single();
-
-      if (error || !mapping) {
-        throw new Error('Configuração da instância não encontrada');
-      }
-
-      const result = await channelWebSocketManager.initializeChannelWebSocket(channelId, {
-        baseUrl: mapping.base_url,
-        apiKey: mapping.api_key,
-        instanceName: mapping.instance_name,
-        channelId
-      });
-
-      if (result.success) {
-        toast({
-          title: "WebSocket Conectado",
-          description: "Canal pronto para receber mensagens em tempo real",
-        });
-      }
-
-      return result;
-    } catch (error) {
-      console.error('❌ [EVOLUTION_SENDER] Erro ao inicializar WebSocket:', error);
-      return { success: false, error: `${error}` };
-    }
-  }, [toast]);
-
   return {
     sendMessage,
     generateQRCode,
     checkConnectionStatus,
-    initializeWebSocketForChannel,
     sending
   };
 };
 
 // Função auxiliar para extrair número de telefone do conversationId
 function extractPhoneFromConversationId(conversationId: string): string | null {
+  // Assumindo que o conversationId contém o número de telefone
+  // Pode ser no formato: "5511999999999" ou "5511999999999_timestamp" ou similar
+  
   // Extrair apenas números
   const numbers = conversationId.replace(/\D/g, '');
   
@@ -381,23 +350,15 @@ async function saveMessageToDatabase(messageData: EvolutionMessageData, messageI
   try {
     const tableName = getTableNameForChannel(messageData.channelId);
     
-    const messageRecord: any = {
+    const messageRecord = {
       session_id: messageData.conversationId,
       message: messageData.content,
-      tipo_remetente: 'USUARIO_INTERNO',
+      tipo_remetente: messageData.sender,
+      nome_do_contato: messageData.agentName || 'Atendente',
       mensagemtype: messageData.messageType || 'text',
-      read_at: new Date().toISOString(),
-      is_read: true
+      created_at: new Date().toISOString(),
+      evolution_message_id: messageId
     };
-
-    // Adicionar campo de contato específico por canal
-    const contactField = getContactFieldForChannel(messageData.channelId);
-    messageRecord[contactField] = messageData.agentName || 'Atendente';
-
-    // Adicionar base64 se for mídia
-    if (messageData.fileBase64) {
-      messageRecord.media_base64 = messageData.fileBase64;
-    }
 
     const { error } = await supabase
       .from(tableName as any)
@@ -438,28 +399,4 @@ function getTableNameForChannel(channelId: string): string {
   };
   
   return channelToTableMap[channelId] || nameToTableMap[channelId] || 'yelena_ai_conversas';
-}
-
-function getContactFieldForChannel(channelId: string): string {
-  const channelToContactFieldMap: Record<string, string> = {
-    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'Nome_do_contato',
-    '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'nome_do_contato',
-    'b7996f75-41a7-4725-8229-564f31868027': 'nome_do_contato',
-    '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'nome_do_contato',
-    '64d8acad-c645-4544-a1e6-2f0825fae00b': 'nome_do_contato',
-    'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'nome_do_contato',
-    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'Nome_do_contato'
-  };
-  
-  const nameToContactFieldMap: Record<string, string> = {
-    'chat': 'Nome_do_contato',
-    'canarana': 'nome_do_contato',
-    'souto-soares': 'nome_do_contato',
-    'joao-dourado': 'nome_do_contato',
-    'america-dourada': 'nome_do_contato',
-    'gerente-lojas': 'nome_do_contato',
-    'gerente-externo': 'Nome_do_contato'
-  };
-  
-  return channelToContactFieldMap[channelId] || nameToContactFieldMap[channelId] || 'nome_do_contato';
 }

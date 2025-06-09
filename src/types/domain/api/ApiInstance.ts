@@ -1,4 +1,3 @@
-
 export interface ApiInstance {
   id?: string;
   instance_name: string;
@@ -12,3 +11,4 @@ export interface ApiInstanceWithConnection extends ApiInstance {
   qr_code?: string;
   connection_status?: 'connected' | 'disconnected' | 'connecting';
 }
+
