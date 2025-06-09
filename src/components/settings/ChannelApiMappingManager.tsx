@@ -7,7 +7,7 @@ import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
 import { EvolutionApiService } from '../../services/EvolutionApiService';
-import { evolutionWebSocketManager } from '../../services/EvolutionWebSocketService';
+import { channelWebSocketManager } from '../../services/ChannelWebSocketManager';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -95,10 +95,10 @@ export const ChannelApiMappingManager: React.FC = () => {
 
         await deleteMapping(channelId);
 
-        // Desconectar WebSocket (substitui desabilitar webhook)
+        // Desconectar WebSocket usando o novo manager
         if (instance && channel && channel.name !== 'Yelena-AI') {
           console.log(`🔌 [WEBSOCKET] Desconectando WebSocket para canal: ${channel.name}`);
-          evolutionWebSocketManager.removeConnection(channelId);
+          await channelWebSocketManager.disconnectChannelWebSocket(channelId);
           console.log(`✅ [WEBSOCKET] WebSocket desconectado para canal: ${channel.name}`);
         }
       }
@@ -117,9 +117,7 @@ export const ChannelApiMappingManager: React.FC = () => {
   };
 
   const getWebSocketStatus = (channelId: string) => {
-    const connection = evolutionWebSocketManager.getConnection(channelId);
-    if (!connection) return 'disconnected';
-    return connection.getConnectionState().toLowerCase();
+    return channelWebSocketManager.getConnectionStatus(channelId);
   };
 
   const getWebSocketStatusBadge = (channelId: string) => {
@@ -294,4 +292,3 @@ export const ChannelApiMappingManager: React.FC = () => {
     </div>
   );
 };
-
