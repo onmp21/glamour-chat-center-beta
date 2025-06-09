@@ -1,4 +1,3 @@
-
 import { supabase } from '../integrations/supabase/client';
 
 export interface WebSocketConfig {
@@ -27,6 +26,18 @@ export interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
   instanceName: string;
+}
+
+export interface InstanceInfo {
+  instanceName: string;
+  profileName?: string;
+  number?: string;
+  status: string;
+  serverUrl?: string;
+  apikey?: string;
+  owner?: string;
+  profilePictureUrl?: string;
+  integration?: string;
 }
 
 export class EvolutionApiService {
@@ -75,7 +86,7 @@ export class EvolutionApiService {
     }
   }
 
-  async listInstances(): Promise<{ success: boolean; instances?: any[]; error?: string }> {
+  async listInstances(): Promise<{ success: boolean; instances?: InstanceInfo[]; error?: string }> {
     try {
       console.log(`📋 [EVOLUTION_API] Listando instâncias em: ${this.config.baseUrl}`);
 
@@ -95,7 +106,7 @@ export class EvolutionApiService {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        const instances: any[] = data.map((item: any) => ({
+        const instances: InstanceInfo[] = data.map((item: any) => ({
           instanceName: item.instanceName,
           profileName: item.profileName,
           number: item.number,
@@ -223,7 +234,7 @@ export class EvolutionApiService {
     }
   }
 
-  async getQRCodeForInstance(instanceName: string): Promise<{ success: boolean; qrCode?: string; error?: string }> {
+  async getQRCodeForInstance(instanceName: string): Promise<{ success: boolean; qrCode?: string; error?: string; connected?: boolean }> {
     try {
       const normalizedName = this.normalizeInstanceName(instanceName);
       console.log(`🔍 [EVOLUTION_API] Obtendo QR Code para instância: ${normalizedName}`);
@@ -256,7 +267,7 @@ export class EvolutionApiService {
     }
   }
 
-  async getQRCode(): Promise<{ success: boolean; qrCode?: string; error?: string }> {
+  async getQRCode(): Promise<{ success: boolean; qrCode?: string; error?: string; connected?: boolean }> {
     return this.getQRCodeForInstance(this.config.instanceName);
   }
 
