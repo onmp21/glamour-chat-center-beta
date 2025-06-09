@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,8 +55,7 @@ export const QRCodeManagerFixed: React.FC<QRCodeManagerFixedProps> = ({
       const result = await generateQRCode(channelId);
       
       if (result.success) {
-        // Check if connected property exists
-        if ('connected' in result && result.connected) {
+        if (result.connected) {
           setConnectionStatus('connected');
           toast({
             title: "Já Conectado",
@@ -84,9 +84,7 @@ export const QRCodeManagerFixed: React.FC<QRCodeManagerFixedProps> = ({
           throw new Error('QR Code não foi retornado pela API');
         }
       } else {
-        // Handle error property safely
-        const errorMessage = 'error' in result ? result.error : 'Erro ao gerar QR Code';
-        throw new Error(errorMessage || 'Erro desconhecido');
+        throw new Error(result.error || 'Erro ao gerar QR Code');
       }
     } catch (error) {
       console.error('❌ [QR_MANAGER_FIXED] Erro ao gerar QR Code:', error);
