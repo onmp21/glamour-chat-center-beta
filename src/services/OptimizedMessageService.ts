@@ -1,3 +1,4 @@
+
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
 import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
@@ -28,7 +29,7 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting messages for conversation ${sessionId} from ${tableName}`);
       
-      // Query ultra-simples - SELECT * sem dependência de autenticação
+      // Query simples usando SELECT * - sem dependência de autenticação
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
@@ -110,7 +111,7 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting conversations from ${tableName}`);
       
-      // Query simples sem dependência de autenticação
+      // Query simples usando SELECT * - sem dependência de autenticação
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
