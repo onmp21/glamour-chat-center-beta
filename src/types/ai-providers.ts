@@ -29,6 +29,8 @@ export interface ReportResult {
   content: string;
   created_at: string;
   provider_id: string;
+  report_content: string; // Add missing property
+  report_type: string; // Add missing property
 }
 
 export interface ReportHistory {
@@ -36,6 +38,16 @@ export interface ReportHistory {
   query: string;
   result: ReportResult;
   timestamp: string;
+  prompt: string; // Add missing property
+  created_at: string; // Add missing property
+  generated_report: string; // Add missing property
+  report_type: string; // Add missing property
+  provider_id: string;
+  provider_name: string;
+  model_used: string;
+  tokens_used: number;
+  generation_time: number;
+  metadata: any;
 }
 
 export const PROVIDER_TYPES = {

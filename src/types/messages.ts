@@ -40,7 +40,7 @@ export interface ProcessedMessage {
 }
 
 export interface RawMessage {
-  id: string; // Mudando para string para consistência
+  id: string; // Keep as string for consistency
   session_id: string;
   message: string;
   read_at: string;
@@ -51,4 +51,5 @@ export interface RawMessage {
   sender?: 'customer' | 'agent';
   timestamp?: string;
   content?: string;
+  nome_do_contato?: string; // Add missing property for compatibility
 }

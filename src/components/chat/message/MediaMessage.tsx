@@ -12,8 +12,8 @@ export const MediaMessage: React.FC<MediaMessageProps> = ({
   message,
   isDarkMode
 }) => {
-  // Determinar se é mensagem enviada ou recebida baseado no tipo de remetente
-  const isAgentMessage = message.sender === 'agent' || 
+  // Fix: Check if sender object exists and has type property
+  const isAgentMessage = message.sender?.type === 'agent' || 
     (message as any).tipo_remetente === 'USUARIO_INTERNO' ||
     (message as any).tipo_remetente === 'Yelena-ai' ||
     (message as any).tipo_remetente === 'Andressa-ai';
