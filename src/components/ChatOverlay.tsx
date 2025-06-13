@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, MessageSquare, Phone, Video, MoreVertical } from 'lucide-react';
+import { X, MessageSquare, Phone, Video, MoreVertical, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +38,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
   conversationId
 }) => {
   const [newMessage, setNewMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
   
   // Get conversation data
@@ -50,6 +51,13 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
   const { messages, loading: messagesLoading } = useSimpleMessages(
     channelId, 
     selectedConversation?.id || null
+  );
+
+  // Filter messages based on search term
+  const filteredMessages = messages.filter(message =>
+    searchTerm === '' || 
+    message.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (message.nome_do_contato && message.nome_do_contato.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const formatTime = (timeString: string) => {
@@ -82,7 +90,10 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
       if (message.tipo_remetente === 'Andressa-ai') return 'Andressa AI';
       return user?.name || 'Agente';
     }
-    return message.nome_do_contato || selectedConversation?.contact_name || 'Cliente';
+    
+    // Truncate long contact names
+    const contactName = message.nome_do_contato || selectedConversation?.contact_name || 'Cliente';
+    return contactName.length > 20 ? contactName.substring(0, 20) + '...' : contactName;
   };
 
   const isMediaMessage = (message: SimpleMessage) => {
@@ -122,16 +133,16 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
                 {(selectedConversation?.contact_name || contactName).charAt(0).toUpperCase()}
               </div>
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h3 className={cn(
-                "font-medium",
+                "font-medium truncate",
                 isDarkMode ? "text-white" : "text-gray-900"
               )}>
                 {selectedConversation?.contact_name || contactName}
               </h3>
               {selectedConversation?.contact_phone && (
                 <p className={cn(
-                  "text-xs",
+                  "text-xs truncate",
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 )}>
                   {formatPhone(selectedConversation.contact_phone)}
@@ -156,6 +167,34 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
           </div>
         </div>
 
+        {/* Search bar */}
+        <div className={cn(
+          "p-3 border-b",
+          isDarkMode ? "border-[#3f3f46]" : "border-gray-200"
+        )}>
+          <div className="relative">
+            <Search 
+              size={16} 
+              className={cn(
+                "absolute left-3 top-1/2 transform -translate-y-1/2",
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              )}
+            />
+            <input
+              type="text"
+              placeholder="Buscar mensagens..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn(
+                "w-full pl-9 pr-3 py-2 text-sm rounded-lg border",
+                isDarkMode 
+                  ? "bg-[#27272a] border-[#3f3f46] text-white placeholder:text-gray-400 focus:border-[#b5103c]" 
+                  : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-[#b5103c]"
+              )}
+            />
+          </div>
+        </div>
+
         {/* Messages area */}
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full">
@@ -164,17 +203,17 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#b5103c]"></div>
                 </div>
-              ) : messages.length === 0 ? (
+              ) : filteredMessages.length === 0 ? (
                 <div className="text-center py-8">
                   <p className={cn(
                     "text-sm",
                     isDarkMode ? "text-gray-400" : "text-gray-500"
                   )}>
-                    Nenhuma mensagem ainda
+                    {searchTerm ? 'Nenhuma mensagem encontrada' : 'Nenhuma mensagem ainda'}
                   </p>
                 </div>
               ) : (
-                messages.map((message) => {
+                filteredMessages.map((message) => {
                   const isOwn = message.tipo_remetente === 'USUARIO_INTERNO' || 
                                 message.tipo_remetente === 'Yelena-ai' ||
                                 message.tipo_remetente === 'Andressa-ai';
@@ -262,7 +301,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
               )}
               onKeyPress={(e) => {
                 if (e.key === 'Enter' && newMessage.trim()) {
-                  // Message sending will be implemented later
                   console.log('Sending message:', newMessage);
                   setNewMessage('');
                 }
@@ -272,7 +310,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
               className="bg-[#b5103c] hover:bg-[#9d0e34] text-white"
               onClick={() => {
                 if (newMessage.trim()) {
-                  // Message sending will be implemented later
                   console.log('Sending message:', newMessage);
                   setNewMessage('');
                 }
