@@ -6,7 +6,8 @@ import { MessageHistory } from './MessageHistory';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored'; // Importar o hook
+import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
+import { RawMessage } from '@/types/messageTypes'; // Import correto
 
 interface ChatAreaProps {
   isDarkMode: boolean;
@@ -15,11 +16,15 @@ interface ChatAreaProps {
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, channelId }) => {
-  const { addMessage } = useChannelMessagesRefactored(channelId, conversation.id); // Obter addMessage
+  const { addMessage } = useChannelMessagesRefactored(channelId, conversation.id);
+
+  // Função adaptadora para converter tipos
+  const handleAddMessage = (message: RawMessage) => {
+    addMessage(message);
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-      {/* Cabeçalho (não rola) */}
       <div className="flex-shrink-0">
         <ChatHeader 
           isDarkMode={isDarkMode} 
@@ -28,7 +33,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, ch
         />
       </div>
       
-      {/* Área de Mensagens (rola) */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <MessageHistory
@@ -40,17 +44,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, ch
         </ScrollArea>
       </div>
 
-      {/* Barra de Input (não rola, fica embaixo) */}
       <div className="flex-shrink-0">
         <ChatInput 
           channelId={channelId} 
           conversationId={conversation.id} 
           isDarkMode={isDarkMode} 
-          addMessageToState={addMessage} // Passar addMessage para ChatInput
+          addMessageToState={handleAddMessage}
         />
       </div>
     </div>
   );
 };
-
-

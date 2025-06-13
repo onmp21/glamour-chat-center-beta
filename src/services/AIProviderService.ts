@@ -134,5 +134,18 @@ export class AIProviderService {
       throw error
     }
   }
-}
 
+  static async getActiveProviders() {
+    return this.getProviders();
+  }
+
+  static getProviderTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic', 
+      google: 'Google',
+      custom: 'Custom'
+    };
+    return labels[type] || type;
+  }
+}

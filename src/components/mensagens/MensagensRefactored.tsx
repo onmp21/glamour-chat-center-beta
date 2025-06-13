@@ -37,7 +37,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const { channels } = useChannels();
   const { getAccessibleChannels } = usePermissions();
 
-  // Detect initial parameters to open ChatOverlay automatically
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
     
@@ -47,7 +46,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     }
   }, [initialChannel, initialPhone]);
 
-  // Mapear canais do banco para IDs legados e filtrar por permissões e status ativo
   const getChannelLegacyId = (channel: any) => {
     const nameToId: Record<string, string> = {
       'Yelena-AI': 'chat',
@@ -64,7 +62,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const accessibleChannels = getAccessibleChannels();
   const canaisData = channels
     .filter(channel => 
-      channel.isActive && 
+      channel.is_active && 
       channel.name !== 'Pedro' && // Filtrar o canal Pedro que não existe mais
       channel.name // Garantir que o canal tem um nome válido
     )
@@ -109,6 +107,15 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       status: 'em_andamento' as const
     },
   ];
+
+  // Funções para ChatOverlayRefactored
+  const handleSendFile = async (file: File, caption?: string) => {
+    console.log('File sending handled by ChatOverlayRefactored');
+  };
+
+  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+    console.log('Audio sending handled by ChatOverlayRefactored');
+  };
 
   const handleChannelClick = (channelId: string) => {
     console.log('📺 [MENSAGENS] Channel clicked:', channelId);
@@ -164,6 +171,8 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         channelId={selectedChannel}
         isDarkMode={isDarkMode}
         onClose={handleCloseOverlay}
+        onSendFile={handleSendFile}
+        onSendAudio={handleSendAudio}
       />
     );
   }

@@ -22,6 +22,7 @@ interface MediaRendererFixedProps {
   fileName?: string;
   balloonColor?: 'sent' | 'received'; // Nova prop para determinar a cor do balão
 }
+
 export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   content,
   messageType,
@@ -270,4 +271,3 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     </div>
   );
 };
-

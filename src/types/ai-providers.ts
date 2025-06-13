@@ -1,71 +1,29 @@
+
 export interface AIProvider {
   id: string;
   name: string;
-  provider_type: 'openai' | 'google_gemini' | 'anthropic_claude' | 'custom';
-  api_key?: string; // Não exposto na resposta da API
-  base_url?: string;
-  default_model: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  last_tested_at?: string;
-  test_status: 'success' | 'error' | 'not_tested';
-  test_message?: string;
-  advanced_settings: Record<string, any>;
-}
-
-export interface AIProviderFormData {
-  name: string;
-  provider_type: 'openai' | 'google_gemini' | 'anthropic_claude' | 'custom';
-  api_key: string;
-  base_url?: string;
-  default_model: string;
-  is_active: boolean;
-  advanced_settings?: Record<string, any>;
-}
-
-export interface TestProviderRequest {
   provider_type: string;
   api_key: string;
   base_url?: string;
-  default_model: string;
-  provider_id?: string;
-}
-
-export interface ReportGenerationRequest {
-  provider_id: string;
-  report_type: 'conversations' | 'channels' | 'custom';
-  data: any;
-  custom_prompt?: string;
-  filters?: Record<string, any>;
-}
-
-export interface ReportResult {
-  report: string;
-  metadata: {
-    report_id: number;
-    generated_at: string;
-    provider_type: string;
-    provider_name: string;
-    model: string;
-    report_type: string;
-    tokens_used: number;
-    generation_time: number;
-    data_summary: any;
-  };
-}
-
-export interface ReportHistory {
-  id: number;
-  report_type: string;
-  prompt: string;
-  generated_report: string;
-  provider_id: number;
-  provider_name?: string;
-  model_used: string;
-  tokens_used: number;
-  generation_time: number;
+  default_model?: string;
+  is_active: boolean;
+  advanced_settings?: any;
   created_at: string;
-  metadata: Record<string, any>;
+  updated_at: string;
 }
 
+export const PROVIDER_TYPES = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google',
+  custom: 'Custom'
+} as const;
+
+export const DEFAULT_MODELS = {
+  openai: 'gpt-4',
+  anthropic: 'claude-3-sonnet',
+  google: 'gemini-pro',
+  custom: ''
+} as const;
+
+export type ProviderType = keyof typeof PROVIDER_TYPES;
