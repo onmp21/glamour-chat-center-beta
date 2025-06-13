@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,12 +21,12 @@ export const MobileChatInputBar: React.FC<MobileChatInputBarProps> = ({
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
-  const { sendMessage, sending } = useMessageSender(channelId || '', conversationId || '', () => {});
+  const { sendMessage, sending } = useMessageSender();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async () => {
     if (message.trim() && conversationId && channelId) {
-      const success = await sendMessage({
+      const success = await sendMessage(channelId, conversationId, {
         conversationId,
         channelId,
         content: message.trim(),

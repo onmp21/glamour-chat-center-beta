@@ -13,6 +13,7 @@ interface RoleSelectorProps {
 
 const rolePermissions: Record<UserRole, string[]> = {
   admin: ['general', 'canarana', 'souto-soares', 'joao-dourado', 'america-dourada', 'manager-store', 'manager-external'],
+  manager: ['general', 'canarana', 'souto-soares', 'joao-dourado', 'america-dourada'],
   manager_external: ['general', 'manager-external'],
   manager_store: ['general', 'canarana', 'souto-soares', 'joao-dourado', 'america-dourada', 'manager-store'],
   salesperson: ['general']
@@ -26,6 +27,7 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       admin: 'Administrador',
+      manager: 'Gerente',
       manager_external: 'Gerente Externo',
       manager_store: 'Gerente de Loja',
       salesperson: 'Vendedora'

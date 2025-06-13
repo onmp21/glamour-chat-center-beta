@@ -39,6 +39,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       admin: 'Administrador',
+      manager: 'Gerente',
       manager_external: 'Gerente Externo',
       manager_store: 'Gerente de Loja',
       salesperson: 'Vendedora'
@@ -49,6 +50,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
   const getRoleBadgeColor = (role: UserRole) => {
     const colors: Record<UserRole, string> = {
       admin: 'bg-red-500 text-white',
+      manager: 'bg-purple-500 text-white',
       manager_external: 'bg-blue-500 text-white',
       manager_store: 'bg-green-500 text-white',
       salesperson: 'bg-yellow-500 text-white'
@@ -205,6 +207,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
               >
                 <option value="all">Todos os cargos</option>
                 <option value="admin">Administrador</option>
+                <option value="manager">Gerente</option>
                 <option value="manager_external">Gerente Externo</option>
                 <option value="manager_store">Gerente de Loja</option>
                 <option value="salesperson">Vendedora</option>
@@ -240,7 +243,7 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
                 <div>
                   <p className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-600")}>Gerentes</p>
                   <p className={cn("text-2xl font-bold", isDarkMode ? "text-white" : "text-gray-900")}>
-                    {users.filter(u => u.role === 'manager_external' || u.role === 'manager_store').length}
+                    {users.filter(u => u.role === 'manager' || u.role === 'manager_external' || u.role === 'manager_store').length}
                   </p>
                 </div>
               </div>
@@ -335,8 +338,10 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
       <UserCreateModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)} 
-        onCreateUser={handleCreateUser} 
-        isDarkMode={isDarkMode} 
+        onUserCreated={() => {
+          setIsCreateModalOpen(false);
+          refreshUsers();
+        }}
       />
 
       <UserEditModal 
@@ -392,4 +397,3 @@ export const UserManagementSection: React.FC<UserManagementSectionProps> = ({
     </>
   );
 };
-

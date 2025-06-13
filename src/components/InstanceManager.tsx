@@ -163,7 +163,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       toast({
         title: "Aviso",
         description: `A instância foi selecionada, mas houve um erro ao configurar o webhook: ${error}`,
-        variant: "warning"
+        variant: "destructive"
       });
     }
     
@@ -482,5 +482,3 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     </div>
   );
 };
-
-
