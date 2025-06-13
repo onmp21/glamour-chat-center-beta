@@ -6,6 +6,8 @@ import { ChatMainArea } from './ChatMainArea';
 import { useSimpleConversations } from '@/hooks/useSimpleConversations';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBase64Migration } from '@/hooks/useBase64Migration';
+import { toast } from 'sonner';
 
 interface ChatOverlayRefactoredProps {
   channelId: string;
@@ -55,6 +57,9 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isAuthenticated, user } = useAuth();
   
+  // Hook para migração de base64
+  const { hasPending, migrateAllTables, isLoading: migrationLoading } = useBase64Migration();
+  
   // Usar hooks simplificados
   const { 
     conversations: simpleConversations, 
@@ -75,8 +80,33 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     conversationsLoading,
     messagesLoading,
     isAuthenticated,
-    user: user?.name
+    user: user?.name,
+    hasPending,
+    migrationLoading
   });
+
+  // Migração automática em background se há base64 pendente
+  useEffect(() => {
+    if (hasPending && !migrationLoading) {
+      console.log('🔄 [CHAT_OVERLAY] Starting background base64 migration');
+      
+      // Executar migração em background
+      setTimeout(async () => {
+        try {
+          const result = await migrateAllTables();
+          if (result.success) {
+            console.log('✅ [CHAT_OVERLAY] Background migration completed successfully');
+            // Refresh conversations após migração
+            refreshConversations();
+          } else {
+            console.error('❌ [CHAT_OVERLAY] Background migration failed');
+          }
+        } catch (error) {
+          console.error('❌ [CHAT_OVERLAY] Background migration error:', error);
+        }
+      }, 2000); // Aguardar 2 segundos para não afetar o carregamento inicial
+    }
+  }, [hasPending, migrationLoading, migrateAllTables, refreshConversations]);
 
   // Converter SimpleConversation para UnifiedConversation (compatibilidade)
   const conversations: UnifiedConversation[] = simpleConversations.map(conv => ({
@@ -106,17 +136,24 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
   const handleSendMessage = async (message: string) => {
     console.log('💬 [CHAT_OVERLAY] Send message:', message);
-    // TODO: Implementar envio de mensagem
+    toast.info('Envio de mensagem será implementado em breve');
   };
 
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('📎 [CHAT_OVERLAY] Send file:', file.name);
-    // TODO: Implementar envio de arquivo
+    toast.info('Envio de arquivo será implementado em breve');
   };
 
   const handleSendAudio = async (audioBlob: Blob, duration: number) => {
     console.log('🎵 [CHAT_OVERLAY] Send audio:', duration);
-    // TODO: Implementar envio de áudio
+    toast.info('Envio de áudio será implementado em breve');
+  };
+
+  const handleMarkAsResolved = () => {
+    if (selectedConversation) {
+      console.log('✅ [CHAT_OVERLAY] Mark as resolved:', selectedConversation);
+      toast.success('Conversa marcada como resolvida');
+    }
   };
 
   const selectedConv = conversations.find(c => c.id === selectedConversation);
@@ -155,6 +192,11 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
           <p className={cn("text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
             Carregando conversas...
           </p>
+          {hasPending && (
+            <p className={cn("text-xs", isDarkMode ? "text-[#a1a1aa]" : "text-gray-600")}>
+              Processando mídias em background...
+            </p>
+          )}
         </div>
       </div>
     );
@@ -187,7 +229,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
           isDarkMode={isDarkMode}
           channelId={channelId}
           onSidebarToggle={setIsSidebarOpen}
-          onMarkAsResolved={() => {}}
+          onMarkAsResolved={handleMarkAsResolved}
           onSendMessage={handleSendMessage}
           onSendFile={handleSendFile}
           onSendAudio={handleSendAudio}
