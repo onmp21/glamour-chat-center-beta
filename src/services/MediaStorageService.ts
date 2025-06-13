@@ -12,21 +12,21 @@ export class MediaStorageService {
     try {
       console.log('📤 [MEDIA_STORAGE] Starting base64 upload to storage');
 
-      // Extract pure base64 (remove data:mime;base64, if exists)
+      // Extrair base64 puro (remover data:mime;base64, se existir)
       const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '');
       
-      // Detect MIME type if not provided
+      // Detectar MIME type se não fornecido
       if (!mimeType) {
         mimeType = this.detectMimeType(base64Content);
       }
 
-      // Generate filename if not provided
+      // Gerar nome do arquivo se não fornecido
       if (!fileName) {
         const extension = this.getExtensionFromMimeType(mimeType);
         fileName = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}${extension}`;
       }
 
-      // Convert base64 to blob
+      // Converter base64 para blob
       const byteCharacters = atob(cleanBase64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -35,7 +35,7 @@ export class MediaStorageService {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: mimeType });
 
-      // Upload to Supabase Storage
+      // Upload para Supabase Storage
       const { data, error } = await supabase.storage
         .from(this.bucketName)
         .upload(fileName, blob, {
@@ -48,7 +48,7 @@ export class MediaStorageService {
         return { success: false, error: error.message };
       }
 
-      // Generate public URL
+      // Gerar URL pública
       const { data: { publicUrl } } = supabase.storage
         .from(this.bucketName)
         .getPublicUrl(data.path);
@@ -71,7 +71,7 @@ export class MediaStorageService {
       if (match) return match[1];
     }
 
-    // Fallback for signature detection
+    // Fallback para detecção por assinatura
     const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '');
     
     if (cleanBase64.startsWith('/9j/')) return 'image/jpeg';
@@ -107,14 +107,14 @@ export class MediaStorageService {
     try {
       console.log(`🔄 [MEDIA_STORAGE] Processing base64 for table ${tableName}, record ${recordId}`);
 
-      // Upload to storage
+      // Upload para storage
       const uploadResult = await this.uploadBase64ToStorage(base64Content);
       
       if (!uploadResult.success) {
         return uploadResult;
       }
 
-      // Update record in table
+      // Atualizar registro na tabela
       const { error } = await supabase.rpc('update_media_url', {
         table_name: tableName,
         record_id: recordId,
@@ -186,7 +186,7 @@ export class MediaStorageService {
             console.error(`❌ [MEDIA_STORAGE] Failed to migrate record ${record.id}:`, result.error);
           }
 
-          // Pause between uploads to avoid rate limiting
+          // Pausa entre uploads para evitar rate limiting
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }

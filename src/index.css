@@ -1,29 +1,12 @@
 
-/* ... keep existing code */
+/* Import base styles and Tailwind */
+@import './styles/base.css';
 
-/* Chat message improvements */
-.chat-message-media {
-  max-width: 100%;
-  border-radius: 8px;
-}
+/* Import theme variables */
+@import './styles/theme.css';
 
-/* Truncate long contact names in chat */
-.contact-name-truncate {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* Import chat-specific styles */
+@import './styles/chat.css';
 
-/* Media preview hover effects */
-.media-preview:hover {
-  transform: scale(1.02);
-  transition: transform 0.2s ease;
-}
-
-/* Search highlight */
-.search-highlight {
-  background-color: rgba(181, 16, 60, 0.2);
-  padding: 1px 2px;
-  border-radius: 2px;
-}
+/* Import animations */
+@import './styles/animations.css';

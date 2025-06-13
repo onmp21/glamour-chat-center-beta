@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { ChatSidebarFixed } from './ChatSidebarFixed';
-import { ChatMainAreaFixed } from './ChatMainAreaFixed';
+import { ChatSidebar } from './ChatSidebar';
+import { ChatMainArea } from './ChatMainArea';
 import { useSimpleConversations } from '@/hooks/useSimpleConversations';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,18 +15,27 @@ interface ChatOverlayRefactoredProps {
   onSendAudio: (audioBlob: Blob, duration: number) => void;
 }
 
-interface SimpleMessage {
+interface Message {
   id: string;
-  session_id: string;
-  message: string;
-  read_at: string;
+  content: string;
+  timestamp: string;
+  sender: 'customer' | 'agent';
   tipo_remetente?: string;
+  type: 'text' | 'image' | 'audio' | 'video' | 'file';
+  fileUrl?: string;
+  fileName?: string;
+  read: boolean;
   nome_do_contato?: string;
   mensagemtype?: string;
-  media_base64?: string;
 }
 
 interface Conversation {
+  contactName: string;
+  contactNumber: string;
+}
+
+// Tipo unificado para compatibilidade
+interface UnifiedConversation {
   id: string;
   contact_name: string;
   contact_phone: string;
@@ -46,7 +55,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isAuthenticated, user } = useAuth();
   
-  // Use simplified hooks
+  // Usar hooks simplificados
   const { 
     conversations: simpleConversations, 
     loading: conversationsLoading, 
@@ -58,7 +67,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     loading: messagesLoading
   } = useSimpleMessages(channelId, selectedConversation);
 
-  console.log('🎯 [CHAT_OVERLAY] Current state:', {
+  console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
     channelId,
     selectedConversation,
     conversationsCount: simpleConversations.length,
@@ -69,8 +78,8 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     user: user?.name
   });
 
-  // Convert SimpleConversation to UnifiedConversation (compatibility)
-  const conversations: Conversation[] = simpleConversations.map(conv => ({
+  // Converter SimpleConversation para UnifiedConversation (compatibilidade)
+  const conversations: UnifiedConversation[] = simpleConversations.map(conv => ({
     id: conv.id,
     contact_name: conv.contact_name,
     contact_phone: conv.contact_phone,
@@ -81,7 +90,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     updated_at: conv.updated_at
   }));
 
-  // Auto-select first conversation
+  // Auto-select primeira conversa
   useEffect(() => {
     if (conversations.length > 0 && !selectedConversation) {
       const firstConversation = conversations[0];
@@ -90,19 +99,50 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     }
   }, [conversations, selectedConversation]);
 
+  const handleConversationSelect = (conversationId: string) => {
+    console.log('📱 [CHAT_OVERLAY] Conversation selected:', conversationId);
+    setSelectedConversation(conversationId);
+  };
+
+  const handleSendMessage = async (message: string) => {
+    console.log('💬 [CHAT_OVERLAY] Send message:', message);
+    // TODO: Implementar envio de mensagem
+  };
+
+  const handleSendFile = async (file: File, caption?: string) => {
+    console.log('📎 [CHAT_OVERLAY] Send file:', file.name);
+    // TODO: Implementar envio de arquivo
+  };
+
+  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+    console.log('🎵 [CHAT_OVERLAY] Send audio:', duration);
+    // TODO: Implementar envio de áudio
+  };
+
   const selectedConv = conversations.find(c => c.id === selectedConversation);
 
-  // Convert messages to display format
-  const displayMessages: SimpleMessage[] = messages.map(msg => ({
-    id: msg.id,
-    session_id: msg.session_id,
-    message: msg.message,
-    read_at: msg.read_at,
-    tipo_remetente: msg.tipo_remetente,
-    nome_do_contato: msg.nome_do_contato,
-    mensagemtype: msg.mensagemtype,
-    media_base64: msg.media_base64
-  }));
+  // Converter mensagens para o formato esperado
+  const displayMessages: Message[] = messages.map(msg => {
+    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
+    
+    return {
+      id: msg.id,
+      content: msg.message,
+      timestamp: msg.read_at,
+      sender: isAgent ? 'agent' : 'customer',
+      tipo_remetente: msg.tipo_remetente,
+      type: 'text',
+      read: true,
+      nome_do_contato: msg.nome_do_contato,
+      mensagemtype: msg.mensagemtype
+    };
+  });
+
+  // Criar objeto de conversa para o header
+  const conversationForHeader: Conversation | null = selectedConv ? {
+    contactName: selectedConv.contact_name,
+    contactNumber: selectedConv.contact_phone
+  } : null;
 
   if (conversationsLoading && conversations.length === 0) {
     return (
@@ -111,7 +151,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
         isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
       )}>
         <div className="text-center space-y-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c] mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
           <p className={cn("text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
             Carregando conversas...
           </p>
@@ -125,7 +165,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       "fixed inset-0 z-50 flex",
       isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
     )}>
-      <ChatSidebarFixed
+      <ChatSidebar
         channelId={channelId}
         conversations={conversations}
         selectedConversation={selectedConversation}
@@ -137,14 +177,22 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
         onRefresh={refreshConversations}
       />
 
-      <ChatMainAreaFixed
-        selectedConv={selectedConv || null}
-        messages={displayMessages}
-        messagesLoading={messagesLoading}
-        isDarkMode={isDarkMode}
-        channelId={channelId}
-        agentName={user?.name}
-      />
+      <div className="flex-1 flex flex-col">
+        <ChatMainArea
+          selectedConv={selectedConv}
+          conversationForHeader={conversationForHeader}
+          messages={displayMessages}
+          messagesLoading={messagesLoading}
+          isSidebarOpen={isSidebarOpen}
+          isDarkMode={isDarkMode}
+          channelId={channelId}
+          onSidebarToggle={setIsSidebarOpen}
+          onMarkAsResolved={() => {}}
+          onSendMessage={handleSendMessage}
+          onSendFile={handleSendFile}
+          onSendAudio={handleSendAudio}
+        />
+      </div>
     </div>
   );
 };
