@@ -55,7 +55,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       {/* Header da Conversa */}
       {conversationForHeader && (
         <div className={cn(
-          "flex items-center p-4 border-b",
+          "chat-header-height flex items-center p-4 border-b",
           isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
         )}>
           {!isSidebarOpen && (
@@ -110,19 +110,15 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         </div>
       )}
 
-      {/* Área de Mensagens com Scroll Fixo */}
+      {/* Área de Mensagens */}
       <div className="flex-1 overflow-hidden">
         {selectedConv ? (
-          <div className="h-full flex flex-col">
-            <div className="flex-1 overflow-y-auto p-4">
-              <MessageHistory
-                channelId={channelId}
-                conversationId={selectedConv.id}
-                isDarkMode={isDarkMode}
-                className="h-full"
-              />
-            </div>
-          </div>
+          <MessageHistory
+            channelId={channelId}
+            conversationId={selectedConv.id}
+            isDarkMode={isDarkMode}
+            className="h-full"
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -143,19 +139,14 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         )}
       </div>
 
-      {/* Input de Mensagem Fixo - RESTAURADO */}
+      {/* Input de Mensagem Original */}
       {selectedConv && (
-        <div className={cn(
-          "border-t p-4",
-          isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
-        )}>
-          <MessageInput
-            channelId={channelId}
-            conversationId={selectedConv.id}
-            isDarkMode={isDarkMode}
-            className="w-full"
-          />
-        </div>
+        <MessageInput
+          channelId={channelId}
+          conversationId={selectedConv.id}
+          isDarkMode={isDarkMode}
+          className="flex-shrink-0"
+        />
       )}
     </div>
   );

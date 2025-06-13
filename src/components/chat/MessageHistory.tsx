@@ -2,7 +2,6 @@
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
-import { ChatMessage } from './ChatMessage';
 
 interface MessageHistoryProps {
   channelId: string;
@@ -94,82 +93,52 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
   }
 
   return (
-    <div className={cn("space-y-4 pb-4", className)}>
-      {messages.map((message, index) => {
-        const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || 
-                       message.tipo_remetente === 'Yelena-ai' ||
-                       message.tipo_remetente === 'Andressa-ai';
-        
-        const showSenderName = shouldShowSenderName(message, index);
-        const senderName = getSenderName(message);
+    <div className={cn("chat-messages-container h-full overflow-y-auto", className)}>
+      <div className="chat-messages-wrapper">
+        {messages.map((message, index) => {
+          const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || 
+                         message.tipo_remetente === 'Yelena-ai' ||
+                         message.tipo_remetente === 'Andressa-ai';
+          
+          const showSenderName = shouldShowSenderName(message, index);
+          const senderName = getSenderName(message);
 
-        return (
-          <div 
-            key={message.id} 
-            className={cn(
-              "flex",
-              isAgent ? "justify-end" : "justify-start"
-            )}
-          >
-            <div className={cn(
-              "max-w-[70%] space-y-1",
-              isAgent ? "items-end" : "items-start"
-            )}>
-              {/* Nome do remetente */}
-              {showSenderName && (
-                <div className={cn(
-                  "text-xs font-medium px-1",
-                  isAgent ? "text-right" : "text-left",
-                  isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
-                )}>
+          return (
+            <div 
+              key={message.id} 
+              className={cn(
+                "chat-message-row",
+                isAgent ? "sent" : "received"
+              )}
+            >
+              {/* Nome do remetente apenas se for necessário */}
+              {showSenderName && !isAgent && (
+                <div className="chat-message-sender">
                   {senderName}
                 </div>
               )}
               
-              {/* Balão da mensagem */}
+              {/* Balão da mensagem - SEM COMPONENTE ANINHADO */}
               <div className={cn(
-                "relative px-4 py-2 rounded-lg shadow-sm",
-                isAgent
-                  ? "bg-[#b5103c] text-white rounded-br-none"
-                  : (isDarkMode ? "bg-[#27272a] text-white border border-[#3f3f46]" : "bg-gray-100 text-gray-900 border border-gray-200") + " rounded-bl-none"
+                "chat-message-whatsapp",
+                isAgent ? "sent" : "received"
               )}>
-                {/* Conteúdo da mensagem */}
-                <div className="text-sm break-words">
-                  <ChatMessage
-                    message={{
-                      id: message.id,
-                      content: message.message,
-                      timestamp: message.read_at,
-                      sender: isAgent ? 'agent' : 'customer',
-                      tipo_remetente: message.tipo_remetente,
-                      isOwn: isAgent,
-                      agentName: senderName,
-                      nome_do_contato: message.nome_do_contato,
-                      mensagemtype: message.mensagemtype
-                    }}
-                    isDarkMode={isDarkMode}
-                    channelId={channelId}
-                  />
+                <div className="chat-message-text">
+                  {message.message}
                 </div>
                 
-                {/* Hora da mensagem */}
-                <div className={cn(
-                  "text-[10px] mt-1 text-right",
-                  isAgent ? "text-red-100" : (isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")
-                )}>
+                <div className="chat-message-timestamp">
                   {formatTime(message.read_at)}
-                  {isAgent && (
-                    <span className="ml-1">✓✓</span>
-                  )}
+                  {isAgent && <span className="checkmark">✓✓</span>}
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-      
-      {/* Elemento para scroll automático */}
-      <div ref={messagesEndRef} />
+          );
+        })}
+        
+        {/* Elemento para scroll automático */}
+        <div ref={messagesEndRef} />
+      </div>
     </div>
   );
 };
