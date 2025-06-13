@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
+import { MediaRendererFixed } from './MediaRendererFixed';
 
 interface SimpleMessageHistoryProps {
   channelId: string;
@@ -25,6 +26,27 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Função para detectar se é mídia
+  const isMediaMessage = (message: any) => {
+    return (
+      message.media_base64 ||
+      (message.mensagemtype && message.mensagemtype !== 'text' && message.mensagemtype !== 'conversation') ||
+      (message.message && message.message.startsWith('data:')) ||
+      (message.message && message.message.includes('supabase.co/storage/v1/object/public/media-files/'))
+    );
+  };
+
+  // Função para obter conteúdo da mídia
+  const getMediaContent = (message: any) => {
+    if (message.media_base64) {
+      return message.media_base64;
+    }
+    if (message.message && (message.message.startsWith('data:') || message.message.includes('supabase.co/storage'))) {
+      return message.message;
+    }
+    return null;
+  };
 
   if (loading) {
     return (
@@ -71,6 +93,8 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
         {messages.map((message, index) => {
           const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai';
           const contactName = message.nome_do_contato || 'Cliente';
+          const isMedia = isMediaMessage(message);
+          const mediaContent = getMediaContent(message);
           
           return (
             <div
@@ -92,9 +116,19 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                       ? "bg-[#18181b] text-white border border-zinc-800"
                       : "bg-white text-gray-900 border border-gray-200"
                 )}>
-                  <p className="break-words whitespace-pre-wrap">
-                    {message.message}
-                  </p>
+                  {isMedia && mediaContent ? (
+                    <MediaRendererFixed
+                      content={mediaContent}
+                      messageType={message.mensagemtype || 'text'}
+                      messageId={message.id}
+                      isDarkMode={isDarkMode}
+                      balloonColor={isAgent ? 'sent' : 'received'}
+                    />
+                  ) : (
+                    <p className="break-words whitespace-pre-wrap">
+                      {message.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className={cn(
