@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Wifi, WifiOff, Activity, Settings } from 'lucide-react';
-import { channelWebSocketManager } from '@/services/ChannelWebSocketManager';
 
 interface WebSocketManagerProps {
   isDarkMode: boolean;
@@ -34,15 +33,13 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
 
   const checkWebSocketStatus = async () => {
     try {
-      const isChannelConnected = channelWebSocketManager.isChannelConnected(channelId);
-      const status = channelWebSocketManager.getConnectionStatus(channelId);
+      // WebSocket removido - usando long polling em vez disso
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
       
-      setIsConnected(isChannelConnected);
-      setConnectionStatus(status);
-      
-      console.log(`📡 [WEBSOCKET_MANAGER] Status do canal ${channelId}:`, { isChannelConnected, status });
+      console.log(`📡 [CONNECTION_MANAGER] Status do canal ${channelId}: desconectado (WebSocket removido)`);
     } catch (error) {
-      console.error('❌ [WEBSOCKET_MANAGER] Erro ao verificar status:', error);
+      console.error('❌ [CONNECTION_MANAGER] Erro ao verificar status:', error);
       setIsConnected(false);
       setConnectionStatus('error');
     }
@@ -60,28 +57,22 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
 
     setLoading(true);
     try {
-      console.log(`🔄 [WEBSOCKET_MANAGER] Iniciando conexão WebSocket para canal: ${channelId}`);
+      console.log(`🔄 [CONNECTION_MANAGER] Iniciando configuração para canal: ${channelId}`);
       
-      // For now, we'll need the full config. This should be improved to get config from storage
-      const result = { success: false, error: 'Configuration needed' };
+      // WebSocket removido - usando long polling em vez disso
+      toast({
+        title: "Informação",
+        description: "WebSockets foram substituídos por long polling para maior confiabilidade",
+      });
       
-      if (result.success) {
-        setIsConnected(true);
-        setConnectionStatus('connected');
-        
-        toast({
-          title: "WebSocket Conectado",
-          description: "Canal configurado para receber mensagens em tempo real",
-        });
-      } else {
-        throw new Error(result.error || 'Falha ao conectar WebSocket');
-      }
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
     } catch (error) {
-      console.error('❌ [WEBSOCKET_MANAGER] Erro ao conectar:', error);
+      console.error('❌ [CONNECTION_MANAGER] Erro ao configurar:', error);
       
       toast({
-        title: "Erro na Conexão",
-        description: `Falha ao conectar WebSocket: ${error}`,
+        title: "Erro na Configuração",
+        description: `Falha ao configurar conexão: ${error}`,
         variant: "destructive"
       });
     } finally {
@@ -92,27 +83,22 @@ export const WebSocketManager: React.FC<WebSocketManagerProps> = ({
   const handleDisconnect = async () => {
     setLoading(true);
     try {
-      console.log(`🔄 [WEBSOCKET_MANAGER] Desconectando WebSocket para canal: ${channelId}`);
+      console.log(`🔄 [CONNECTION_MANAGER] Desconectando canal: ${channelId}`);
       
-      const result = await channelWebSocketManager.disconnectChannelWebSocket(channelId);
+      // WebSocket removido - usando long polling em vez disso
+      setIsConnected(false);
+      setConnectionStatus('disconnected');
       
-      if (result.success) {
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        
-        toast({
-          title: "WebSocket Desconectado",
-          description: "Conexão WebSocket encerrada",
-        });
-      } else {
-        throw new Error(result.error || 'Falha ao desconectar WebSocket');
-      }
+      toast({
+        title: "Desconectado",
+        description: "Canal desconectado com sucesso",
+      });
     } catch (error) {
-      console.error('❌ [WEBSOCKET_MANAGER] Erro ao desconectar:', error);
+      console.error('❌ [CONNECTION_MANAGER] Erro ao desconectar:', error);
       
       toast({
         title: "Erro",
-        description: `Falha ao desconectar WebSocket: ${error}`,
+        description: `Falha ao desconectar canal: ${error}`,
         variant: "destructive"
       });
     } finally {

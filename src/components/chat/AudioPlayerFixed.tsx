@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MediaProcessorUnified } from '@/utils/MediaProcessorUnified';
+import { MediaProcessor } from '@/services/MediaProcessor';
 
 interface AudioPlayerFixedProps {
   audioContent: string;
@@ -11,6 +10,7 @@ interface AudioPlayerFixedProps {
   onLoadStart?: () => void;
   onLoadEnd?: () => void;
   onError?: () => void;
+  balloonColor?: 'sent' | 'received';
 }
 
 export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
@@ -19,7 +19,8 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   messageId,
   onLoadStart,
   onLoadEnd,
-  onError
+  onError,
+  balloonColor = 'received'
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -27,24 +28,26 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   // Processar áudio na inicialização
   useEffect(() => {
-    console.log('🎵 [AUDIO_FIXED] Processing audio for message:', messageId);
+    console.log('🎵 [AUDIO_PLAYER] Processing audio for message:', messageId);
     
-    const result = MediaProcessorUnified.process(audioContent, 'audio');
+    const result = MediaProcessor.processAudio(audioContent);
     
-    if (result.success && result.dataUrl) {
-      console.log('✅ [AUDIO_FIXED] Audio processed successfully:', {
+    if (result.isProcessed && result.url) {
+      console.log('✅ [AUDIO_PLAYER] Audio processed successfully:', {
         messageId,
         mimeType: result.mimeType,
         size: result.size
       });
-      setAudioUrl(result.dataUrl);
+      setAudioUrl(result.url);
       setHasError(false);
     } else {
-      console.error('❌ [AUDIO_FIXED] Failed to process audio:', result.error);
+      console.error('❌ [AUDIO_PLAYER] Failed to process audio:', result.error);
       setHasError(true);
       onError?.();
     }
@@ -58,12 +61,12 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     let loadTimeout: NodeJS.Timeout;
 
     const handleLoadStart = () => {
-      console.log('🎵 [AUDIO_FIXED] Load start:', messageId);
+      console.log('🎵 [AUDIO_PLAYER] Load start:', messageId);
       onLoadStart?.();
     };
 
     const handleLoadedMetadata = () => {
-      console.log('🎵 [AUDIO_FIXED] Metadata loaded:', messageId, 'duration:', audio.duration);
+      console.log('🎵 [AUDIO_PLAYER] Metadata loaded:', messageId, 'duration:', audio.duration);
       
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(audio.duration);
@@ -74,7 +77,7 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     };
 
     const handleCanPlay = () => {
-      console.log('🎵 [AUDIO_FIXED] Can play:', messageId);
+      console.log('🎵 [AUDIO_PLAYER] Can play:', messageId);
       if (!isLoaded && audio.duration) {
         setDuration(audio.duration);
         setIsLoaded(true);
@@ -98,7 +101,7 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     };
 
     const handleError = (e: Event) => {
-      console.error('❌ [AUDIO_FIXED] Error loading audio:', messageId, e);
+      console.error('❌ [AUDIO_PLAYER] Error loading audio:', messageId, e);
       setIsLoaded(false);
       setHasError(true);
       onError?.();
@@ -108,11 +111,11 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     // Timeout para evitar loading infinito
     loadTimeout = setTimeout(() => {
       if (!isLoaded && !hasError) {
-        console.warn('⚠️ [AUDIO_FIXED] Load timeout:', messageId);
+        console.warn('⚠️ [AUDIO_PLAYER] Load timeout:', messageId);
         setHasError(true);
         onError?.();
       }
-    }, 8000); // 8 segundos
+    }, 8000);
 
     audio.addEventListener('loadstart', handleLoadStart);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -120,6 +123,9 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('error', handleError);
+
+    // Configurar velocidade
+    audio.playbackRate = playbackRate;
 
     // Tentar carregar
     audio.load();
@@ -133,7 +139,7 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [audioUrl, messageId, isLoaded, hasError, onLoadStart, onLoadEnd, onError]);
+  }, [audioUrl, messageId, isLoaded, hasError, onLoadStart, onLoadEnd, onError, playbackRate]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -148,10 +154,36 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
         playPromise
           .then(() => setIsPlaying(true))
           .catch(error => {
-            console.error('❌ [AUDIO_FIXED] Play error:', error);
+            console.error('❌ [AUDIO_PLAYER] Play error:', error);
             setHasError(true);
           });
       }
+    }
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    const progressBar = progressRef.current;
+    if (!audio || !progressBar || !isLoaded) return;
+
+    const rect = progressBar.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    const newTime = percentage * duration;
+    
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const changePlaybackRate = () => {
+    const rates = [1, 1.5, 2];
+    const currentIndex = rates.indexOf(playbackRate);
+    const nextIndex = (currentIndex + 1) % rates.length;
+    const newRate = rates[nextIndex];
+    
+    setPlaybackRate(newRate);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = newRate;
     }
   };
 
@@ -164,18 +196,64 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
 
   const progressPercentage = duration > 0 ? Math.min((currentTime / duration) * 100, 100) : 0;
 
+  // Definir cores baseadas no balão - estilo WhatsApp
+  const getPlayerColors = () => {
+    if (balloonColor === 'sent') {
+      // Cores para mensagens enviadas (balão vermelho #b5103c)
+      return {
+        background: '#b5103c',
+        text: '#ffffff',
+        playButton: '#ffffff',
+        playButtonBg: 'rgba(255, 255, 255, 0.2)',
+        playButtonHover: 'rgba(255, 255, 255, 0.3)',
+        progressBg: 'rgba(255, 255, 255, 0.3)',
+        progressFill: '#ffffff',
+        timeText: 'rgba(255, 255, 255, 0.8)',
+        speedButton: 'rgba(255, 255, 255, 0.7)'
+      };
+    } else {
+      // Cores para mensagens recebidas baseadas no modo
+      if (isDarkMode) {
+        // Modo escuro - balão recebido (#272728)
+        return {
+          background: '#272728',
+          text: '#ffffff',
+          playButton: '#ffffff',
+          playButtonBg: 'rgba(255, 255, 255, 0.15)',
+          playButtonHover: 'rgba(255, 255, 255, 0.25)',
+          progressBg: 'rgba(255, 255, 255, 0.2)',
+          progressFill: '#ffffff',
+          timeText: 'rgba(255, 255, 255, 0.7)',
+          speedButton: 'rgba(255, 255, 255, 0.6)'
+        };
+      } else {
+        // Modo claro - balão recebido (#ffffff)
+        return {
+          background: '#ffffff',
+          text: '#374151',
+          playButton: '#374151',
+          playButtonBg: 'rgba(55, 65, 81, 0.1)',
+          playButtonHover: 'rgba(55, 65, 81, 0.15)',
+          progressBg: 'rgba(0, 0, 0, 0.1)',
+          progressFill: '#374151',
+          timeText: 'rgba(0, 0, 0, 0.6)',
+          speedButton: 'rgba(0, 0, 0, 0.5)'
+        };
+      }
+    }
+  };
+
+  const colors = getPlayerColors();
+
   // Estado de erro
   if (hasError) {
     return (
-      <div className={cn(
-        "flex items-center gap-2 p-3 rounded-lg max-w-[280px]",
-        isDarkMode ? "bg-red-900/20 border border-red-800" : "bg-red-50 border border-red-200"
-      )}>
+      <div 
+        className="flex items-center gap-2 p-3 rounded-2xl max-w-[280px] shadow-sm"
+        style={{ backgroundColor: colors.background }}
+      >
         <AlertCircle className="text-red-500" size={20} />
-        <span className={cn(
-          "text-sm",
-          isDarkMode ? "text-red-300" : "text-red-600"
-        )}>
+        <span className="text-sm" style={{ color: colors.text }}>
           Erro ao carregar áudio
         </span>
       </div>
@@ -185,65 +263,122 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   // Estado de carregamento
   if (!isLoaded && !hasError) {
     return (
-      <div className={cn(
-        "flex items-center gap-3 p-3 rounded-lg max-w-[280px]",
-        isDarkMode ? "bg-gray-700" : "bg-gray-100"
-      )}>
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-blue-600"></div>
-        <span className={cn(
-          "text-sm",
-          isDarkMode ? "text-gray-300" : "text-gray-600"
-        )}>
-          Carregando áudio...
+      <div 
+        className="flex items-center gap-3 p-3 rounded-2xl max-w-[280px] shadow-sm"
+        style={{ backgroundColor: colors.background }}
+      >
+        <div 
+          className="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent"
+          style={{ borderColor: colors.progressBg, borderTopColor: colors.progressFill }}
+        ></div>
+        <span className="text-sm" style={{ color: colors.text }}>
+          Carregando...
         </span>
       </div>
     );
   }
 
   return (
-    <div className={cn(
-      "chat-message-audio p-3 rounded-lg max-w-[280px]",
-      isDarkMode ? "bg-gray-800" : "bg-gray-100"
-    )}>
+    <div 
+      className="p-3 rounded-2xl max-w-[280px] shadow-sm"
+      style={{ 
+        backgroundColor: colors.background,
+        border: balloonColor === 'received' && !isDarkMode ? '1px solid #e5e7eb' : 'none'
+      }}
+    >
       <audio ref={audioRef} src={audioUrl || undefined} preload="metadata" />
       
       <div className="flex items-center gap-3">
-        {/* Play/Pause Button */}
+        {/* Play/Pause Button - estilo WhatsApp */}
         <button
           onClick={togglePlayPause}
           disabled={!isLoaded || hasError}
-          className={cn(
-            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-            "bg-blue-500 text-white hover:bg-blue-600",
-            (!isLoaded || hasError) && "opacity-50 cursor-not-allowed"
-          )}
+          className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+          style={{
+            backgroundColor: colors.playButtonBg,
+            color: colors.playButton,
+            opacity: (!isLoaded || hasError) ? 0.5 : 1,
+            cursor: (!isLoaded || hasError) ? 'not-allowed' : 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            if (isLoaded && !hasError) {
+              e.currentTarget.style.backgroundColor = colors.playButtonHover;
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = colors.playButtonBg;
+          }}
         >
           {isPlaying ? (
             <Pause size={18} />
           ) : (
-            <Play size={18} className="ml-1" />
+            <Play size={18} className="ml-0.5" />
           )}
         </button>
 
-        {/* Waveform e Info */}
-        <div className="flex-1 min-w-0">
-          {/* Barra de progresso simples */}
-          <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-2 mb-2">
+        {/* Waveform visual e informações */}
+        <div className="flex-1 space-y-1">
+          {/* Barra de progresso estilo WhatsApp */}
+          <div 
+            ref={progressRef}
+            className="w-full rounded-full h-1 cursor-pointer relative overflow-hidden"
+            style={{ backgroundColor: colors.progressBg }}
+            onClick={handleProgressClick}
+          >
             <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercentage}%` }}
+              className="h-1 rounded-full transition-all duration-150"
+              style={{ 
+                width: `${progressPercentage}%`,
+                backgroundColor: colors.progressFill
+              }}
             />
           </div>
           
-          {/* Tempo */}
-          <div className={cn(
-            "text-xs font-mono text-right",
-            isDarkMode ? "text-gray-300" : "text-gray-600"
-          )}>
-            {formatTime(currentTime)} / {formatTime(duration)}
+          {/* Tempo e velocidade */}
+          <div className="flex items-center justify-between">
+            <span 
+              className="text-xs"
+              style={{ color: colors.timeText }}
+            >
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+            
+            {playbackRate !== 1 && (
+              <button
+                onClick={changePlaybackRate}
+                className="text-xs px-1.5 py-0.5 rounded transition-colors"
+                style={{ 
+                  color: colors.speedButton,
+                  backgroundColor: colors.playButtonBg
+                }}
+                title="Velocidade de reprodução"
+              >
+                {playbackRate}x
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Botão de velocidade (sempre visível) */}
+        <button
+          onClick={changePlaybackRate}
+          className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-200"
+          style={{
+            backgroundColor: colors.playButtonBg,
+            color: colors.playButton
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = colors.playButtonHover;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = colors.playButtonBg;
+          }}
+          title="Velocidade de reprodução"
+        >
+          {playbackRate}x
+        </button>
       </div>
     </div>
   );
 };
+

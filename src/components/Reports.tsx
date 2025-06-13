@@ -29,19 +29,7 @@ export const Reports: React.FC<ReportsProps> = ({ isDarkMode }) => {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/generate-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: prompt.trim() }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao gerar relatório');
-      }
-
-      const data = await response.json();
+      const data = await ReportService.generateReport(prompt.trim()); // Usar ReportService
       setGeneratedReport(data.report);
       setHtmlReport(data.htmlReport || '');
       
@@ -357,30 +345,30 @@ export const Reports: React.FC<ReportsProps> = ({ isDarkMode }) => {
                     </div>
                   </div>
                   {generatedReport && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={printReport}
-                        className={cn(
-                          isDarkMode ? "border-[#3f3f46] text-[#a1a1aa] hover:bg-[#27272a]" : ""
-                        )}
-                      >
-                        <Printer size={14} className="mr-2" strokeWidth={1.5} />
-                        Imprimir
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={downloadReport}
-                        className={cn(
-                          isDarkMode ? "border-[#3f3f46] text-[#a1a1aa] hover:bg-[#27272a]" : ""
-                        )}
-                      >
-                        <Download size={14} className="mr-2" strokeWidth={1.5} />
-                        Download
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={printReport}
+                      className={cn(
+                        isDarkMode ? "border-[#3f3f46] text-[#a1a1aa] hover:bg-[#27272a]" : ""
+                      )}
+                    >
+                      <Printer size={14} className="mr-2" strokeWidth={1.5} />
+                      Imprimir
+                    </Button>
+                  )}
+                  {generatedReport && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadReport}
+                      className={cn(
+                        isDarkMode ? "border-[#3f3f46] text-[#a1a1aa] hover:bg-[#27272a]" : ""
+                      )}
+                    >
+                      <Download size={14} className="mr-2" strokeWidth={1.5} />
+                      Download
+                    </Button>
                   )}
                 </div>
               </CardHeader>
@@ -441,36 +429,57 @@ export const Reports: React.FC<ReportsProps> = ({ isDarkMode }) => {
                     "text-sm",
                     isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
                   )}>
-                    Clique para usar como modelo
+                    Descreva o relatório que deseja
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {[
-                  "Relatório de atendimentos por canal",
-                  "Análise de satisfação do cliente",
-                  "Produtividade da equipe",
-                  "Estatísticas de exames agendados",
-                  "Tags mais utilizadas",
-                  "Tempo de resposta por canal"
-                ].map((example, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "h-auto p-2 text-left whitespace-normal text-xs",
-                      isDarkMode 
-                        ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800" 
-                        : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                    )}
-                    onClick={() => setPrompt(example)}
-                  >
-                    {example}
-                  </Button>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrompt('Relatório de conversas dos últimos 7 dias com foco em atendimentos não resolvidos.')}
+                  className={cn(
+                    "h-auto py-3 text-left whitespace-normal",
+                    isDarkMode ? "border-zinc-600 text-zinc-300 hover:bg-zinc-800" : ""
+                  )}
+                >
+                  Relatório de conversas dos últimos 7 dias com foco em atendimentos não resolvidos.
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrompt('Análise de sentimento das interações dos clientes no último mês.')}
+                  className={cn(
+                    "h-auto py-3 text-left whitespace-normal",
+                    isDarkMode ? "border-zinc-600 text-zinc-300 hover:bg-zinc-800" : ""
+                  )}
+                >
+                  Análise de sentimento das interações dos clientes no último mês.
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrompt('Resumo das principais dúvidas e problemas dos clientes no último trimestre.')}
+                  className={cn(
+                    "h-auto py-3 text-left whitespace-normal",
+                    isDarkMode ? "border-zinc-600 text-zinc-300 hover:bg-zinc-800" : ""
+                  )}
+                >
+                  Resumo das principais dúvidas e problemas dos clientes no último trimestre.
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrompt('Relatório de desempenho dos agentes de atendimento no último mês, incluindo tempo médio de resposta e resolução.')}
+                  className={cn(
+                    "h-auto py-3 text-left whitespace-normal",
+                    isDarkMode ? "border-zinc-600 text-zinc-300 hover:bg-zinc-800" : ""
+                  )}
+                >
+                  Relatório de desempenho dos agentes de atendimento no último mês, incluindo tempo médio de resposta e resolução.
+                </Button>
               </div>
             </CardContent>
           </Card>

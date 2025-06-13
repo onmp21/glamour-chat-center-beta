@@ -12,6 +12,12 @@ export const MediaMessage: React.FC<MediaMessageProps> = ({
   message,
   isDarkMode
 }) => {
+  // Determinar se é mensagem enviada ou recebida baseado no tipo de remetente
+  const isAgentMessage = message.sender === 'agent' || 
+    (message as any).tipo_remetente === 'USUARIO_INTERNO' ||
+    (message as any).tipo_remetente === 'Yelena-ai' ||
+    (message as any).tipo_remetente === 'Andressa-ai';
+
   return (
     <MediaMessageRenderer
       content={message.content}
@@ -19,6 +25,7 @@ export const MediaMessage: React.FC<MediaMessageProps> = ({
       messageId={message.id}
       isDarkMode={isDarkMode}
       fileName={message.fileData?.fileName}
+      balloonColor={isAgentMessage ? 'sent' : 'received'}
     />
   );
 };

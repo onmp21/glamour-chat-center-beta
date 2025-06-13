@@ -1,4 +1,4 @@
-/* ESQUEMA MONOCROMÁTICO PADRONIZADO PARA CHAT */
+/* ESQUEMA MONOCROMÁTICO PADRONIZADO PARA CHAT - CORES MANUS */
 @layer utilities {
   /* Headers padronizados - altura fixa para consistência */
   .chat-header-height {
@@ -45,7 +45,7 @@
 
   /* Overlay para wallpaper no modo escuro */
   .dark .chat-messages-container::before {
-    background-color: rgba(9, 9, 11, 0.6);
+    background-color: rgba(33, 33, 34, 0.6); /* #212122 com transparência */
   }
 
   .chat-messages-container::-webkit-scrollbar {
@@ -65,44 +65,44 @@
     background-color: rgba(255, 255, 255, 0.2);
   }
 
-  /* CORES CORRIGIDAS - MODO ESCURO */
+  /* CORES CORRIGIDAS - MODO ESCURO - CORES MANUS */
   .dark .chat-container {
-    background-color: #09090b;
+    background-color: #212122; /* Fundo principal Manus */
   }
 
   .dark .chat-sidebar {
-    background-color: #09090b;
-    border-color: #3f3f46;
+    background-color: #212122; /* Fundo principal Manus */
+    border-color: #363537; /* Bordas Manus */
   }
 
   .dark .chat-header {
-    background-color: #18181b;
-    border-color: #3f3f46;
+    background-color: #272728; /* Fundo secundário Manus */
+    border-color: #363537; /* Bordas Manus */
   }
 
-  /* CLIENTE MODO ESCURO - #242626 FORÇADO */
+  /* CLIENTE MODO ESCURO - #272728 FORÇADO (Fundo secundário Manus) */
   .dark .chat-message-received,
   .dark .chat-message-whatsapp.received {
-    background-color: #242626 !important;
-    border-color: #3f3f46 !important;
-    color: #fafafa !important;
+    background-color: #272728 !important;
+    border-color: #363537 !important;
+    color: #ffffff !important; /* Texto principal Manus */
   }
 
-  /* CANAL MODO ESCURO - #6d0d30 FORÇADO */
+  /* CANAL MODO ESCURO - #b5103c FORÇADO (Vermelho padrão Manus) */
   .dark .chat-message-sent,
   .dark .chat-message-whatsapp.sent {
-    background-color: #6d0d30 !important;
-    color: white !important;
+    background-color: #b5103c !important;
+    color: #ffffff !important;
   }
 
   .dark .chat-input {
-    background-color: #18181b;
-    border-color: #3f3f46;
-    color: #fafafa;
+    background-color: #272728; /* Fundo secundário Manus */
+    border-color: #363537; /* Bordas Manus */
+    color: #ffffff; /* Texto principal Manus */
   }
 
   .dark .chat-input::placeholder {
-    color: #a1a1aa;
+    color: #ababab; /* Texto secundário Manus */
   }
 
   /* CORES CORRIGIDAS - MODO CLARO */
@@ -129,11 +129,11 @@
     border: 1px solid #e5e7eb !important;
   }
 
-  /* CANAL MODO CLARO - #d1114c FORÇADO */
+  /* CANAL MODO CLARO - #b5103c FORÇADO (Vermelho padrão Manus) */
   .chat-message-sent,
   .chat-message-whatsapp.sent {
-    background-color: #d1114c !important;
-    color: white !important;
+    background-color: #b5103c !important;
+    color: #ffffff !important;
   }
 
   .chat-input {
@@ -184,12 +184,12 @@
     word-wrap: break-word;
     overflow-wrap: break-word;
     display: block;
-    max-width: 75%; /* Reduzido de 85% para 75% */
+    max-width: 75%;
     min-width: 120px;
     width: fit-content;
     z-index: 3;
-    font-weight: 500; /* Fonte mais grossa */
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; /* Fonte similar ao WhatsApp */
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   /* CLIENTE - ESQUERDA - CORES FORÇADAS */
@@ -204,14 +204,14 @@
   }
 
   .dark .chat-message-whatsapp.received {
-    background-color: #242626 !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background-color: #272728 !important; /* Fundo secundário Manus */
+    color: #ffffff !important; /* Texto principal Manus */
+    border: 1px solid #363537 !important; /* Bordas Manus */
   }
 
   /* CANAL - DIREITA - CORES FORÇADAS */
   .chat-message-whatsapp.sent {
-    background-color: #d1114c !important;
+    background-color: #b5103c !important; /* Vermelho padrão Manus */
     color: #ffffff !important;
     border-top-right-radius: 4px;
     align-self: flex-end !important;
@@ -220,7 +220,7 @@
   }
 
   .dark .chat-message-whatsapp.sent {
-    background-color: #6d0d30 !important;
+    background-color: #b5103c !important; /* Vermelho padrão Manus */
     color: #ffffff !important;
   }
 
@@ -265,7 +265,7 @@
   }
 
   .dark .chat-message-sender {
-    color: rgba(255, 255, 255, 0.9);
+    color: #ababab; /* Texto secundário Manus */
   }
 
   .chat-message-text {
@@ -281,17 +281,17 @@
 
   /* MÍDIA RESPONSIVA MELHORADA - TAMANHOS SIMILARES AO WHATSAPP WEB */
   .chat-message-media {
-    max-width: 320px; /* Aumentado de 100% para tamanho fixo maior */
-    max-height: 320px; /* Aumentado de 200px para 320px */
-    min-width: 200px; /* Tamanho mínimo para consistência */
-    min-height: 150px; /* Altura mínima */
-    border-radius: 12px; /* Bordas mais arredondadas como WhatsApp */
+    max-width: 320px;
+    max-height: 320px;
+    min-width: 200px;
+    min-height: 150px;
+    border-radius: 12px;
     margin-bottom: 6px;
     cursor: pointer;
     object-fit: cover;
     display: block;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* Sombra mais pronunciada */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
   .chat-message-media:hover {
@@ -302,8 +302,8 @@
   /* ÁUDIO MELHORADO - ESTILO WHATSAPP */
   .chat-message-audio {
     width: 100%;
-    min-width: 280px; /* Aumentado de 200px */
-    max-width: 320px; /* Aumentado de 280px */
+    min-width: 280px;
+    max-width: 320px;
     margin: 4px 0;
     border-radius: 12px;
     background-color: rgba(0, 0, 0, 0.05);
@@ -319,13 +319,13 @@
     align-items: center;
     padding: 12px;
     background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 12px; /* Bordas mais arredondadas */
+    border-radius: 12px;
     margin: 6px 0;
     transition: all 0.2s ease;
-    min-width: 220px; /* Aumentado de 180px */
-    max-width: 320px; /* Aumentado de 280px */
+    min-width: 220px;
+    max-width: 320px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Sombra consistente */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
   .chat-message-document:hover {
@@ -348,7 +348,7 @@
     white-space: pre-wrap;
     line-height: 1.4;
     font-size: 0.875rem;
-    font-weight: 500; /* Fonte mais grossa */
+    font-weight: 500;
     display: block;
     margin: 0;
     padding: 0;
@@ -356,61 +356,65 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
-  /* OVERLAY PARA MÍDIA COM ASPECT RATIO CORRETO */
+  /* OVERLAY PARA MÍDIA COM ASPECT RATIO CORRETO E Z-INDEX MÁXIMO */
   .media-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.95);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: rgba(0, 0, 0, 0.95) !important;
+    z-index: 999999 !important; /* Z-index máximo para ficar acima de tudo */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px !important;
+    backdrop-filter: blur(4px) !important;
   }
 
   .media-overlay-content {
-    max-width: 95vw;
-    max-height: 95vh;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .media-overlay-image,
   .media-overlay-video {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
   }
 
   .media-overlay-close {
-    position: absolute;
-    top: -60px;
-    right: 0;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    font-size: 20px;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(10px);
-    transition: all 0.2s ease;
+    position: absolute !important;
+    top: 20px !important;
+    right: 20px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: none !important;
+    color: #000 !important;
+    font-size: 20px !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    backdrop-filter: blur(10px) !important;
+    transition: all 0.2s ease !important;
+    z-index: 9999999 !important; /* Z-index ainda maior para o botão de fechar */
   }
 
   .media-overlay-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(1.1);
+    background: rgba(255, 255, 255, 1) !important;
+    transform: scale(1.1) !important;
   }
 
   /* Animação de entrada do overlay */
@@ -432,24 +436,24 @@
   /* Responsividade melhorada - mantendo tamanhos maiores */
   @media (max-width: 640px) {
     .chat-message-whatsapp {
-      max-width: 80%; /* Reduzido de 90% para 80% */
+      max-width: 80%;
       padding: 8px 12px;
     }
     
     .chat-message-media {
-      max-width: 280px; /* Reduzido de 320px mas ainda maior que antes */
-      max-height: 280px; /* Reduzido de 320px mas ainda maior */
+      max-width: 280px;
+      max-height: 280px;
       min-width: 180px;
       min-height: 120px;
     }
 
     .chat-message-audio {
-      min-width: 240px; /* Reduzido de 280px mas ainda maior */
+      min-width: 240px;
       max-width: 280px;
     }
     
     .chat-message-document {
-      min-width: 200px; /* Reduzido de 220px mas ainda maior */
+      min-width: 200px;
       max-width: 280px;
       padding: 10px;
     }
@@ -474,24 +478,24 @@
 
   @media (max-width: 480px) {
     .chat-message-whatsapp {
-      max-width: 85%; /* Reduzido de 95% para 85% */
+      max-width: 85%;
       padding: 6px 10px;
     }
 
     .chat-message-media {
-      max-width: 240px; /* Ainda maior que o original */
+      max-width: 240px;
       max-height: 240px;
       min-width: 160px;
       min-height: 100px;
     }
 
     .chat-message-audio {
-      min-width: 200px; /* Ainda maior que o original */
+      min-width: 200px;
       max-width: 240px;
     }
     
     .chat-message-document {
-      min-width: 180px; /* Ainda maior que o original */
+      min-width: 180px;
       max-width: 240px;
       padding: 8px;
     }
@@ -519,8 +523,8 @@
     align-items: center;
     justify-content: center;
     min-height: 100px;
-    background-color: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    background-color: rgba(181, 16, 60, 0.1); /* Vermelho padrão Manus com transparência */
+    border: 1px solid rgba(181, 16, 60, 0.2);
     border-radius: 8px;
     text-align: center;
     padding: 16px;
@@ -529,16 +533,17 @@
   }
 
   .media-error:hover {
-    background-color: rgba(239, 68, 68, 0.15);
+    background-color: rgba(181, 16, 60, 0.15);
     transform: translateY(-1px);
   }
 
   .dark .media-error {
-    background-color: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.3);
+    background-color: rgba(181, 16, 60, 0.15);
+    border-color: rgba(181, 16, 60, 0.3);
   }
 
   .dark .media-error:hover {
-    background-color: rgba(239, 68, 68, 0.2);
+    background-color: rgba(181, 16, 60, 0.2);
   }
 }
+

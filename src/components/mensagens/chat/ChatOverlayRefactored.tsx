@@ -7,11 +7,14 @@ import { useChannelConversationsRefactored } from '@/hooks/useChannelConversatio
 import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
 
 interface ChatOverlayRefactoredProps {
   channelId: string;
   isDarkMode: boolean;
   onClose: () => void;
+  onSendFile: (file: File, caption?: string) => void;
+  onSendAudio: (audioBlob: Blob, duration: number) => void;
 }
 
 interface Message {
@@ -33,6 +36,16 @@ interface Conversation {
   contactNumber: string;
 }
 
+// Helper function to convert File/Blob to Base64
+const fileToBase64 = (file: File | Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({ 
   channelId, 
   isDarkMode, 
@@ -46,6 +59,66 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const { messages, loading: messagesLoading } = useChannelMessagesRefactored(channelId, selectedConversation || undefined);
   const { getConversationStatus, updateConversationStatus, markConversationAsViewed } = useConversationStatusEnhanced();
   const { playNotificationSound } = useNotificationSound();
+  const { sendMessage: sendAppMessage } = useMessageSenderExtended();
+
+  const handleSendFile = async (file: File, caption?: string) => {
+    if (!selectedConversation) return;
+
+    try {
+      const base64Content = await fileToBase64(file);
+      const messageType = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "document";
+
+      const success = await sendAppMessage({
+        conversationId: selectedConversation,
+        channelId: channelId,
+        content: caption || "",
+        sender: "agent",
+        messageType: messageType,
+        fileData: {
+          base64: base64Content,
+          mimeType: file.type,
+          fileName: file.name,
+        },
+      });
+
+      if (success) {
+        console.log("✅ [CHAT_OVERLAY] Arquivo enviado com sucesso:", file.name);
+      } else {
+        console.error("❌ [CHAT_OVERLAY] Falha ao enviar arquivo:", file.name);
+      }
+    } catch (error) {
+      console.error("❌ [CHAT_OVERLAY] Erro ao converter arquivo para base64 ou enviar:", error);
+    }
+  };
+
+  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+    if (!selectedConversation) return;
+
+    try {
+      const base64Content = await fileToBase64(audioBlob);
+      const success = await sendAppMessage({
+        conversationId: selectedConversation,
+        channelId: channelId,
+        content: "", // Áudio não tem conteúdo de texto direto
+        sender: "agent",
+        messageType: "audio",
+        fileData: {
+          base64: base64Content,
+          mimeType: audioBlob.type,
+          fileName: `audio_message_${Date.now()}.webm`,
+          duration: duration,
+        },
+      });
+
+      if (success) {
+        console.log("✅ [CHAT_OVERLAY] Áudio enviado com sucesso:", `audio_message_${Date.now()}.webm`);
+      } else {
+        console.error("❌ [CHAT_OVERLAY] Falha ao enviar áudio:", `audio_message_${Date.now()}.webm`);
+      }
+    } catch (error) {
+      console.error("❌ [CHAT_OVERLAY] Erro ao converter áudio para base64 ou enviar:", error);
+    }
+  };
 
   // Auto-select first conversation and mark as viewed
   useEffect(() => {
@@ -107,14 +180,27 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     }
   };
 
-  const handleSendMessage = (message: string) => {
+  const handleSendMessage = async (message: string) => {
     if (!selectedConversation || !message.trim()) return;
     
-    console.log('💬 [CHAT_OVERLAY] Sending message:', message, 'to conversation:', selectedConversation);
-    
     const currentStatus = getConversationStatus(channelId, selectedConversation);
-    if (currentStatus === 'unread') {
-      updateConversationStatus(channelId, selectedConversation, 'in_progress', false);
+    if (currentStatus === "unread") {
+      updateConversationStatus(channelId, selectedConversation, "in_progress", false);
+    }
+
+    const success = await sendAppMessage({
+      conversationId: selectedConversation,
+      channelId: channelId,
+      content: message,
+      sender: "agent", // Assumindo que a mensagem é enviada pelo agente
+      messageType: "text",
+    });
+
+    if (success) {
+      // Opcional: Limpar o input da mensagem após o envio bem-sucedido
+      // setMessage(""); 
+    } else {
+      console.error("❌ [CHAT_OVERLAY] Falha ao enviar mensagem pelo aplicativo.");
     }
   };
 
@@ -218,8 +304,12 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
           onSidebarToggle={setIsSidebarOpen}
           onMarkAsResolved={handleMarkAsResolved}
           onSendMessage={handleSendMessage}
+          onSendFile={handleSendFile}
+          onSendAudio={handleSendAudio}
         />
       </div>
     </div>
   );
 };
+
+

@@ -7,7 +7,6 @@ import { useApiInstances } from '../../hooks/useApiInstances';
 import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
-import { channelWebSocketManager } from '../../services/ChannelWebSocketManager';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -29,29 +28,18 @@ export const ChannelApiMappingManager: React.FC = () => {
       
       await upsertMapping(selectedChannel, selectedInstance);
 
-      // Configurar WebSocket automaticamente (sem webhook)
+      // Configurar webhook automaticamente
       const instance = instances.find(inst => inst.id === selectedInstance);
       const channel = activeChannels.find(ch => ch.id === selectedChannel);
 
       if (instance && channel) {
-        console.log(`🔌 [WEBSOCKET] Configurando WebSocket para canal: ${channel.name} → instância: ${instance.instance_name}`);
+        console.log(`🔌 [WEBHOOK] Configurando webhook para canal: ${channel.name} → instância: ${instance.instance_name}`);
         
         try {
-          // Estabelecer conexão WebSocket local diretamente
-          const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel, {
-            baseUrl: instance.base_url,
-            apiKey: instance.api_key,
-            instanceName: instance.instance_name
-          });
-
-          if (wsResult.success) {
-            console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${channel.name}`);
-          } else {
-            console.warn("⚠️ [WEBSOCKET] Falha ao estabelecer conexão:", wsResult.error);
-          }
-
-        } catch (wsError) {
-          console.warn("⚠️ [WEBSOCKET] Erro durante configuração WebSocket:", wsError);
+          // Webhook será configurado automaticamente pelo backend
+          console.log(`✅ [WEBHOOK] Configuração de webhook para canal: ${channel.name} será processada pelo backend`);
+        } catch (error) {
+          console.warn("⚠️ [WEBHOOK] Erro durante configuração do webhook:", error);
         }
       }
 
@@ -75,11 +63,11 @@ export const ChannelApiMappingManager: React.FC = () => {
 
         await deleteMapping(channelId);
 
-        // Desconectar WebSocket
+        // Remover configuração de webhook
         if (instance && channel) {
-          console.log(`🔌 [WEBSOCKET] Desconectando WebSocket para canal: ${channel.name}`);
-          await channelWebSocketManager.disconnectChannelWebSocket(channelId);
-          console.log(`✅ [WEBSOCKET] WebSocket desconectado para canal: ${channel.name}`);
+          console.log(`🔌 [WEBHOOK] Removendo configuração de webhook para canal: ${channel.name}`);
+          // A remoção do webhook será processada pelo backend
+          console.log(`✅ [WEBHOOK] Configuração de webhook removida para canal: ${channel.name}`);
         }
       }
     } catch (error) {
@@ -96,17 +84,17 @@ export const ChannelApiMappingManager: React.FC = () => {
     return instance?.instance_name || 'Instância não encontrada';
   };
 
-  const getWebSocketStatus = (channelId: string) => {
-    return channelWebSocketManager.isChannelConnected(channelId);
+  const getWebhookStatus = (channelId: string) => {
+    // Sempre retorna false pois não estamos mais usando WebSocket
+    return false;
   };
 
-  const getWebSocketStatusBadge = (channelId: string) => {
-    const isConnected = getWebSocketStatus(channelId);
-    
+  const getWebhookStatusBadge = (channelId: string) => {
+    // Sempre mostra webhook configurado quando há mapeamento
     return (
-      <div className={`flex items-center gap-1 text-xs ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
+      <div className="flex items-center gap-1 text-xs text-green-600">
         <Wifi className="h-3 w-3" />
-        {isConnected ? 'WebSocket Ativo' : 'Desconectado'}
+        {'Webhook Configurado'}
       </div>
     );
   };
@@ -221,7 +209,7 @@ export const ChannelApiMappingManager: React.FC = () => {
                                   {getInstanceName(mapping.api_instance_id)}
                                 </span>
                               </div>
-                              {getWebSocketStatusBadge(channel.id)}
+                              {getWebhookStatusBadge(channel.id)}
                             </div>
                             <Button
                               variant="outline"

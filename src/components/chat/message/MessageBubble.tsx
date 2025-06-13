@@ -19,32 +19,43 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   return (
     <div className={cn(
       "chat-message-row message-animate",
-      isOwn ? "sent" : "received"
+      isOwn ? "justify-end" : "justify-start"
     )}>
       <div className={cn(
-        "chat-message-whatsapp",
-        isOwn ? "sent" : "received"
+        "relative max-w-[70%] px-4 py-2 rounded-lg shadow-md",
+        isOwn
+          ? "bg-primary text-primary-foreground rounded-br-none"
+          : "bg-card text-card-foreground rounded-bl-none border border-border",
+        isDarkMode ? "dark" : ""
       )}>
-        {!isOwn && (
-          <div className="chat-message-sender">
+        {!isOwn && message.sender.name && (
+          <div className={cn(
+            "text-xs font-semibold mb-1",
+            isDarkMode ? "text-muted-foreground" : "text-gray-600"
+          )}>
             {message.sender.name}
           </div>
         )}
         
-        <div className="chat-message-content">
+        <div className="text-sm">
           {children}
         </div>
         
-        <div className="chat-message-timestamp">
+        <div className={cn(
+          "text-[10px] mt-1 text-right",
+          isOwn ? "text-primary-foreground/80" : "text-muted-foreground"
+        )}>
           {new Date(message.timestamp).toLocaleTimeString('pt-BR', {
             hour: '2-digit',
             minute: '2-digit'
           })}
           {isOwn && (
-            <span className="checkmark">✓✓</span>
+            <span className="ml-1">✓✓</span>
           )}
         </div>
       </div>
     </div>
   );
 };
+
+

@@ -19,10 +19,15 @@ export const SendButton: React.FC<SendButtonProps> = ({
   sending,
   isDarkMode
 }) => {
+  console.log('[SendButton] Renderizando. hasContent:', hasContent);
   if (hasContent) {
+    console.log('[SendButton] hasContent é true. Botão de Enviar será renderizado.');
     return (
       <Button
-        onClick={onSend}
+        onClick={() => {
+          console.log('[SendButton] Botão de Enviar clicado. Chamando onSend().');
+          onSend();
+        }}
         disabled={sending}
         size="icon"
         className={cn(
@@ -43,11 +48,15 @@ export const SendButton: React.FC<SendButtonProps> = ({
     );
   }
 
+  console.log('[SendButton] hasContent é false. Botão de Gravar Áudio será renderizado.');
   return (
     <Button
       variant="ghost"
       size="icon"
-      onClick={onStartRecording}
+      onClick={() => {
+        console.log('[SendButton] Botão de Gravar Áudio clicado. Chamando onStartRecording().');
+        onStartRecording();
+      }}
       className={cn(
         "h-9 w-9 rounded-full",
         isDarkMode ? "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300" : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
@@ -57,3 +66,5 @@ export const SendButton: React.FC<SendButtonProps> = ({
     </Button>
   );
 };
+
+

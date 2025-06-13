@@ -42,11 +42,9 @@ export interface RawMessage {
   id: number;
   session_id: string;
   message: string;
-  media_base64?: string; // Nova coluna para armazenar base64
-  Nome_do_contato?: string;
-  nome_do_contato?: string;
-  read_at?: string;
-  tipo_remetente?: string;
-  mensagemtype?: string;
-  is_read?: boolean;
+  read_at: string;
+  Nome_do_contato: string;
+  mensagemtype: string;
+  tipo_remetente: string;
+  media_base64?: string;
 }

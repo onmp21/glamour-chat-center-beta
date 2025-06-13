@@ -1,4 +1,3 @@
-
 import { Base64Utils } from '@/utils/base64Utils';
 
 export interface MediaResult {
@@ -8,6 +7,8 @@ export interface MediaResult {
   size?: string;
   isProcessed: boolean;
   error?: string;
+  thumbnail?: string;
+  duration?: number;
 }
 
 export class MediaProcessor {
@@ -92,13 +93,20 @@ export class MediaProcessor {
         throw new Error('Formato de mídia não reconhecido');
       }
 
-      return {
+      const result: MediaResult = {
         type: detectedType,
         url: processedUrl,
         mimeType,
         size: this.calculateSize(processedUrl),
         isProcessed: true
       };
+
+      // Gerar thumbnail para vídeos
+      if (detectedType === 'video') {
+        result.thumbnail = this.generateVideoThumbnail(processedUrl);
+      }
+
+      return result;
     } catch (error) {
       console.error('❌ [MEDIA_PROCESSOR] Erro no processamento:', error);
       return {
@@ -262,6 +270,20 @@ export class MediaProcessor {
   }
 
   /**
+   * Gera thumbnail para vídeo
+   */
+  private static generateVideoThumbnail(videoUrl: string): string | undefined {
+    try {
+      // Para vídeos base64, não é possível gerar thumbnail no lado cliente
+      // sem carregar o vídeo completo. Retornar um placeholder.
+      return undefined;
+    } catch (error) {
+      console.error('❌ [MEDIA_PROCESSOR] Erro gerando thumbnail:', error);
+      return undefined;
+    }
+  }
+
+  /**
    * Retorna ícone baseado no tipo
    */
   static getMediaIcon(type: MediaResult['type']): string {
@@ -282,4 +304,78 @@ export class MediaProcessor {
   static isMediaType(type: string): boolean {
     return ['image', 'audio', 'video', 'document', 'sticker'].includes(type);
   }
+
+  /**
+   * Processa especificamente áudio do WhatsApp
+   */
+  static processAudio(content: string): MediaResult {
+    const result = this.process(content, 'audio');
+    
+    // Para áudio do WhatsApp, geralmente é OGG
+    if (result.isProcessed && result.mimeType === 'audio/mpeg') {
+      result.mimeType = 'audio/ogg';
+      result.url = result.url.replace('audio/mpeg', 'audio/ogg');
+    }
+    
+    return result;
+  }
+
+  /**
+   * Processa especificamente vídeo do WhatsApp
+   */
+  static processVideo(content: string): MediaResult {
+    const result = this.process(content, 'video');
+    
+    // Adicionar controles de vídeo
+    if (result.isProcessed) {
+      result.duration = this.estimateVideoDuration(content);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Processa especificamente imagem do WhatsApp
+   */
+  static processImage(content: string): MediaResult {
+    const result = this.process(content, 'image');
+    
+    // Para imagens, verificar se é sticker
+    if (result.isProcessed && result.mimeType === 'image/webp') {
+      result.type = 'sticker';
+    }
+    
+    return result;
+  }
+
+  /**
+   * Estima duração do vídeo (placeholder)
+   */
+  private static estimateVideoDuration(content: string): number | undefined {
+    // Implementação simplificada - em produção seria necessário
+    // analisar os metadados do vídeo
+    return undefined;
+  }
+
+  /**
+   * Valida se o conteúdo é uma mídia válida
+   */
+  static validateMedia(content: string, expectedType?: string): { isValid: boolean; error?: string } {
+    if (!content) {
+      return { isValid: false, error: 'Conteúdo vazio' };
+    }
+
+    const result = this.process(content, expectedType);
+    
+    if (!result.isProcessed) {
+      return { isValid: false, error: result.error || 'Falha no processamento' };
+    }
+
+    if (expectedType && result.type !== expectedType) {
+      return { isValid: false, error: `Tipo esperado: ${expectedType}, encontrado: ${result.type}` };
+    }
+
+    return { isValid: true };
+  }
 }
+

@@ -44,6 +44,7 @@ export const AndressaMessageDisplay: React.FC<AndressaMessageDisplayProps> = ({
           messageType={message.mensagemtype}
           messageId={message.id}
           isDarkMode={isDarkMode}
+          balloonColor={isAgent ? 'sent' : 'received'}
         />
       );
     }

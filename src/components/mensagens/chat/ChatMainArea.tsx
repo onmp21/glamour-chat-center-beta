@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Menu, MoreVertical } from 'lucide-react';
 import { ConversationHeader } from '../ConversationHeader';
 import { ChatInput } from '../ChatInput';
-import { MediaMessageRenderer } from '@/components/chat/MediaMessageRenderer';
+// Importar o novo componente otimizado
+import { OptimizedMessageList } from '../OptimizedMessageList';
 
 interface Message {
   id: string;
@@ -30,50 +30,44 @@ interface Conversation {
 interface ChatMainAreaProps {
   selectedConv: any;
   conversationForHeader: Conversation | null;
-  displayMessages: Message[];
-  messagesLoading: boolean;
+  // displayMessages: Message[]; // Removido, OptimizedMessageList gerencia
+  // messagesLoading: boolean; // Removido, OptimizedMessageList gerencia
   isSidebarOpen: boolean;
   isDarkMode: boolean;
   channelId?: string;
   onSidebarToggle: (open: boolean) => void;
   onMarkAsResolved: () => void;
   onSendMessage: (message: string) => void;
+  onSendFile: (file: File, caption?: string) => void;
+  onSendAudio: (audioBlob: Blob, duration: number) => void;
 }
 
 export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   selectedConv,
   conversationForHeader,
-  displayMessages,
-  messagesLoading,
+  // displayMessages, // Removido
+  // messagesLoading, // Removido
   isSidebarOpen,
   isDarkMode,
   channelId,
   onSidebarToggle,
   onMarkAsResolved,
-  onSendMessage
+  onSendMessage,
+  onSendFile,
+  onSendAudio
 }) => {
-  // Referência para o contêiner de mensagens
+  // Referência para o contêiner de mensagens (ainda pode ser útil para o ChatInput)
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  // const scrollAreaRef = useRef<HTMLDivElement>(null); // Removido, ScrollArea está dentro de OptimizedMessageList
   
-  // Função para rolar para o final das mensagens
+  // Função para rolar para o final das mensagens (ainda pode ser útil para o ChatInput)
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
   
-  // Rolar para o final quando as mensagens mudarem ou quando a conversa for selecionada
-  useEffect(() => {
-    if (!messagesLoading) {
-      // Pequeno atraso para garantir que o DOM foi atualizado
-      const timeoutId = setTimeout(() => {
-        scrollToBottom();
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [displayMessages, messagesLoading, selectedConv]);
+  // useEffect para rolar para o final removido, pois OptimizedMessageList gerencia
 
   if (!selectedConv || !conversationForHeader) {
     return (
@@ -90,54 +84,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     alert('Menu de opções em desenvolvimento');
   };
 
-  const renderMessage = (message: Message) => {
-    const isAgentMessage = message.sender === 'agent';
-    
-    // Verificar se é mídia usando a mesma lógica de todos os canais
-    const isMediaMessage = 
-      (message.mensagemtype && message.mensagemtype !== 'text') ||
-      message.content.startsWith('data:') ||
-      (message.content.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(message.content.replace(/\s/g, '')));
-    
-    return (
-      <div
-        key={message.id}
-        className={cn(
-          "chat-message-whatsapp message-animate",
-          isAgentMessage ? "sent" : "received"
-        )}
-      >
-        {/* Nome do contato para mensagens recebidas */}
-        {!isAgentMessage && message.Nome_do_contato && (
-          <div className="chat-message-sender" style={{ color: isDarkMode ? '#e9edef' : '#303030' }}>
-            {message.Nome_do_contato}
-          </div>
-        )}
-        
-        {/* Conteúdo da mensagem */}
-        <div>
-          {isMediaMessage ? (
-            <MediaMessageRenderer
-              content={message.content}
-              messageType={message.mensagemtype || 'text'}
-              messageId={message.id}
-              isDarkMode={isDarkMode}
-            />
-          ) : (
-            <p className="chat-message-text break-words">{message.content}</p>
-          )}
-        </div>
-        
-        {/* Timestamp */}
-        <div className="chat-message-timestamp">
-          {new Date(message.timestamp).toLocaleTimeString('pt-BR', {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
-        </div>
-      </div>
-    );
-  };
+  // renderMessage function removida, OptimizedMessageList renderiza as mensagens
 
   return (
     <>
@@ -189,20 +136,13 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         </div>
       </div>
       
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        {messagesLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#b5103c]"></div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {displayMessages.map(renderMessage)}
-            {/* Elemento invisível no final para rolar até ele */}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </ScrollArea>
+      {/* Messages - Usando OptimizedMessageList */}
+      {channelId && selectedConv.id && (
+        <OptimizedMessageList
+          channel={channelId}
+          sessionId={selectedConv.id}
+        />
+      )}
       
       {/* Input */}
       <ChatInput 
@@ -212,7 +152,11 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           // Rolar para o final após enviar uma mensagem
           setTimeout(scrollToBottom, 300);
         }}
+        onSendFile={onSendFile}
+        onSendAudio={onSendAudio}
       />
     </>
   );
 };
+
+

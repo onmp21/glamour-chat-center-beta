@@ -17,6 +17,7 @@ interface YelenaChatInputProps {
   conversationId: string;
   isDarkMode: boolean;
   onMessageSent?: () => void;
+  addMessageToState: (message: any) => void;
 }
 
 export const YelenaChatInput: React.FC<YelenaChatInputProps> = ({
@@ -24,6 +25,7 @@ export const YelenaChatInput: React.FC<YelenaChatInputProps> = ({
   conversationId,
   isDarkMode,
   onMessageSent,
+  addMessageToState,
 }) => {
   const [message, setMessage] = useState('');
   const [fileData, setFileData] = useState<FileData | null>(null);
@@ -35,7 +37,22 @@ export const YelenaChatInput: React.FC<YelenaChatInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async (caption?: string) => {
-    if ((!message.trim() && !fileData) || sending || !user) return;
+    console.log('🚀 [YELENA_CHAT_INPUT] handleSend chamado:', {
+      hasMessage: !!message.trim(),
+      hasFileData: !!fileData,
+      sending,
+      user: !!user,
+      userName: user?.name
+    });
+
+    if ((!message.trim() && !fileData) || sending || !user) {
+      console.log('❌ [YELENA_CHAT_INPUT] Envio bloqueado:', {
+        noContent: !message.trim() && !fileData,
+        sending,
+        noUser: !user
+      });
+      return;
+    }
 
     console.log('🚀 Iniciando envio de mensagem:', {
       hasText: !!message.trim(),
@@ -54,7 +71,7 @@ export const YelenaChatInput: React.FC<YelenaChatInputProps> = ({
       fileData: fileData || undefined
     };
 
-    const success = await sendMessage(messageData);
+    const success = await sendMessage(messageData, addMessageToState);
     if (success) {
       setMessage('');
       setFileData(null);

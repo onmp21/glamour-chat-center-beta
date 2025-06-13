@@ -10,7 +10,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 345 84% 39%; /* #b5103c - COR VERMELHA CORRETA */
+    --primary: 345 84% 39%; /* #b5103c - COR PRINCIPAL DA MARCA */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -43,42 +43,44 @@
 
   .dark {
     /* CORES PADRONIZADAS - TEMA ESCURO PROFISSIONAL */
-    --background: 240 10% 3.9%; /* #09090b - Fundo principal mais escuro */
-    --foreground: 0 0% 98%; /* #fafafa - Texto principal branco */
+    --background: 240 1% 13%; /* #212122 - Fundo principal */
+    --foreground: 0 0% 100%; /* #ffffff - Texto principal */
 
-    --card: 240 6% 10%; /* #18181b - Cards escuros */
-    --card-foreground: 0 0% 98%; /* #fafafa - Texto dos cards */
+    --card: 240 1% 15%; /* #272728 - Cards */
+    --card-foreground: 0 0% 100%; /* #ffffff - Texto dos cards */
 
-    --popover: 240 6% 10%; /* #18181b */
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 1% 15%; /* #272728 */
+    --popover-foreground: 0 0% 100%;
 
     --primary: 345 84% 39%; /* #b5103c - COR VERMELHA CORRETA */
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 6% 15%; /* #27272a - Cinza escuro para elementos secundários */
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 240 1% 15%; /* #272728 - Cinza escuro para elementos secundários */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 6% 15%; /* #27272a - Elementos com menos destaque */
-    --muted-foreground: 240 5% 64.9%; /* #a1a1aa - Texto menos destacado */
+    --muted: 240 1% 15%; /* #272728 - Elementos com menos destaque */
+    --muted-foreground: 0 0% 67%; /* #ababab - Texto menos destacado */
 
-    --accent: 240 6% 15%; /* #27272a - Elementos de destaque */
-    --accent-foreground: 0 0% 98%;
+    --accent: 240 1% 15%; /* #272728 - Elementos de destaque */
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 6% 20%; /* #3f3f46 - Bordas mais claras */
-    --input: 240 6% 10%; /* #18181b - Campos de input */
+    --border: 270 2% 21%; /* #363537 - Bordas */
+    --input: 240 1% 15%; /* #272728 - Campos de input */
     --ring: 345 84% 39%; /* #b5103c */
     
     /* SIDEBAR COM CORES PADRONIZADAS */
-    --sidebar-background: 240 10% 3.9%; /* #09090b - Mesmo fundo principal */
-    --sidebar-foreground: 0 0% 98%; /* #fafafa - Texto branco */
+    --sidebar-background: 240 1% 13%; /* #212122 - Mesmo fundo principal */
+    --sidebar-foreground: 0 0% 100%; /* #ffffff - Texto branco */
     --sidebar-primary: 345 84% 39%; /* #b5103c */
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 6% 10%; /* #18181b - Elementos destacados */
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 6% 20%; /* #3f3f46 - Bordas */
+    --sidebar-accent: 240 1% 15%; /* #272728 - Elementos destacados */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 270 2% 21%; /* #363537 - Bordas */
     --sidebar-ring: 345 84% 39%; /* #b5103c */
   }
 }
+
+

@@ -1,6 +1,7 @@
 import { supabase } from '../integrations/supabase/client';
 import { ChannelApiMappingRepository } from '../repositories/ChannelApiMappingRepository';
 import { ApiInstanceRepository } from '../repositories/ApiInstanceRepository';
+import { EvolutionApiService } from './EvolutionApiService';
 
 export type { ApiInstance } from '../types/domain/api/ApiInstance';
 
@@ -35,18 +36,39 @@ export class ChannelApiMappingService {
       'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
     };
     
-    console.log(`🗂️ [CHANNEL_API_MAPPING] Mapeando canal ${channelId} para tabela ${channelTableMapping[channelId] || 'yelena_ai_conversas'}`);
     return channelTableMapping[channelId] || 'yelena_ai_conversas';
   }
 
+  private channelNameToUuidMapping: Record<string, string> = {
+    'chat': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
+    'canarana': '011b69ba-cf25-4f63-af2e-4ad0260d9516',
+    'souto-soares': 'b7996f75-41a7-4725-8229-564f31868027',
+    'joao-dourado': '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
+    'america-dourada': '64d8acad-c645-4544-a1e6-2f0825fae00b',
+    'gerente-lojas': 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
+    'gerente-externo': 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7',
+  };
+
+  private getChannelUuid(channelIdOrName: string): string {
+    // Check if it's already a UUID (simple check, not foolproof but sufficient for this context)
+    if (channelIdOrName.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      return channelIdOrName;
+    }
+    // If it's a name, return the corresponding UUID
+    return this.channelNameToUuidMapping[channelIdOrName] || channelIdOrName; // Fallback to original if not found
+  }
+
   async getAllMappings() {
-    console.log(`🔍 [CHANNEL_API_MAPPING] Buscando todos os mapeamentos de API`);
     return this.channelApiMappingRepository.getAll();
   }
 
   async getMappingByChannelId(channelId: string) {
     console.log(`🔍 [CHANNEL_API_MAPPING] Buscando mapeamento de API para canal ${channelId}`);
-    return this.channelApiMappingRepository.getByChannelId(channelId);
+    const uuidChannelId = this.getChannelUuid(channelId); // Convert to UUID
+    if (uuidChannelId !== channelId) {
+      console.log(`🔄 [CHANNEL_API_MAPPING] Convertendo channelId '${channelId}' para UUID '${uuidChannelId}'`);
+    }
+    return this.channelApiMappingRepository.getByChannelId(uuidChannelId);
   }
 
   async getApiInstanceForChannel(channelId: string) {
@@ -76,12 +98,20 @@ export class ChannelApiMappingService {
 
   async upsertMapping(channelId: string, apiInstanceId: string) {
     console.log(`📝 [CHANNEL_API_MAPPING] Atualizando mapeamento para canal ${channelId} com instância ${apiInstanceId}`);
-    return this.channelApiMappingRepository.upsertByChannelId(channelId, apiInstanceId);
+    const uuidChannelId = this.getChannelUuid(channelId); // Convert to UUID
+    if (uuidChannelId !== channelId) {
+      console.log(`🔄 [CHANNEL_API_MAPPING] Convertendo channelId '${channelId}' para UUID '${uuidChannelId}' para upsert`);
+    }
+    return this.channelApiMappingRepository.upsertByChannelId(uuidChannelId, apiInstanceId);
   }
 
   async deleteMappingByChannelId(channelId: string) {
     console.log(`🗑️ [CHANNEL_API_MAPPING] Removendo mapeamento para canal ${channelId}`);
-    return this.channelApiMappingRepository.deleteByChannelId(channelId);
+    const uuidChannelId = this.getChannelUuid(channelId); // Convert to UUID
+    if (uuidChannelId !== channelId) {
+      console.log(`🔄 [CHANNEL_API_MAPPING] Convertendo channelId '${channelId}' para UUID '${uuidChannelId}' para exclusão`);
+    }
+    return this.channelApiMappingRepository.deleteByChannelId(uuidChannelId);
   }
 
   // Método para verificar conexão com cache
@@ -99,27 +129,16 @@ export class ChannelApiMappingService {
     try {
       console.log(`🔍 [CHANNEL_API_MAPPING] Verificando conexão da instância ${instanceName} em ${baseUrl}`);
       
-      const response = await fetch(`${baseUrl}/instance/connectionState/${instanceName}`, {
-        method: 'GET',
-        headers: {
-          'apikey': apiKey,
-          'Content-Type': 'application/json'
-        }
+      const evolutionService = new EvolutionApiService({
+        baseUrl,
+        apiKey,
+        instanceName
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [CHANNEL_API_MAPPING] Erro ao verificar status da conexão: ${response.status} - ${errorText}`);
-        
-        // Atualizar cache com resultado negativo
-        this.connectionCache.set(cacheKey, { timestamp: now, isConnected: false });
-        return false;
-      }
-
-      const data = await response.json();
-      const isConnected = data.instance?.state === 'open';
       
-      console.log(`🔍 [CHANNEL_API_MAPPING] Status da instância ${instanceName}: ${data.instance?.state}`);
+      const result = await evolutionService.getConnectionStatus();
+      const isConnected = result.success && result.connected;
+      
+      console.log(`🔍 [CHANNEL_API_MAPPING] Status da instância ${instanceName}: ${result.state || 'unknown'} - Conectado: ${isConnected}`);
       
       // Atualizar cache com o resultado
       this.connectionCache.set(cacheKey, { timestamp: now, isConnected });
@@ -139,7 +158,7 @@ export class ChannelApiMappingService {
       console.log(`🔄 [CHANNEL_API_MAPPING] Tentando reconectar instância ${instanceName}`);
       
       const response = await fetch(`${baseUrl}/instance/restart/${instanceName}`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'apikey': apiKey,
           'Content-Type': 'application/json'
@@ -171,7 +190,7 @@ export class ChannelApiMappingService {
   }
 
   // Método para enviar mensagem via API Evolution
-  async sendMessageViaEvolution(channelId: string, phoneNumber: string, message: string, mediaUrl?: string): Promise<boolean> {
+  async sendMessageViaEvolution(channelId: string, phoneNumber: string, message: string, mediaBase64?: string, mediaType?: string): Promise<boolean> {
     try {
       console.log(`📤 [CHANNEL_API_MAPPING] Enviando mensagem para ${phoneNumber} via canal ${channelId}`);
       
@@ -205,71 +224,66 @@ export class ChannelApiMappingService {
         }
       }
 
-      // Preparar os dados da mensagem
-      const messageData: any = {
-        number: phoneNumber
-      };
-
-      // Verificar se é mensagem de texto ou mídia
-      if (mediaUrl) {
-        // Determinar o tipo de mídia com base na URL
-        if (mediaUrl.startsWith('data:image')) {
-          messageData.imageMessage = {
-            image: mediaUrl.split(',')[1], // Remover o prefixo data:image/...;base64,
-            caption: message || ''
-          };
-        } else if (mediaUrl.startsWith('data:audio')) {
-          messageData.audioMessage = {
-            audio: mediaUrl.split(',')[1]
-          };
-        } else if (mediaUrl.startsWith('data:video')) {
-          messageData.videoMessage = {
-            video: mediaUrl.split(',')[1],
-            caption: message || ''
-          };
-        } else if (mediaUrl.startsWith('data:application')) {
-          messageData.documentMessage = {
-            document: mediaUrl.split(',')[1],
-            fileName: 'document.pdf',
-            caption: message || ''
-          };
-        } else {
-          // Se não conseguir determinar o tipo, enviar como texto com link
-          messageData.textMessage = {
-            text: `${message || ''}\n${mediaUrl}`
-          };
-        }
-      } else {
-        // Mensagem de texto simples
-        messageData.textMessage = {
-          text: message
-        };
-      }
-
-      // Enviar a mensagem para a API Evolution
-      console.log(`🔄 [CHANNEL_API_MAPPING] Enviando mensagem para API Evolution: ${apiInstance.base_url}/message/sendMessage`);
-      
-      const response = await fetch(`${apiInstance.base_url}/message/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiInstance.api_key
-        },
-        body: JSON.stringify(messageData)
+      const evolutionService = new EvolutionApiService({
+        baseUrl: apiInstance.base_url,
+        apiKey: apiInstance.api_key,
+        instanceName: apiInstance.instance_name
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error(`❌ [CHANNEL_API_MAPPING] Erro ao enviar mensagem via API Evolution: ${response.status} - ${errorData}`);
-        return false;
+      let result;
+      
+      if (mediaBase64 && mediaType) {
+        // Enviar mensagem com mídia
+        result = await evolutionService.sendMediaMessage(phoneNumber, mediaBase64, message);
+      } else {
+        // Enviar mensagem de texto
+        result = await evolutionService.sendTextMessage(phoneNumber, message);
       }
 
-      const result = await response.json();
-      console.log('✅ [CHANNEL_API_MAPPING] Mensagem enviada com sucesso via API Evolution:', result);
-      return true;
+      if (result.success) {
+        console.log('✅ [CHANNEL_API_MAPPING] Mensagem enviada com sucesso via API Evolution');
+        return true;
+      } else {
+        console.error(`❌ [CHANNEL_API_MAPPING] Erro ao enviar mensagem: ${result.error}`);
+        return false;
+      }
     } catch (error) {
       console.error('❌ [CHANNEL_API_MAPPING] Erro ao enviar mensagem via API Evolution:', error);
       return false;
+    }
+  }
+
+  // Método para obter foto de perfil de um contato
+  async getContactProfilePicture(channelId: string, phoneNumber: string): Promise<string | null> {
+    try {
+      console.log(`🖼️ [CHANNEL_API_MAPPING] Obtendo foto de perfil para ${phoneNumber} via canal ${channelId}`);
+      
+      // Obter a instância da API para o canal
+      const apiInstance = await this.getApiInstanceForChannel(channelId);
+      
+      if (!apiInstance) {
+        console.error(`❌ [CHANNEL_API_MAPPING] Nenhuma instância da API configurada para o canal ${channelId}`);
+        return null;
+      }
+
+      const evolutionService = new EvolutionApiService({
+        baseUrl: apiInstance.base_url,
+        apiKey: apiInstance.api_key,
+        instanceName: apiInstance.instance_name
+      });
+
+      const result = await evolutionService.getProfilePicture(phoneNumber);
+      
+      if (result.success && result.data?.profilePictureUrl) {
+        console.log(`✅ [CHANNEL_API_MAPPING] Foto de perfil obtida com sucesso para ${phoneNumber}`);
+        return result.data.profilePictureUrl;
+      } else {
+        console.warn(`⚠️ [CHANNEL_API_MAPPING] Não foi possível obter foto de perfil para ${phoneNumber}: ${result.error}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ [CHANNEL_API_MAPPING] Erro ao obter foto de perfil:', error);
+      return null;
     }
   }
 
@@ -280,9 +294,19 @@ export class ChannelApiMappingService {
       
       console.log(`💾 [CHANNEL_API_MAPPING] Salvando mensagem na tabela ${tableName}`);
       
+      // Formatar dados da mensagem conforme especificação da tabela
+      const formattedMessageData = {
+        session_id: messageData.session_id, // numero do cliente
+        message: messageData.message, // texto ou base64 da mensagem
+        read_at: messageData.read_at, // hora que a mensagem foi enviada (horário de Brasília)
+        Nome_do_contato: messageData.Nome_do_contato, // nome do cliente
+        mensagemtype: messageData.mensagemtype, // audioMenssage, imageMenssage, videoMenssage, stickerMessage ou conversation
+        tipo_remetente: messageData.tipo_remetente // quem enviou a mensagem "nome do cliente" ou "nome do canal"
+      };
+      
       const { error } = await supabase
         .from(tableName as any)
-        .insert([messageData]);
+        .insert([formattedMessageData]);
 
       if (error) {
         console.error(`❌ [CHANNEL_API_MAPPING] Erro ao salvar mensagem na tabela ${tableName}:`, error);

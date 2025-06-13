@@ -44,6 +44,7 @@ export const YelenaMessageDisplay: React.FC<YelenaMessageDisplayProps> = ({
           messageType={message.mensagemtype}
           messageId={message.id}
           isDarkMode={isDarkMode}
+          balloonColor={isAgent ? 'sent' : 'received'}
         />
       );
     }

@@ -25,7 +25,7 @@ export class EvolutionWebSocketService {
   private normalizeInstanceName(name: string): string {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9]/g, '')
+      .replace(/[^a-z0-9]/g, "")
       .substring(0, 20);
   }
 
@@ -34,14 +34,11 @@ export class EvolutionWebSocketService {
       const normalizedName = this.normalizeInstanceName(this.config.instanceName);
       console.log(`🔌 [WEBSOCKET] Conectando à instância: ${normalizedName}`);
 
-      // Primeiro configurar o WebSocket na API Evolution
-      await this.configureWebSocket();
-
       // Construir URL do WebSocket
       const wsUrl = this.config.baseUrl
-        .replace('http://', 'ws://')
-        .replace('https://', 'wss://') + 
-        `/websocket/${normalizedName}?apikey=${this.config.apiKey}`;
+        .replace("http://", "ws://")
+        .replace("https://", "wss://") +
+        `/websocket/${normalizedName}?apikey=${this.config.apiKey}`;;
 
       console.log(`🔌 [WEBSOCKET] URL: ${wsUrl}`);
 
@@ -49,7 +46,7 @@ export class EvolutionWebSocketService {
 
       return new Promise((resolve, reject) => {
         if (!this.ws) {
-          reject(new Error('WebSocket não inicializado'));
+          reject(new Error("WebSocket não inicializado"));
           return;
         }
 
@@ -65,7 +62,7 @@ export class EvolutionWebSocketService {
             console.log(`📨 [WEBSOCKET] Mensagem recebida:`, message);
             this.handleMessage(message);
           } catch (error) {
-            console.error('❌ [WEBSOCKET] Erro ao processar mensagem:', error);
+            console.error("❌ [WEBSOCKET] Erro ao processar mensagem:", error);
           }
         };
 
@@ -75,57 +72,35 @@ export class EvolutionWebSocketService {
         };
 
         this.ws.onerror = (error) => {
-          console.error('❌ [WEBSOCKET] Erro de conexão:', error);
+          console.error("❌ [WEBSOCKET] Erro de conexão:", error);
           reject(error);
         };
 
         // Timeout para conexão
         setTimeout(() => {
           if (this.ws?.readyState !== WebSocket.OPEN) {
-            reject(new Error('Timeout na conexão WebSocket'));
+            reject(new Error("Timeout na conexão WebSocket"));
           }
         }, 10000);
       });
     } catch (error) {
-      console.error('❌ [WEBSOCKET] Erro ao conectar:', error);
+      console.error("❌ [WEBSOCKET] Erro ao conectar:", error);
       return false;
     }
   }
 
-  private async configureWebSocket(): Promise<void> {
-    try {
-      const normalizedName = this.normalizeInstanceName(this.config.instanceName);
-      console.log(`⚙️ [WEBSOCKET] Configurando WebSocket para: ${normalizedName}`);
-
-      const response = await fetch(`${this.config.baseUrl}/websocket/set/${normalizedName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.config.apiKey
-        },
-        body: JSON.stringify({
-          enabled: true,
-          events: [
-            'MESSAGES_UPSERT',
-            'MESSAGES_SET',
-            'CONNECTION_UPDATE',
-            'MESSAGES_UPDATE',
-            'MESSAGES_DELETE'
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [WEBSOCKET] Erro ao configurar: ${response.status} - ${errorText}`);
-        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log(`✅ [WEBSOCKET] Configuração aplicada:`, result);
-    } catch (error) {
-      console.error('❌ [WEBSOCKET] Erro ao configurar WebSocket:', error);
-      throw error;
+  private handleReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`🔄 [WEBSOCKET] Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+      
+      setTimeout(() => {
+        this.connect().catch(error => {
+          console.error("❌ [WEBSOCKET] Erro na reconexão:", error);
+        });
+      }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.error("❌ [WEBSOCKET] Máximo de tentativas de reconexão atingido");
     }
   }
 
@@ -144,6 +119,9 @@ export class EvolutionWebSocketService {
         break;
       case 'MESSAGES_DELETE':
         this.handleMessageDelete(data);
+        break;
+      case 'QRCODE_UPDATED':
+        this.handleQrCodeUpdated(data);
         break;
       default:
         console.log(`📨 [WEBSOCKET] Evento não tratado: ${event}`, data);
@@ -190,6 +168,15 @@ export class EvolutionWebSocketService {
     
     // Emitir evento para componentes React
     window.dispatchEvent(new CustomEvent('evolution-message-delete', {
+      detail: data
+    }));
+  }
+
+  private handleQrCodeUpdated(data: any): void {
+    console.log(`📸 [WEBSOCKET] QR Code atualizado:`, data);
+    
+    // Emitir evento para componentes React
+    window.dispatchEvent(new CustomEvent('evolution-qrcode-updated', {
       detail: data
     }));
   }
@@ -271,7 +258,7 @@ export class EvolutionWebSocketService {
       return {
         caption: msg.videoMessage.caption,
         mimetype: msg.videoMessage.mimetype,
-        url: msg.videoMessage.url,
+        url: msg.videoVideo.url,
         base64: msg.videoMessage.base64 // Se disponível
       };
     }
@@ -309,6 +296,13 @@ export class EvolutionWebSocketService {
       };
     }
     
+    if (msg?.contactMessage) {
+      return {
+        displayName: msg.contactMessage.displayName,
+        vcard: msg.contactMessage.vcard
+      };
+    }
+    
     return { raw: msg };
   }
 
@@ -324,21 +318,6 @@ export class EvolutionWebSocketService {
       
     } catch (error) {
       console.error('❌ [WEBSOCKET] Erro ao salvar mensagem:', error);
-    }
-  }
-
-  private handleReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      console.log(`🔄 [WEBSOCKET] Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-      
-      setTimeout(() => {
-        this.connect().catch(error => {
-          console.error('❌ [WEBSOCKET] Erro na reconexão:', error);
-        });
-      }, this.reconnectDelay * this.reconnectAttempts);
-    } else {
-      console.error('❌ [WEBSOCKET] Máximo de tentativas de reconexão atingido');
     }
   }
 
@@ -363,60 +342,15 @@ export class EvolutionWebSocketService {
   }
 
   getConnectionState(): string {
-    if (!this.ws) return 'DISCONNECTED';
+    if (!this.ws) return "DISCONNECTED";
     
     switch (this.ws.readyState) {
-      case WebSocket.CONNECTING: return 'CONNECTING';
-      case WebSocket.OPEN: return 'CONNECTED';
-      case WebSocket.CLOSING: return 'CLOSING';
-      case WebSocket.CLOSED: return 'DISCONNECTED';
-      default: return 'UNKNOWN';
+      case WebSocket.CONNECTING: return "CONNECTING";
+      case WebSocket.OPEN: return "CONNECTED";
+      case WebSocket.CLOSING: return "CLOSING";
+      case WebSocket.CLOSED: return "DISCONNECTED";
+      default: return "UNKNOWN";
     }
   }
 }
 
-export class EvolutionWebSocketManager {
-  private connections: Map<string, EvolutionWebSocketService> = new Map();
-
-  addConnection(channelId: string, config: WebSocketConfig): EvolutionWebSocketService {
-    const service = new EvolutionWebSocketService(config);
-    this.connections.set(channelId, service);
-    console.log(`✅ [WEBSOCKET_MANAGER] Conexão adicionada para canal: ${channelId}`);
-    return service;
-  }
-
-  getConnection(channelId: string): EvolutionWebSocketService | null {
-    return this.connections.get(channelId) || null;
-  }
-
-  removeConnection(channelId: string): void {
-    const connection = this.connections.get(channelId);
-    if (connection) {
-      connection.disconnect();
-      this.connections.delete(channelId);
-      console.log(`🗑️ [WEBSOCKET_MANAGER] Conexão removida para canal: ${channelId}`);
-    }
-  }
-
-  disconnectAll(): void {
-    for (const [channelId, connection] of this.connections.entries()) {
-      connection.disconnect();
-    }
-    this.connections.clear();
-    console.log(`🔌 [WEBSOCKET_MANAGER] Todas as conexões desconectadas`);
-  }
-
-  listConnections(): string[] {
-    return Array.from(this.connections.keys());
-  }
-
-  getConnectionStates(): Record<string, string> {
-    const states: Record<string, string> = {};
-    for (const [channelId, connection] of this.connections.entries()) {
-      states[channelId] = connection.getConnectionState();
-    }
-    return states;
-  }
-}
-
-export const evolutionWebSocketManager = new EvolutionWebSocketManager();

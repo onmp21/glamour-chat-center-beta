@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <>
       <div className={cn(
         "h-full transition-all duration-300 flex flex-col",
-        isDarkMode ? "bg-[#09090b] border-[#3f3f46]" : "bg-white border-gray-200",
+        isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200",
         "border-r",
         isVisible ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         isCollapsed ? "w-16" : "w-64"
@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={onToggleCollapse}
                   className={cn(
                     "h-8 w-8 mx-auto",
-                    isDarkMode ? "text-[#a1a1aa] hover:bg-[#18181b]" : "text-gray-600 hover:bg-gray-100"
+                    isDarkMode ? "text-white hover:bg-[#b5103c]" : "text-gray-600 hover:bg-gray-100"
                   )}
                 >
                   <PanelLeftClose size={24} className="text-[#b5103c]" strokeWidth={1.5} />
@@ -143,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onToggleCollapse}
                 className={cn(
                   "h-8 w-8",
-                  isDarkMode ? "text-[#a1a1aa] hover:bg-[#18181b]" : "text-gray-600 hover:bg-gray-100"
+                  isDarkMode ? "text-white hover:bg-[#b5103c]" : "text-gray-600 hover:bg-gray-100"
                 )}
               >
                 <PanelLeftClose size={24} className="text-[#b5103c]" strokeWidth={1.5} />
@@ -164,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   activeSection === item.id
                     ? "bg-[#b5103c] text-white shadow-lg"
                     : isDarkMode
-                      ? "text-[#a1a1aa] hover:bg-[#18181b] hover:text-white"
+                      ? "text-white hover:bg-[#b5103c] hover:text-white"
                       : "text-gray-700 hover:bg-gray-100",
                   isCollapsed && "justify-center px-2"
                 )}

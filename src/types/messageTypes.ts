@@ -17,14 +17,11 @@ export interface ExtendedMessageData {
 }
 
 export interface RawMessage {
-  id: number;
-  session_id: string;
-  message: string;
-  media_base64?: string;
-  Nome_do_contato?: string;
-  nome_do_contato?: string;
-  read_at?: string;
-  tipo_remetente?: string;
-  mensagemtype?: string;
-  is_read?: boolean;
+  id?: string;
+  session_id: string; // numero do cliente
+  message: string; // texto ou base64 da mensagem
+  read_at: string; // hora que a mensagem foi enviada (horário de Brasília)
+  Nome_do_contato: string; // nome do cliente
+  mensagemtype: string; // audioMenssage, imageMenssage, videoMenssage, stickerMessage ou conversation
+  tipo_remetente: string; // quem enviou a mensagem "nome do cliente" ou "nome do canal"
 }

@@ -15,15 +15,17 @@ export class ConversationGrouper {
       const phoneNumber = PhoneExtractor.extractPhoneFromSessionId(msg.session_id);
       if (!phoneNumber) return;
 
-      const contactName = ContactNameResolver.getResolvedName(phoneNumber) || `Cliente ${phoneNumber.slice(-4)}`;
+      const contactName = ContactNameResolver.getResolvedName(phoneNumber) || msg.Nome_do_contato || `Cliente ${phoneNumber.slice(-4)}`;
       const lastMessageTime = msg.read_at || null;
 
-      if (conversationsMap.has(phoneNumber)) {
-        const conversation = conversationsMap.get(phoneNumber)!;
+      const conversationKey = `${phoneNumber}_${contactName}`;
+
+      if (conversationsMap.has(conversationKey)) {
+        const conversation = conversationsMap.get(conversationKey)!;
         
         // Atualizar apenas se a mensagem for mais recente
         if (lastMessageTime && (!conversation.last_message_time || lastMessageTime > conversation.last_message_time)) {
-          conversationsMap.set(phoneNumber, {
+          conversationsMap.set(conversationKey, {
             ...conversation,
             last_message: msg.message,
             last_message_time: lastMessageTime,
@@ -31,8 +33,8 @@ export class ConversationGrouper {
           });
         }
       } else {
-        conversationsMap.set(phoneNumber, {
-          id: phoneNumber,
+        conversationsMap.set(conversationKey, {
+          id: conversationKey,
           contact_name: contactName,
           contact_phone: phoneNumber,
           last_message: msg.message,

@@ -34,6 +34,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         conversationId={conversationId}
         isDarkMode={isDarkMode}
         onMessageSent={onMessageSent}
+        addMessageToState={addMessageToState}
       />
     );
   }
@@ -54,10 +55,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   } = useMessageActions(channelId, conversationId, addMessageToState);
 
   const handleSendMessage = async (caption?: string) => {
+    console.log('[ChatInput] handleSendMessage foi chamado.'); // Novo log
+    console.log('[ChatInput] Chamando handleSend com fileData:', fileData);
     const success = await handleSend(caption);
     if (success) {
       setShowFilePreview(false);
-      onMessageSent?.();
     }
   };
 
@@ -66,6 +68,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleFileSelect = (fileData: FileData) => {
+    console.log('[ChatInput] Arquivo selecionado:', fileData);
     setFileData(fileData);
     setShowFilePreview(true);
     setError(null);
@@ -77,6 +80,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleAudioReady = (audioData: FileData) => {
+    console.log('[ChatInput] Áudio pronto:', audioData);
     setFileData(audioData);
     setIsRecording(false);
     setShowFilePreview(true);
@@ -158,3 +162,5 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     </>
   );
 };
+
+

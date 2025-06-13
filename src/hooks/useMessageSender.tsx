@@ -85,6 +85,7 @@ export const useMessageSender = () => {
 
   const sendMessage = async (messageData: MessageData) => {
     setSending(true);
+    console.log(`🔍 [USE_MESSAGE_SENDER] Dados da mensagem recebidos:`, messageData);
     try {
       const tableName = getTableNameForChannel(messageData.channelId);
       

@@ -166,29 +166,63 @@ export function useChannelConversations(channelId: string) {
     loadConversations();
   }, [loadConversations]);
 
-  // Configurar realtime para atualizações via WebSocket
+  // Configurar long polling otimizado para atualizações quase em tempo real
   useEffect(() => {
     if (!channelId) return;
 
     const tableName = getTableNameForChannel(channelId);
+    let lastCheckedTimestamp = new Date().toISOString();
+    let isPolling = false;
+    let shouldContinuePolling = true;
     
-    const channel = supabase
-      .channel(`conversations-${channelId}`)
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: tableName 
-        }, 
-        (payload) => {
-          console.log(`🔄 [CONVERSATIONS] Mudança detectada na tabela ${tableName}:`, payload);
-          loadConversations();
+    console.log(`🔄 [LONG_POLLING] Iniciando long polling para canal: ${channelId}, tabela: ${tableName}`);
+    
+    // Função para verificar novas mensagens
+    const checkForNewMessages = async () => {
+      if (isPolling || !shouldContinuePolling) return;
+      
+      try {
+        isPolling = true;
+        
+        // Buscar mensagens mais recentes que o último timestamp verificado
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .gt('read_at', lastCheckedTimestamp)
+          .order('id', { ascending: true });
+        
+        if (error) {
+          console.error(`❌ [LONG_POLLING] Erro ao verificar novas mensagens:`, error);
+          return;
         }
-      )
-      .subscribe();
+        
+        if (data && data.length > 0) {
+          console.log(`✅ [LONG_POLLING] ${data.length} novas mensagens encontradas para ${channelId}`);
+          lastCheckedTimestamp = new Date().toISOString();
+          await loadConversations();
+        }
+        
+        // Iniciar próximo ciclo de polling imediatamente para mensagens novas
+        // ou após um curto intervalo se não houver mensagens novas
+        setTimeout(
+          checkForNewMessages, 
+          data && data.length > 0 ? 500 : 2000
+        );
+        
+      } catch (error) {
+        console.error(`❌ [LONG_POLLING] Erro no polling:`, error);
+        setTimeout(checkForNewMessages, 3000); // Tentar novamente após erro
+      } finally {
+        isPolling = false;
+      }
+    };
 
+    // Iniciar o long polling
+    checkForNewMessages();
+    
     return () => {
-      supabase.removeChannel(channel);
+      console.log(`🔄 [LONG_POLLING] Parando long polling para canal: ${channelId}`);
+      shouldContinuePolling = false;
     };
   }, [channelId, getTableNameForChannel, loadConversations]);
 

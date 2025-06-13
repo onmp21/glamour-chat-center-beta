@@ -1,275 +1,588 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  Users, 
-  MessageCircle, 
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  FileText,
+  Download,
+  Calendar,
+  Users,
+  MessageCircle,
   TrendingUp,
   Filter,
   Plus,
   Eye,
-  BarChart3
+  BarChart3,
+  Loader2,
+  Printer,
+  Brain,
+  Activity,
+  PieChart
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { AIProviderService } from '@/services/AIProviderService';
+import { AIProvider, ReportResult, ReportHistory } from '@/types/ai-providers';
+import { ConversationService } from '@/services/ConversationService'; // Assumindo que este serviço existe para buscar dados de conversas
+
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
 }
 
+interface ReportFilters {
+  channel_id?: string;
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  report_type: 'conversations' | 'channels' | 'custom';
+  custom_prompt?: string;
+}
+
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
   isDarkMode
 }) => {
+  const { toast } = useToast();
   const [selectedPeriod, setSelectedPeriod] = useState('7d');
-  
-  const stats = [
-    {
-      title: 'Total de Conversas',
-      value: '1,234',
-      change: '+12%',
-      icon: MessageCircle,
-      color: 'text-blue-600'
-    },
-    {
-      title: 'Usuários Ativos',
-      value: '856',
-      change: '+8%',
-      icon: Users,
-      color: 'text-green-600'
-    },
-    {
-      title: 'Taxa de Resposta',
-      value: '94%',
-      change: '+5%',
-      icon: TrendingUp,
-      color: 'text-purple-600'
-    },
-    {
-      title: 'Relatórios Gerados',
-      value: '45',
-      change: '+15%',
-      icon: FileText,
-      color: 'text-orange-600'
-    }
-  ];
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [filters, setFilters] = useState<ReportFilters>({
+    report_type: 'conversations'
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [reportResult, setReportResult] = useState<ReportResult | null>(null);
+  const [error, setError] = useState<string>('');
+  const [channels, setChannels] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [recentReports, setRecentReports] = useState<ReportHistory[]>([]); // Para o histórico de relatórios
 
-  const recentReports = [
-    {
-      id: 1,
-      name: 'Relatório de Conversas - Dezembro',
-      type: 'Conversas',
-      date: '2024-12-15',
-      status: 'Concluído',
-      size: '2.3 MB'
-    },
-    {
-      id: 2,
-      name: 'Análise de Performance - Semanal',
-      type: 'Performance',
-      date: '2024-12-14',
-      status: 'Processando',
-      size: '1.8 MB'
-    },
-    {
-      id: 3,
-      name: 'Relatório de Atendimento - Novembro',
-      type: 'Atendimento',
-      date: '2024-12-10',
-      status: 'Concluído',
-      size: '3.1 MB'
-    }
-  ];
+  // Carregar provedores, canais e histórico de relatórios ao montar
+  useEffect(() => {
+    loadProviders();
+    loadChannels();
+    loadRecentReports();
+  }, []);
 
-  const reportTypes = [
-    {
-      name: 'Relatório de Conversas',
-      description: 'Análise detalhada das conversas por período',
-      icon: MessageCircle,
-      color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-    },
-    {
-      name: 'Relatório de Performance',
-      description: 'Métricas de performance e tempo de resposta',
-      icon: BarChart3,
-      color: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-    },
-    {
-      name: 'Relatório de Usuários',
-      description: 'Análise de usuários ativos e engajamento',
-      icon: Users,
-      color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400'
+  const loadProviders = async () => {
+    try {
+      const activeProviders = await AIProviderService.getActiveProviders();
+      setProviders(activeProviders);
+      if (activeProviders.length > 0) {
+        setSelectedProvider(activeProviders[0].id);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar provedores:', error);
     }
-  ];
+  };
+
+  const loadChannels = async () => {
+    try {
+      const channelsData = await ConversationService.getChannels();
+      setChannels(channelsData);
+    } catch (error) {
+      console.error('Erro ao carregar canais:', error);
+    }
+  };
+
+  const loadRecentReports = async () => {
+    try {
+      // TODO: Implementar serviço para buscar histórico de relatórios do backend
+      // Por enquanto, mock data
+      setRecentReports([
+        {
+          id: 1,
+          report_type: 'conversations',
+          prompt: 'Resumo das conversas de dezembro',
+          generated_report: 'Relatório de conversas de dezembro...',
+          provider_id: 1,
+          provider_name: 'OpenAI',
+          model_used: 'gpt-4',
+          tokens_used: 1200,
+          generation_time: 5.2,
+          created_at: '2024-12-15T10:00:00Z',
+          metadata: {}
+        },
+        {
+          id: 2,
+          report_type: 'custom',
+          prompt: 'Análise de sentimento dos últimos 7 dias',
+          generated_report: 'Análise de sentimento: 80% positivo...',
+          provider_id: 1,
+          provider_name: 'OpenAI',
+          model_used: 'gpt-3.5-turbo',
+          tokens_used: 800,
+          generation_time: 3.1,
+          created_at: '2024-12-14T14:30:00Z',
+          metadata: {}
+        }
+      ]);
+    } catch (error) {
+      console.error('Erro ao carregar relatórios recentes:', error);
+    }
+  };
+
+  const generateReport = async () => {
+    if (!selectedProvider) {
+      setError('Selecione um provedor de IA');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError('');
+    setReportResult(null);
+
+    try {
+      let data: any;
+      // TODO: Ajustar a busca de dados conforme a necessidade do backend
+      if (filters.report_type === 'conversations') {
+        data = await ConversationService.getConversationsForLLMAnalysis(100, {
+          channel_id: filters.channel_id,
+          status: filters.status,
+          date_from: filters.date_from,
+          date_to: filters.date_to
+        });
+      } else if (filters.report_type === 'channels') {
+        data = await ConversationService.getChannels();
+      } else {
+        data = await ConversationService.getConversationsSummary({
+          channel_id: filters.channel_id,
+          status: filters.status,
+          date_from: filters.date_from,
+          date_to: filters.date_to
+        });
+      }
+
+      const response = await fetch('http://localhost:5000/api/reports/generate', { // Usar o endpoint do backend
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider_id: selectedProvider,
+          report_type: filters.report_type,
+          data: data,
+          custom_prompt: filters.custom_prompt,
+          filters: filters // Passar os filtros para o backend também
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao gerar relatório');
+      }
+
+      const result: ReportResult = await response.json();
+      setReportResult(result);
+      toast({
+        title: "Sucesso",
+        description: "Relatório gerado com sucesso",
+      });
+      loadRecentReports(); // Recarregar histórico após gerar novo relatório
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erro desconhecido');
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro ao gerar relatório. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const downloadReport = (reportContent: string, reportType: string, reportId?: number) => {
+    const filename = `relatorio_${reportType}_${reportId || new Date().toISOString().split('T')[0]}.md`;
+    const blob = new Blob([reportContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const printReport = (reportContent: string) => {
+    // Implementar lógica de impressão, talvez usando um iframe ou nova janela
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Relatório</title>
+            <style>
+              body { font-family: sans-serif; margin: 20px; }
+              pre { white-space: pre-wrap; word-wrap: break-word; }
+            </style>
+          </head>
+          <body>
+            <pre>${reportContent}</pre>
+            <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); } }</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const clearReport = () => {
+    setReportResult(null);
+    setError('');
+    setFilters({ report_type: 'conversations' });
+    setSelectedProvider(providers.length > 0 ? providers[0].id : '');
+  };
+
+  // Mock de dados para os gráficos (substituir por dados reais do backend)
+  const chartData = {
+    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+    datasets: [
+      {
+        label: 'Conversas',
+        data: [65, 59, 80, 81, 56, 55],
+        backgroundColor: 'rgba(181, 16, 60, 0.5)', // Cor principal do tema
+        borderColor: '#b5103c',
+        borderWidth: 1,
+      },
+    ],
+  };
 
   return (
-    <div className="min-h-screen p-6 bg-background">
+    <div className={cn("h-full flex flex-col", isDarkMode ? "bg-background" : "bg-gray-50")}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-foreground">
-          Central de Relatórios
-        </h1>
-        <p className="text-lg text-muted-foreground">
-          Análises e relatórios detalhados do sistema
-        </p>
-      </div>
-
-      {/* Filtros e Ações */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
-        <div className="flex gap-2">
-          <Button
-            variant={selectedPeriod === '7d' ? 'default' : 'outline'}
-            onClick={() => setSelectedPeriod('7d')}
-            size="sm"
-          >
-            7 dias
-          </Button>
-          <Button
-            variant={selectedPeriod === '30d' ? 'default' : 'outline'}
-            onClick={() => setSelectedPeriod('30d')}
-            size="sm"
-          >
-            30 dias
-          </Button>
-          <Button
-            variant={selectedPeriod === '90d' ? 'default' : 'outline'}
-            onClick={() => setSelectedPeriod('90d')}
-            size="sm"
-          >
-            90 dias
-          </Button>
-        </div>
-        
-        <div className="flex gap-2 ml-auto">
-          <Button variant="outline" size="sm">
-            <Filter className="w-4 h-4 mr-2" />
-            Filtros
-          </Button>
-          <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Relatório
-          </Button>
+      <div className="p-6 border-b border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-full bg-primary/10">
+              <BarChart3 size={32} className="text-primary" strokeWidth={1.5} />
+            </div>
+            <div>
+              <h1 className={cn(
+                "text-3xl font-bold",
+                isDarkMode ? "text-card-foreground" : "text-gray-900"
+              )}>
+                Relatórios Inteligentes
+              </h1>
+              <p className={cn(
+                "text-lg",
+                isDarkMode ? "text-muted-foreground" : "text-gray-600"
+              )}>
+                Gere insights automáticos usando inteligência artificial
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <Card key={index} className="bg-card border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+      {/* Stats Rápidas */}
+      <div className="p-6 border-b border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className={cn(isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+              <CardContent className="p-3 flex items-center gap-2">
+                <FileText size={16} className="text-primary" />
+                <span className={cn("text-sm font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  Relatórios Gerados
+                </span>
+                <p className={cn("text-lg font-bold ml-auto", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  {recentReports.length}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+              <CardContent className="p-3 flex items-center gap-2">
+                <Brain size={16} className="text-primary" />
+                <span className={cn("text-sm font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  Provedores Ativos
+                </span>
+                <p className={cn("text-lg font-bold ml-auto", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  {providers.filter(p => p.is_active).length}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={cn(isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+              <CardContent className="p-3 flex items-center gap-2">
+                <Activity size={16} className="text-primary" />
+                <span className={cn("text-sm font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  Tokens Utilizados (Mês)
+                </span>
+                <p className={cn("text-lg font-bold ml-auto", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                  {/* TODO: Buscar dados reais de uso de tokens */}
+                  ~50k
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
+      {/* Conteúdo principal: Gerador de Relatórios e Resultado */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gerador de Relatórios */}
+            <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-accent" : "bg-gray-100")}>
+                    <Brain size={18} className="text-primary" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <CardTitle className={cn("text-lg", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                      Gerador de Relatórios Inteligentes
+                    </CardTitle>
+                    <CardDescription className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                      Descreva o relatório que deseja gerar com IA
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Provedor de IA */}
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stat.value}
-                  </p>
-                  <Badge variant="secondary" className="mt-1 text-green-600">
-                    {stat.change}
-                  </Badge>
+                  <label htmlFor="ai-provider" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                    Provedor de IA
+                  </label>
+                  <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+                    <SelectTrigger className={cn(isDarkMode ? "bg-input-dark border-input-dark text-card-foreground" : "bg-white border-gray-200")}>
+                      <SelectValue placeholder="Selecione um provedor" />
+                    </SelectTrigger>
+                    <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
+                      {providers.map(provider => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.name} ({AIProviderService.getProviderTypeLabel(provider.provider_type)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Tipos de Relatórios */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">
-              Tipos de Relatórios
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {reportTypes.map((type, index) => (
-              <div
-                key={index}
-                className="p-4 rounded-lg border border-border hover:border-accent cursor-pointer transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${type.color}`}>
-                    <type.icon className="w-5 h-5" />
+                {/* Tipo de Relatório */}
+                <div>
+                  <label htmlFor="report-type" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                    Tipo de Relatório
+                  </label>
+                  <Select value={filters.report_type} onValueChange={(value: any) => setFilters({ ...filters, report_type: value })}>
+                    <SelectTrigger className={cn(isDarkMode ? "bg-input-dark border-input-dark text-card-foreground" : "bg-white border-gray-200")}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
+                      <SelectItem value="conversations">Análise de Conversas</SelectItem>
+                      <SelectItem value="channels">Análise de Canais</SelectItem>
+                      <SelectItem value="custom">Relatório Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Prompt Personalizado */}
+                {filters.report_type === 'custom' && (
+                  <div>
+                    <Label htmlFor="custom-prompt" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                      Prompt Personalizado
+                    </Label>
+                    <Textarea
+                      id="custom-prompt"
+                      value={filters.custom_prompt || ''}
+                      onChange={(e) => setFilters({ ...filters, custom_prompt: e.target.value })}
+                      placeholder="Descreva que tipo de análise você gostaria..."
+                      className={cn(
+                        "min-h-[100px] text-sm",
+                        isDarkMode
+                          ? "bg-input-dark border-input-dark text-card-foreground placeholder:text-muted-foreground"
+                          : "bg-white border-gray-300"
+                      )}
+                      rows={4}
+                    />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground">
-                      {type.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {type.description}
-                    </p>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    Gerar
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={generateReport}
+                    disabled={isGenerating || !selectedProvider}
+                    size="sm"
+                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 size={14} className="mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      'Gerar Relatório'
+                    )}
                   </Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Relatórios Recentes */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle className="text-foreground">
-              Relatórios Recentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentReports.map((report) => (
-                <div
-                  key={report.id}
-                  className="p-4 rounded-lg border border-border"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-foreground">
-                      {report.name}
-                    </h3>
-                    <Badge
-                      variant={report.status === 'Concluído' ? 'default' : 'secondary'}
-                      className={
-                        report.status === 'Concluído'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                      }
+                  {reportResult && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearReport}
+                      className={cn(
+                        isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
+                      )}
                     >
-                      {report.status}
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      <Calendar className="w-4 h-4 inline mr-1" />
-                      {new Date(report.date).toLocaleDateString('pt-BR')}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {report.size}
-                    </span>
-                  </div>
-                  
-                  <div className="flex gap-2 mt-3">
-                    <Button size="sm" variant="outline">
-                      <Eye className="w-4 h-4 mr-1" />
-                      Visualizar
+                      Limpar
                     </Button>
-                    {report.status === 'Concluído' && (
-                      <Button size="sm" variant="outline">
-                        <Download className="w-4 h-4 mr-1" />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Relatório Gerado */}
+            <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-accent" : "bg-gray-100")}>
+                      <FileText size={18} className="text-primary" strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <CardTitle className={cn("text-lg", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                        Relatório Gerado
+                      </CardTitle>
+                    </div>
+                  </div>
+                  {reportResult && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printReport(reportResult.report_content)}
+                        className={cn(
+                          isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
+                        )}
+                      >
+                        <Printer size={14} className="mr-2" strokeWidth={1.5} />
+                        Imprimir
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadReport(reportResult.report_content, reportResult.report_type, reportResult.id)}
+                        className={cn(
+                          isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
+                        )}
+                      >
+                        <Download size={14} className="mr-2" strokeWidth={1.5} />
                         Download
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent>
+                {reportResult ? (
+                  <div className={cn(
+                    "p-3 rounded-lg border min-h-[200px] max-h-[400px] overflow-auto whitespace-pre-wrap text-sm",
+                    isDarkMode
+                      ? "bg-input-dark border-input-dark text-card-foreground"
+                      : "bg-gray-50 border-gray-200 text-gray-800"
+                  )}>
+                    {reportResult.report_content}
+                  </div>
+                ) : (
+                  <div className={cn(
+                    "flex items-center justify-center h-[200px] border-2 border-dashed rounded-lg",
+                    isDarkMode ? "border-border" : "border-gray-300"
+                  )}>
+                    <div className="text-center">
+                      <FileText size={32} className={cn(
+                        "mx-auto mb-2",
+                        isDarkMode ? "text-muted-foreground" : "text-gray-400"
+                      )} />
+                      <p className={cn(
+                        "text-sm",
+                        isDarkMode ? "text-muted-foreground" : "text-gray-500"
+                      )}>
+                        O relatório aparecerá aqui
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Histórico de Relatórios */}
+          <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-accent" : "bg-gray-100")}>
+                  <FileText size={18} className="text-primary" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <CardTitle className={cn("text-lg", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                    Histórico de Relatórios Recentes
+                  </CardTitle>
+                  <CardDescription className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                    Visualize e gerencie seus relatórios gerados
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {recentReports.length === 0 ? (
+                <div className={cn(
+                  "flex items-center justify-center h-[100px] border-2 border-dashed rounded-lg",
+                  isDarkMode ? "border-border" : "border-gray-300"
+                )}>
+                  <p className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-500")}>
+                    Nenhum relatório recente.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentReports.map(report => (
+                    <div key={report.id} className={cn(
+                      "p-3 border rounded-lg flex items-center justify-between",
+                      isDarkMode ? "bg-input-dark border-input-dark" : "bg-gray-50 border-gray-200"
+                    )}>
+                      <div>
+                        <p className={cn("font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+                          {report.prompt}
+                        </p>
+                        <p className={cn("text-xs", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                          Gerado em: {new Date(report.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReportResult({ ...report, report_content: report.generated_report })}
+                          className={cn(
+                            isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
+                          )}
+                        >
+                          <Eye size={14} className="mr-2" />
+                          Ver
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadReport(report.generated_report, report.report_type, report.id)}
+                          className={cn(
+                            isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
+                          )}
+                        >
+                          <Download size={14} className="mr-2" />
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
-};
+}
+
+

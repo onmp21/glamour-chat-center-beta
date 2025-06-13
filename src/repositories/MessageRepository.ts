@@ -1,4 +1,5 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { BaseRepository } from './BaseRepository';
 import { RawMessage } from '@/types/messages';
 import { TableName } from '@/utils/channelMapping';
@@ -12,8 +13,10 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     const insertData = {
       session_id: sessionId,
       message: message,
-      Nome_do_contato: contactName,
-      read_at: new Date().toISOString()
+      Nome_do_contato: contactName || 'Contato Anônimo',
+      read_at: new Date().toISOString(),
+      mensagemtype: 'conversation',
+      tipo_remetente: 'sistema'
     };
 
     console.log(`💾 [MESSAGE_REPOSITORY] Inserting message into ${this.tableName}`);
@@ -22,11 +25,12 @@ export class MessageRepository extends BaseRepository<RawMessage> {
   }
 
   async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
-    const { data, error } = await this.supabase
+    const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
-      .ilike('session_id', `%${phoneNumber}%`)
-      .order('id', { ascending: true });
+      .ilike("session_id", `%${phoneNumber}%`)
+      .order("id", { ascending: true })
+      .limit(1000);
 
     if (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
@@ -36,23 +40,33 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     return data || [];
   }
 
+  async findMessagesAfterTimestamp(timestamp: string): Promise<{ data: RawMessage[] | null; error: any }> {
+    console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages after ${timestamp} in ${this.tableName}`);
+    
+    const { data, error } = await supabase
+      .from(this.tableName)
+      .select('*')
+      .gt('read_at', timestamp)      .order("id", { ascending: true })
+      .limit(1000);
+    if (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error fetching messages after timestamp from ${this.tableName}:`, error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  }
+
   async markAsRead(sessionId: string): Promise<void> {
-    const { error } = await this.supabase
+    const { error } = await supabase
       .from(this.tableName)
       .update({ 
-        is_read: true, 
         read_at: new Date().toISOString() 
       })
-      .eq('session_id', sessionId)
-      .eq('is_read', false);
+      .eq('session_id', sessionId);
 
     if (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error marking messages as read:`, error);
       throw error;
     }
-  }
-
-  private get supabase() {
-    return require('@/integrations/supabase/client').supabase;
   }
 }

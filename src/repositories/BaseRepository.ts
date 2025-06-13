@@ -13,31 +13,42 @@ export abstract class BaseRepository<T> {
     return this.tableName;
   }
 
-  async findAll(): Promise<T[]> {
-    console.log(`🔍 [BASE_REPOSITORY] Fetching all from ${this.tableName}`);
-    
-    // Incluir media_base64 na seleção
-    const { data, error } = await supabase
-      .from(this.tableName)
-      .select('*, media_base64')
-      .order('id', { ascending: true });
+  async findAll(limit?: number, offset?: number): Promise<T[]> {
+    try {
+      console.log(`🔍 [BASE_REPOSITORY] Fetching all from ${this.tableName} with limit ${limit} and offset ${offset}`);
+      
+      let query = supabase
+        .from(this.tableName)
+        .select("*")
+        .order("id", { ascending: true });
 
-    if (error) {
-      console.error(`❌ [BASE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
+      if (limit !== undefined) {
+        query = query.limit(limit);
+      }
+      if (offset !== undefined) {
+        query = query.range(offset, offset + (limit || 100) - 1);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`❌ [BASE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
+        throw error;
+      }
+
+      console.log(`✅ [BASE_REPOSITORY] Found ${data?.length || 0} records in ${this.tableName}`);
+      return data || [];
+    } catch (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error in findAll for ${this.tableName}:`, error);
       throw error;
     }
-
-    console.log(`✅ [BASE_REPOSITORY] Found ${data?.length || 0} records in ${this.tableName}`);
-    return (data || []) as T[];
   }
 
   async create(data: Partial<T>): Promise<T> {
-    console.log(`💾 [BASE_REPOSITORY] Creating in ${this.tableName}`);
-    
     const { data: result, error } = await supabase
       .from(this.tableName)
       .insert(data as any)
-      .select('*, media_base64')
+      .select('*')
       .single();
 
     if (error) {
@@ -49,7 +60,27 @@ export abstract class BaseRepository<T> {
     return result as T;
   }
 
-  createRealtimeChannel(channelSuffix: string = '') {
+  createRealtimeChannel(channelSuffix: string = "") {
     return supabase.channel(`${this.tableName}${channelSuffix}`);
+  }
+
+  async countAll(): Promise<number> {
+    try {
+      console.log(`🔍 [BASE_REPOSITORY] Counting all from ${this.tableName}`);
+      const { count, error } = await supabase
+        .from(this.tableName)
+        .select("count", { count: "exact" });
+
+      if (error) {
+        console.error(`❌ [BASE_REPOSITORY] Error counting from ${this.tableName}:`, error);
+        throw error;
+      }
+
+      console.log(`✅ [BASE_REPOSITORY] Found ${count || 0} records in ${this.tableName}`);
+      return count || 0;
+    } catch (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error in countAll for ${this.tableName}:`, error);
+      throw error;
+    }
   }
 }

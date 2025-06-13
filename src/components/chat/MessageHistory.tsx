@@ -250,6 +250,7 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
                           messageType={messageType}
                           messageId={message.id}
                           isDarkMode={isDarkMode}
+                          balloonColor={isAgentMessage ? 'sent' : 'received'}
                         />
                       ) : (
                         <p className="break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>

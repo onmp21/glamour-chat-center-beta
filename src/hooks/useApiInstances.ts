@@ -86,7 +86,7 @@ export function useApiInstances() {
 
       if (error) throw error;
 
-      setInstances(prev => prev.filter(inst => inst.id !== id));
+      await loadInstances();
     } catch (err) {
       console.error('Error deleting instance:', err);
       throw err;

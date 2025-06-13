@@ -17,13 +17,32 @@ export const useMessageActions = (
   const { user } = useAuth();
 
   const handleSend = async (caption?: string) => {
-    if ((!message.trim() && !fileData) || sending || !user) return;
+    console.log('[useMessageActions] Início de handleSend');
+    console.log('[useMessageActions] message:', message);
+    console.log('[useMessageActions] fileData:', fileData);
+    console.log('[useMessageActions] sending:', sending);
+    console.log('[useMessageActions] user:', user);
+
+    if ((!message.trim() && !fileData) || sending || !user) {
+      console.log('[useMessageActions] Condição de guarda ativada. Retornando false.');
+      return false; 
+    }
+
+    console.log(`[useMessageActions] channelId recebido: ${channelId}`);
+    console.log(`[useMessageActions] fileData antes de sendMessage:`, fileData);
+
+    if (!channelId || channelId.trim() === '') {
+      console.error("[useMessageActions] channelId é inválido ou vazio. Não é possível enviar a mensagem.");
+      return false;
+    }
 
     let messageType: string;
     if (fileData) {
       messageType = FileService.getFileType(fileData.mimeType);
+      console.log('[useMessageActions] Tipo de mensagem detectado (fileData):', messageType);
     } else {
       messageType = 'text';
+      console.log('[useMessageActions] Tipo de mensagem detectado (texto):', messageType);
     }
 
     const messageData = {
@@ -36,12 +55,17 @@ export const useMessageActions = (
       fileData: fileData || undefined
     };
 
+    console.log('[useMessageActions] messageData preparado para sendMessage:', messageData);
     const success = await sendMessage(messageData, addMessageToState);
+    console.log('[useMessageActions] Resultado de sendMessage (success):', success);
+
     if (success) {
       setMessage('');
       setFileData(null);
+      console.log('[useMessageActions] Mensagem enviada com sucesso. Limpando estados.');
       return true;
     }
+    console.log('[useMessageActions] Falha no envio da mensagem.');
     return false;
   };
 
@@ -64,3 +88,5 @@ export const useMessageActions = (
     handleKeyPress
   };
 };
+
+

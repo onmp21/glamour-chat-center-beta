@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2 } from 'lucide-react';
+import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2, Eye, EyeOff, Copy, QrCode } from 'lucide-react';
 import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
 
 interface InstanceManagerProps {
@@ -26,6 +25,8 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
   const [instances, setInstances] = useState<InstanceInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [qrCodeModal, setQrCodeModal] = useState<{ instanceName: string; qrCode: string } | null>(null);
 
   const loadInstances = async () => {
     if (!apiConfig.baseUrl || !apiConfig.apiKey) {
@@ -119,9 +120,52 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     }
   };
 
-  const handleInstanceSelect = (instanceName: string) => {
+  const handleInstanceSelect = async (instanceName: string) => {
     setSelectedInstance(instanceName);
     onInstanceSelect?.(instanceName);
+    
+    // Configurar webhook automaticamente ao selecionar a instância
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConfig.baseUrl,
+        apiKey: apiConfig.apiKey,
+        instanceName: instanceName
+      });
+      
+      // URL do webhook para onde os eventos serão enviados
+      const webhookUrl = `${window.location.protocol}//${window.location.hostname}:3000/webhook`;
+      
+      // Lista de eventos que queremos receber
+      const events = [
+        'MESSAGES_UPSERT',
+        'MESSAGES_UPDATE',
+        'CONNECTION_UPDATE',
+        'QRCODE_UPDATED',
+        'MESSAGES_SET',
+        'CONTACTS_UPSERT',
+        'CHATS_UPSERT'
+      ];
+      
+      console.log('🔗 [INSTANCE_MANAGER] Configurando webhook automaticamente:', webhookUrl);
+      
+      const result = await service.setWebhook(webhookUrl, events, instanceName);
+      
+      if (result.success) {
+        toast({
+          title: "Webhook configurado",
+          description: `Webhook configurado automaticamente para a instância ${instanceName}`,
+        });
+      } else {
+        throw new Error(result.error || 'Erro ao configurar webhook');
+      }
+    } catch (error) {
+      console.error('❌ [INSTANCE_MANAGER] Erro ao configurar webhook:', error);
+      toast({
+        title: "Aviso",
+        description: `A instância foi selecionada, mas houve um erro ao configurar o webhook: ${error}`,
+        variant: "warning"
+      });
+    }
     
     toast({
       title: "Instância selecionada",
@@ -163,42 +207,115 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     }
   };
 
+  const showQRCode = async (instanceName: string) => {
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConfig.baseUrl,
+        apiKey: apiConfig.apiKey,
+        instanceName: instanceName
+      });
+
+      const result = await service.getQRCodeForInstance(instanceName);
+      
+      if (result.success && result.qrCode) {
+        setQrCodeModal({ instanceName, qrCode: result.qrCode });
+      } else {
+        throw new Error(result.error || 'Erro ao obter QR Code');
+      }
+    } catch (error) {
+      console.error('❌ [INSTANCE_MANAGER] Erro ao obter QR Code:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao obter QR Code: ${error}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const copyApiKey = () => {
+    navigator.clipboard.writeText(apiConfig.apiKey);
+    toast({
+      title: "API Key copiada",
+      description: "A API Key foi copiada para a área de transferência",
+    });
+  };
+
   return (
     <div className="space-y-4">
-      {/* Header */}
+      {/* Header com informações da API */}
+      <Card className={cn(
+        isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
+      )}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Configuração da Evolution API</CardTitle>
+              <CardDescription>
+                URL: {apiConfig.baseUrl || 'Não configurada'}
+              </CardDescription>
+            </div>
+            <Button
+              onClick={loadInstances}
+              disabled={loading}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              Atualizar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">API Key:</span>
+            <code className={cn(
+              "px-2 py-1 rounded text-xs font-mono",
+              isDarkMode ? "bg-secondary" : "bg-gray-100"
+            )}>
+              {showApiKey ? apiConfig.apiKey : '••••••••••••••••'}
+            </code>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowApiKey(!showApiKey)}
+            >
+              {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={copyApiKey}
+            >
+              <Copy size={14} />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Header da lista de instâncias */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Gerenciar Instâncias</h3>
+          <h3 className="text-lg font-semibold">Instâncias Disponíveis</h3>
           <p className={cn(
             "text-sm",
-            isDarkMode ? "text-gray-400" : "text-gray-600"
+            isDarkMode ? "text-muted-foreground" : "text-gray-600"
           )}>
-            Visualize e gerencie instâncias existentes da Evolution API
+            Clique em uma instância para vinculá-la a este canal
           </p>
         </div>
-        
-        <Button
-          onClick={loadInstances}
-          disabled={loading}
-          variant="outline"
-          size="sm"
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-          Atualizar
-        </Button>
       </div>
 
-      {/* Lista de Instâncias */}
+      {/* Lista de Instâncias em Cards */}
       {instances.length === 0 ? (
         <Card className={cn(
-          isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+          isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
         )}>
           <CardContent className="text-center py-8">
             <div className="text-4xl mb-4">📱</div>
             <h4 className="font-medium mb-2">Nenhuma instância encontrada</h4>
             <p className={cn(
               "text-sm mb-4",
-              isDarkMode ? "text-gray-400" : "text-gray-600"
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
             )}>
               {loading ? "Carregando instâncias..." : "Não há instâncias disponíveis na Evolution API"}
             </p>
@@ -211,56 +328,88 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {instances.map((instance) => (
             <Card
               key={instance.instanceName}
               className={cn(
-                "transition-all duration-200 hover:shadow-md cursor-pointer",
-                isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200",
-                selectedInstance === instance.instanceName && "ring-2 ring-blue-500"
+                "transition-all duration-200 hover:shadow-lg cursor-pointer border-2",
+                isDarkMode ? "bg-card border-border hover:border-accent" : "bg-white border-gray-200 hover:border-gray-300",
+                selectedInstance === instance.instanceName && "ring-2 ring-primary border-primary"
               )}
               onClick={() => handleInstanceSelect(instance.instanceName)}
             >
-              <CardContent className="p-4">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(instance.status)}
-                    
-                    <div>
-                      <h4 className="font-medium">{instance.instanceName}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          getStatusColor(instance.status)
-                        )} />
-                        <span className={cn(
-                          "text-xs",
-                          isDarkMode ? "text-gray-400" : "text-gray-600"
-                        )}>
-                          {getStatusText(instance.status)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                      {getStatusText(instance.status)}
-                    </Badge>
-                    
+                    {getStatusIcon(instance.status)}
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      getStatusColor(instance.status)
+                    )} />
+                  </div>
+                  <Badge 
+                    variant="outline"
+                    className={cn(
+                      "text-xs",
+                      instance.status === 'open' && "border-green-500 text-green-600",
+                      instance.status === 'connecting' && "border-yellow-500 text-yellow-600",
+                      instance.status === 'close' && "border-destructive text-destructive"
+                    )}
+                  >
+                    {getStatusText(instance.status)}
+                  </Badge>
+                </div>
+                <CardTitle className="text-base truncate">
+                  {instance.instanceName}
+                </CardTitle>
+                {instance.profileName && (
+                  <CardDescription className="truncate">
+                    {instance.profileName}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              
+              <CardContent className="pt-0">
+                {instance.number && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs text-muted-foreground">Número:</span>
+                    <code className={cn(
+                      "text-xs px-1 py-0.5 rounded",
+                      isDarkMode ? "bg-secondary" : "bg-gray-100"
+                    )}>
+                      {instance.number}
+                    </code>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  {instance.status !== 'open' && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteInstance(instance.instanceName);
+                        showQRCode(instance.instanceName);
                       }}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      className="flex-1"
                     >
-                      <Trash2 size={14} />
+                      <QrCode size={14} />
+                      QR Code
                     </Button>
-                  </div>
+                  )}
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteInstance(instance.instanceName);
+                    }}
+                    className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 dark:hover:bg-destructive/20"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -268,23 +417,70 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         </div>
       )}
 
+      {/* Instância selecionada */}
       {selectedInstance && (
         <Card className={cn(
-          "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
+          "border-primary bg-card dark:border-primary dark:bg-card"
         )}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+              <div className="w-2 h-2 bg-primary rounded-full" />
               <span className="text-sm font-medium">
-                Instância selecionada: {selectedInstance}
+                Instância vinculada: {selectedInstance}
               </span>
             </div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              Esta instância será usada para enviar mensagens neste canal
+            <p className="text-xs text-primary mt-1">
+              Esta instância será usada para enviar e receber mensagens neste canal
             </p>
           </CardContent>
         </Card>
       )}
+
+      {/* Modal do QR Code */}
+      {qrCodeModal && (
+        <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
+          <div className={cn(
+            "p-6 rounded-lg shadow-lg max-w-md w-full mx-4",
+            isDarkMode ? "bg-card" : "bg-white"
+          )}>
+            <h3 className="text-lg font-medium mb-4 text-center">
+              Conectar {qrCodeModal.instanceName}
+            </h3>
+            
+            <div className="text-center">
+              <p className="mb-4 text-sm">
+                Escaneie o QR Code abaixo com o WhatsApp para conectar esta instância:
+              </p>
+              <div className="mb-4 flex justify-center">
+                <img 
+                  src={`data:image/png;base64,${qrCodeModal.qrCode}`} 
+                  alt="QR Code" 
+                  className="w-64 h-64 border rounded-lg"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setQrCodeModal(null)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Fechar
+                </Button>
+                <Button
+                  onClick={() => showQRCode(qrCodeModal.instanceName)}
+                  variant="default"
+                  className="flex-1"
+                >
+                  <RefreshCw size={16} />
+                  Atualizar QR
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+

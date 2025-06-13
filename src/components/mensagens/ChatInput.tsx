@@ -20,6 +20,8 @@ import { EmojiPickerCompact } from './EmojiPickerCompact';
 interface ChatInputProps {
   isDarkMode: boolean;
   onSendMessage: (message: string) => void;
+  onSendFile?: (file: File, caption?: string) => void;
+  onSendAudio?: (audioBlob: Blob, duration: number) => void;
 }
 
 interface FilePreview {
@@ -30,7 +32,9 @@ interface FilePreview {
 
 export const ChatInput: React.FC<ChatInputProps> = ({ 
   isDarkMode, 
-  onSendMessage 
+  onSendMessage,
+  onSendFile,
+  onSendAudio
 }) => {
   const [message, setMessage] = useState('');
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
@@ -39,17 +43,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [showFilePreview, setShowFilePreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingStartTimeRef = useRef<number>(0);
 
   const handleSend = () => {
     if (message.trim() || filePreview) {
       if (filePreview) {
-        console.log('Sending file:', filePreview.file.name);
+        console.log("Sending file:", filePreview.file.name);
+        onSendFile?.(filePreview.file, message.trim() || undefined);
         setFilePreview(null);
         setShowFilePreview(false);
-      }
-      if (message.trim()) {
+        setMessage("");
+      } else if (message.trim()) {
         onSendMessage(message.trim());
-        setMessage('');
+        setMessage("");
       }
     }
   };
@@ -86,30 +94,93 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     event.target.value = '';
   };
 
-  const handleRecordStart = () => {
-    setIsRecording(true);
-    setRecordingTime(0);
-    recordingIntervalRef.current = setInterval(() => {
-      setRecordingTime(prev => prev + 1);
-    }, 1000);
-    console.log('Recording started');
+  const handleRecordStart = async () => {
+    try {
+      console.log('🎤 [AUDIO_RECORDING] Iniciando gravação de áudio...');
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+        const duration = (Date.now() - recordingStartTimeRef.current) / 1000;
+        
+        console.log('🎤 [AUDIO_RECORDING] Gravação finalizada:', {
+          size: audioBlob.size,
+          duration: duration,
+          type: audioBlob.type
+        });
+        
+        // Parar todas as tracks do stream
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Enviar áudio
+        onSendAudio?.(audioBlob, duration);
+      };
+      
+      mediaRecorderRef.current = mediaRecorder;
+      recordingStartTimeRef.current = Date.now();
+      
+      mediaRecorder.start(100); // Coletar dados a cada 100ms
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+      console.log('🎤 [AUDIO_RECORDING] Gravação iniciada com sucesso');
+    } catch (error) {
+      console.error('❌ [AUDIO_RECORDING] Erro ao iniciar gravação:', error);
+      alert('Erro ao acessar o microfone. Verifique as permissões.');
+    }
   };
 
   const handleRecordStop = () => {
+    console.log('🎤 [AUDIO_RECORDING] Parando gravação...');
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    
     setIsRecording(false);
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
     }
-    console.log('Recording stopped and sent');
   };
 
   const handleRecordCancel = () => {
+    console.log('🎤 [AUDIO_RECORDING] Cancelando gravação...');
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Limpar chunks para não enviar
+    audioChunksRef.current = [];
+    
     setIsRecording(false);
     setRecordingTime(0);
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
     }
-    console.log('Recording cancelled');
   };
 
   const formatTime = (seconds: number) => {

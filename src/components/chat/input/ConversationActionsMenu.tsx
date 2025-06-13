@@ -1,12 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, MessageSquare, Clock, CheckCircle, RefreshCw, User, Phone, Calendar } from 'lucide-react';
+import { MoreVertical, MessageSquare, Clock, CheckCircle, RefreshCw, User, Phone, Calendar, Brain, FileText, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { ConversationNotesModal } from './ConversationNotesModal';
 import { ConversationTagsModal } from './ConversationTagsModal';
+import { AIActionsModal } from './AIActionsModal'; // Novo modal para ações de IA
 import { format } from 'date-fns';
 
 interface ConversationActionsMenuProps {
@@ -33,6 +34,7 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
   onRefresh
 }) => {
   const { updateConversationStatus } = useConversationStatusEnhanced();
+  const [showAIModal, setShowAIModal] = useState(false);
 
   const handleStatusChange = async (newStatus: 'unread' | 'in_progress' | 'resolved') => {
     if (!channelId || !conversationId) return;
@@ -166,6 +168,42 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
 
         <DropdownMenuSeparator className={isDarkMode ? "bg-zinc-800" : "bg-gray-200"} />
 
+        {/* Ações de IA */}
+        <DropdownMenuItem
+          onClick={() => setShowAIModal(true)}
+          className={cn(
+            "cursor-pointer",
+            isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-gray-100"
+          )}
+        >
+          <Brain size={16} className="mr-2 text-[#b5103c]" />
+          Resumir Conversa com IA
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => setShowAIModal(true)}
+          className={cn(
+            "cursor-pointer",
+            isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-gray-100"
+          )}
+        >
+          <Zap size={16} className="mr-2 text-[#b5103c]" />
+          Resposta Rápida com IA
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => setShowAIModal(true)}
+          className={cn(
+            "cursor-pointer",
+            isDarkMode ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-gray-100"
+          )}
+        >
+          <FileText size={16} className="mr-2 text-[#b5103c]" />
+          Gerar Relatório desta Conversa
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator className={isDarkMode ? "bg-zinc-800" : "bg-gray-200"} />
+
         {/* Notes */}
         {channelId && conversationId && (
           <ConversationNotesModal
@@ -198,6 +236,17 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
           Atualizar conversa
         </DropdownMenuItem>
       </DropdownMenuContent>
+
+      {/* Modal de Ações de IA */}
+      {showAIModal && (
+        <AIActionsModal
+          isDarkMode={isDarkMode}
+          conversationId={conversationId}
+          channelId={channelId}
+          contactName={contactName}
+          onClose={() => setShowAIModal(false)}
+        />
+      )}
     </DropdownMenu>
   );
 };

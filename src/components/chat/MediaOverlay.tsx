@@ -50,12 +50,14 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
     <div 
       className="media-overlay animate-fade-in"
       onClick={handleBackdropClick}
+      style={{ zIndex: 99999 }}
     >
       <div className="media-overlay-content">
         <button
           onClick={onClose}
           className="media-overlay-close"
           aria-label="Fechar"
+          style={{ zIndex: 100000 }}
         >
           <X size={20} />
         </button>
@@ -66,6 +68,13 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
             alt="Imagem ampliada"
             className="media-overlay-image"
             onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '90vw', 
+              maxHeight: '90vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain'
+            }}
           />
         ) : (
           <video
@@ -74,6 +83,13 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
             autoPlay
             className="media-overlay-video"
             onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxWidth: '90vw', 
+              maxHeight: '90vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain'
+            }}
           >
             Seu navegador não suporta reprodução de vídeo.
           </video>

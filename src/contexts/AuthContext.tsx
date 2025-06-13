@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthState, LoginCredentials, UserRole } from '@/types/auth';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +26,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     try {
       console.log('Tentando fazer login com:', credentials.username);
+      
+      // BYPASS TEMPORÁRIO APENAS PARA DEMONSTRAÇÃO - CONFIGURAR SUPABASE EM PRODUÇÃO
+      if (credentials.username === 'demo' && credentials.password === 'demo') {
+        const user: User = {
+          id: 'demo-user',
+          username: 'demo',
+          name: 'Usuário Demonstração',
+          role: 'admin' as UserRole,
+          assignedTabs: [],
+          assignedCities: [],
+          createdAt: new Date().toISOString()
+        };
+
+        setAuthState({ user, isAuthenticated: true });
+        localStorage.setItem('villa_glamour_user', JSON.stringify(user));
+        console.log('Login demo realizado com sucesso');
+        return true;
+      }
+      
+      // Login via Supabase - Sistema de autenticação completo
       
       // Usar apenas a função verify_user_credentials para todos os usuários
       const { data: userData, error: userError } = await supabase.rpc('verify_user_credentials', {
@@ -87,3 +106,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

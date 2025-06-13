@@ -8,6 +8,7 @@ interface MediaMessageRendererProps {
   messageId: string;
   isDarkMode?: boolean;
   fileName?: string;
+  balloonColor?: 'sent' | 'received';
 }
 
 export const MediaMessageRenderer: React.FC<MediaMessageRendererProps> = (props) => {

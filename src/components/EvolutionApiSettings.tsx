@@ -8,11 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X, LogOut } from 'lucide-react';
 import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService';
-import { EvolutionWebSocketService, evolutionWebSocketManager } from '@/services/EvolutionWebSocketService';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
-import { channelWebSocketManager } from '@/services/ChannelWebSocketManager';
 
 interface EvolutionApiSettingsProps {
   isDarkMode: boolean;
@@ -72,6 +70,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   const [validatingApi, setValidatingApi] = useState(false);
   const [creatingInstance, setCreatingInstance] = useState(false);
   const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
+  const [loggingOutInstance, setLoggingOutInstance] = useState<string | null>(null);
   const [linkingChannel, setLinkingChannel] = useState(false);
   
   const channelMappingService = new ChannelInstanceMappingService();
@@ -257,7 +256,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         instanceName: newInstanceName
       });
 
-      const result = await service.createInstance(newInstanceName);
+      const result = await service.createInstanceSimple(newInstanceName);
       
       if (result.success) {
         toast({
@@ -319,6 +318,41 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
     }
   };
 
+  const logoutInstance = async (instanceName: string) => {
+    setLoggingOutInstance(instanceName);
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName
+      });
+
+      const result = await service.logoutInstance(instanceName);
+      
+      if (result.success) {
+        toast({
+          title: "Sucesso",
+          description: `Instância '${instanceName}' desconectada com sucesso!`,
+        });
+
+        // Recarregar instâncias
+        console.log('📋 [EVOLUTION_API_SETTINGS] Recarregando instâncias após logout...');
+        await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
+      } else {
+        throw new Error(result.error || 'Erro ao desconectar instância');
+      }
+    } catch (error) {
+      console.error('Erro ao desconectar instância:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao desconectar instância: ${error}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoggingOutInstance(null);
+    }
+  };
+
   // SEÇÃO 3: Vincular Canal à Instância
   const linkChannelToInstance = async () => {
     if (!selectedChannelForMapping || !selectedInstanceForMapping) {
@@ -350,22 +384,47 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         is_active: true
       });
 
-      // Estabelecer conexão WebSocket diretamente
-      const wsResult = await channelWebSocketManager.initializeChannelWebSocket(selectedChannel.id, {
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey,
-        instanceName: selectedInstance.instanceName
-      });
+      // Configurar webhook automaticamente (exceto para instância 'glamour')
+      if (selectedInstance.instanceName !== 'glamour') {
+        console.log('🔗 [WEBHOOK] Configurando webhook automaticamente para instância:', selectedInstance.instanceName);
+        
+        const service = new EvolutionApiService({
+          baseUrl: apiConnection.baseUrl,
+          apiKey: apiConnection.apiKey,
+          instanceName: selectedInstance.instanceName
+        });
 
-      if (wsResult.success) {
-        console.log(`✅ [WEBSOCKET] Conexão WebSocket estabelecida para canal: ${selectedChannel.name}`);
+        // URL do webhook do Supabase para este canal
+        const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/whatsapp-webhook-${selectedChannel.name.toLowerCase().replace(/\s+/g, '-')}`;
+        
+        // Eventos que queremos receber
+        const webhookEvents = [
+          'MESSAGES_UPSERT',
+          'MESSAGES_SET', 
+          'MESSAGES_UPDATE',
+          'CONNECTION_UPDATE',
+          'QRCODE_UPDATED',
+          'CONTACTS_UPSERT',
+          'CHATS_UPSERT'
+        ];
+
+        const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
+        
+        if (webhookResult.success) {
+          console.log('✅ [WEBHOOK] Webhook configurado com sucesso para instância:', selectedInstance.instanceName);
+        } else {
+          console.warn('⚠️ [WEBHOOK] Falha ao configurar webhook:', webhookResult.error);
+        }
       } else {
-        console.warn("⚠️ [WEBSOCKET] Falha ao estabelecer conexão:", wsResult.error);
+        console.log('⏭️ [WEBHOOK] Instância glamour ignorada (já tem webhook para IA)');
       }
+
+      // Configuração concluída sem WebSocket
+      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName}`)
 
       toast({
         title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com WebSocket ativo!`,
+        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook configurado!`,
       });
 
       // Recarregar mapeamentos
@@ -390,8 +449,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
     try {
       const mapping = channelMappings.find(m => m.id === mappingId);
       if (mapping) {
-        // Desconectar WebSocket
-        await channelWebSocketManager.disconnectChannelWebSocket(mapping.channelId);
+        console.log(`🔌 [UNLINK] Desvinculando canal ${mapping.channelName} da instância ${mapping.instanceName}`);
       }
 
       await channelMappingService.deleteMapping(mappingId);
@@ -415,7 +473,13 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       'open': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
+      'connected': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
+      'ready': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
+      'online': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
       'close': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
+      'closed': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
+      'disconnected': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
+      'offline': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
       'connecting': { color: 'bg-yellow-500', text: 'Conectando', icon: Settings },
       'qr': { color: 'bg-blue-500', text: 'QR Code', icon: QrCode }
     };
@@ -642,6 +706,25 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                             >
                               <QrCode className="mr-2 h-4 w-4" />
                               Ver QR Code
+                            </Button>
+                          )}
+                          {instance.status === 'open' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => logoutInstance(instance.instanceName)}
+                              disabled={loggingOutInstance === instance.instanceName}
+                              className={cn(
+                                "border-orange-500 text-orange-600 hover:bg-orange-50",
+                                isDarkMode ? "border-orange-400 text-orange-400 hover:bg-orange-900/20" : ""
+                              )}
+                            >
+                              {loggingOutInstance === instance.instanceName ? (
+                                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <LogOut className="mr-2 h-4 w-4" />
+                              )}
+                              Desconectar
                             </Button>
                           )}
                           <Button

@@ -3,6 +3,10 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { YelenaMessageDisplay } from './YelenaMessageDisplay';
 import { AndressaMessageDisplay } from './AndressaMessageDisplay';
+import { JoaoDouradoMessageDisplay } from './JoaoDouradoMessageDisplay';
+import { AmericaDouradaMessageDisplay } from './AmericaDouradaMessageDisplay';
+import { GerenteLojasMessageDisplay } from './GerenteLojasMessageDisplay';
+import { GerenteExternoMessageDisplay } from './GerenteExternoMessageDisplay';
 import { MessageBubble } from './message/MessageBubble';
 import { MessageContent } from './message/MessageContent';
 import { ChatMessage as ChatMessageType } from '@/types/chat';
@@ -39,10 +43,40 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     );
   }
 
-  // Se for canal Andressa (gerente-externo), usar o AndressaMessageDisplay
+  // Se for canal João Dourado, usar o JoaoDouradoMessageDisplay
+  if (channelId === 'joao-dourado') {
+    return (
+      <JoaoDouradoMessageDisplay 
+        message={message} 
+        isDarkMode={isDarkMode} 
+      />
+    );
+  }
+
+  // Se for canal América Dourada, usar o AmericaDouradaMessageDisplay
+  if (channelId === 'america-dourada') {
+    return (
+      <AmericaDouradaMessageDisplay 
+        message={message} 
+        isDarkMode={isDarkMode} 
+      />
+    );
+  }
+
+  // Se for canal Gerente Lojas, usar o GerenteLojasMessageDisplay
+  if (channelId === 'gerente-lojas') {
+    return (
+      <GerenteLojasMessageDisplay 
+        message={message} 
+        isDarkMode={isDarkMode} 
+      />
+    );
+  }
+
+  // Se for canal Andressa (gerente-externo), usar o AndressaMessageDisplay ou GerenteExternoMessageDisplay
   if (channelId === 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7' || channelId === 'gerente-externo') {
     return (
-      <AndressaMessageDisplay 
+      <GerenteExternoMessageDisplay 
         message={message} 
         isDarkMode={isDarkMode} 
       />

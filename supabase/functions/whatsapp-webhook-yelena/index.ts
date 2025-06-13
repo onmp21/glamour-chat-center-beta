@@ -2,6 +2,39 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { downloadMediaAsBase64, getMediaTypeFromMessage, getMediaUrlFromMessage, getMediaCaptionFromMessage } from '../_shared/mediaUtils.ts'
 
+// Mapeamento de instâncias para tabelas
+const instanceToTableMapping: Record<string, string> = {
+  'yelena': 'yelena_ai_conversas',
+  'yelena-ai': 'yelena_ai_conversas',
+  'canarana': 'canarana_conversas',
+  'souto-soares': 'souto_soares_conversas',
+  'joao-dourado': 'joao_dourado_conversas',
+  'america-dourada': 'america_dourada_conversas',
+  'gerente-lojas': 'gerente_lojas_conversas',
+  'gerente-externo': 'gerente_externo_conversas'
+};
+
+// Função para determinar a tabela baseada na instância
+const getTableForInstance = (instance: string): string => {
+  const normalizedInstance = instance.toLowerCase().trim();
+  
+  // Tentar correspondência exata primeiro
+  if (instanceToTableMapping[normalizedInstance]) {
+    return instanceToTableMapping[normalizedInstance];
+  }
+  
+  // Tentar correspondência parcial
+  for (const [key, table] of Object.entries(instanceToTableMapping)) {
+    if (normalizedInstance.includes(key) || key.includes(normalizedInstance)) {
+      return table;
+    }
+  }
+  
+  // Fallback para yelena_ai_conversas se não encontrar correspondência
+  console.log(`⚠️ [WEBHOOK] Instance '${instance}' not found in mapping, using yelena_ai_conversas as fallback`);
+  return 'yelena_ai_conversas';
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -142,21 +175,26 @@ serve(async (req) => {
     const sessionId = phoneNumber;
     const timestamp = new Date(message.messageTimestamp * 1000).toISOString();
 
-    console.log(`💾 [WEBHOOK_YELENA] Saving ${tipoRemetente} message type ${messageType}: ${messageType === 'text' ? messageContent.substring(0, 50) : '[MEDIA]'}...`);
+    // Determinar a tabela baseada na instância
+    const targetTable = getTableForInstance(payload.instance);
+    console.log(`🎯 [WEBHOOK] Instance: ${payload.instance} -> Table: ${targetTable}`);
+
+    console.log(`💾 [WEBHOOK] Saving ${tipoRemetente} message type ${messageType}: ${messageType === 'text' ? messageContent.substring(0, 50) : '[MEDIA]'}...`);
 
     const { data, error } = await supabase
-      .from('messages')
+      .from(targetTable)
       .insert({
         session_id: sessionId,
-        content: messageContent,
-        sender: contactName || 'Yelena',
-        timestamp: timestamp,
+        message: messageContent,
+        Nome_do_contato: contactName,
+        read_at: timestamp,
         tipo_remetente: tipoRemetente,
-        mensagemtype: messageType
+        mensagemtype: messageType,
+        media_base64: messageType !== 'text' ? messageContent : null
       });
 
     if (error) {
-      console.error('❌ [WEBHOOK_YELENA] Error saving message:', error);
+      console.error('❌ [WEBHOOK] Error saving message:', error);
       return new Response(
         JSON.stringify({ error: 'Database error', details: error.message }),
         { 
@@ -166,13 +204,15 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ [WEBHOOK_YELENA] Message saved successfully');
+    console.log('✅ [WEBHOOK] Message saved successfully');
 
     return new Response(
       JSON.stringify({ 
         status: 'success', 
         message: 'Message processed',
         data: {
+          instance: payload.instance,
+          table: targetTable,
           phone: phoneNumber,
           contact: contactName,
           content_preview: messageType === 'text' ? messageContent.substring(0, 100) : `[${messageType.toUpperCase()}]`,
@@ -188,7 +228,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ [WEBHOOK_YELENA] Error processing webhook:', error);
+    console.error('❌ [WEBHOOK] Error processing webhook:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error', details: error.message }),
       { 

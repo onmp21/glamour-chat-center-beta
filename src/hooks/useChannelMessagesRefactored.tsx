@@ -4,6 +4,7 @@ import { MessageService } from '@/services/MessageService';
 import { ChannelMessage, RawMessage } from '@/types/messages';
 import { MessageConverter } from '@/utils/MessageConverter';
 import { MessageSorter } from '@/utils/MessageSorter';
+import { DetailedLogger } from '@/services/DetailedLogger';
 
 export const useChannelMessagesRefactored = (channelId: string, conversationId?: string) => {
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
@@ -12,6 +13,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
 
   const loadMessages = useCallback(async () => {
     if (!channelId) {
+      DetailedLogger.warn('useChannelMessagesRefactored', 'Nenhum channelId fornecido');
       setMessages([]);
       setLoading(false);
       return;
@@ -21,23 +23,24 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       setLoading(true);
       setError(null);
 
-      console.log(`📨 [MESSAGES_HOOK_V2] Loading messages for channel: ${channelId}, conversation: ${conversationId}`);
+      DetailedLogger.info('useChannelMessagesRefactored', `Carregando mensagens para o canal: ${channelId}, conversa: ${conversationId}`);
 
       const messageService = new MessageService(channelId);
       
       let loadedMessages: ChannelMessage[];
       if (conversationId) {
-        loadedMessages = await messageService.getMessagesByConversation(conversationId);
+        const result = await messageService.getMessagesByConversation(conversationId);
+        loadedMessages = result.data;
       } else {
         loadedMessages = await messageService.getAllMessages();
       }
 
       const sortedMessages = MessageSorter.sortChannelMessages(loadedMessages);
       
-      console.log(`✅ [MESSAGES_HOOK_V2] Loaded ${sortedMessages.length} messages`);
+      DetailedLogger.info('useChannelMessagesRefactored', `Carregadas ${sortedMessages.length} mensagens`);
       setMessages(sortedMessages);
     } catch (err) {
-      console.error(`❌ [MESSAGES_HOOK_V2] Error loading messages:`, err);
+      DetailedLogger.error('useChannelMessagesRefactored', `Erro ao carregar mensagens`, { error: err });
       setError(err instanceof Error ? err.message : 'Unknown error');
       setMessages([]);
     } finally {
@@ -50,11 +53,11 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       const processedMessage = MessageConverter.rawToChannelMessage(newMessage);
       
       if (MessageConverter.isDuplicate(prevMessages, processedMessage)) {
-        console.log(`⚠️ [MESSAGES_HOOK_V2] Message with ID ${processedMessage.id} already exists, skipping add.`);
+        DetailedLogger.warn('useChannelMessagesRefactored', `Mensagem com ID ${processedMessage.id} já existe, ignorando.`);
         return prevMessages;
       }
 
-      console.log(`➕ [MESSAGES_HOOK_V2] Adding new message to state:`, processedMessage);
+      DetailedLogger.info('useChannelMessagesRefactored', `Adicionando nova mensagem ao estado:`, processedMessage);
       return MessageSorter.sortChannelMessages([...prevMessages, processedMessage]);
     });
   }, []);
@@ -62,7 +65,6 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
   useEffect(() => {
     loadMessages();
 
-    // Setup realtime subscription with proper cleanup
     let channel: any = null;
 
     if (channelId) {
@@ -70,12 +72,12 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       const channelSuffix = conversationId ? `-${conversationId}-${Date.now()}` : `-messages-${Date.now()}`;
       
       channel = messageService.createRealtimeSubscription((payload) => {
-        console.log(`🔴 [MESSAGES_HOOK_V2] New message via realtime:`, payload);
+        DetailedLogger.info("useChannelMessagesRefactored", `Nova mensagem via realtime:`, payload);
         
         if (conversationId) {
           const messagePhone = messageService.extractPhoneFromSessionId(payload.new.session_id);
           if (messagePhone !== conversationId) {
-            console.log(`⏭️ [MESSAGES_HOOK_V2] Message not for current conversation, ignoring`);
+            DetailedLogger.info("useChannelMessagesRefactored", `Mensagem não é para a conversa atual, ignorando`);
             return;
           }
         }
@@ -84,11 +86,12 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       }, channelSuffix);
 
       channel.subscribe();
+      DetailedLogger.info("useChannelMessagesRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
     }
 
     return () => {
       if (channel) {
-        console.log(`🔌 [MESSAGES_HOOK_V2] Unsubscribing from channel ${channelId}`);
+        DetailedLogger.info("useChannelMessagesRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         channel.unsubscribe();
       }
     };

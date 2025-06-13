@@ -1,8 +1,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChannelService } from '@/services/ChannelService';
-import { ChannelConversation } from '@/types/messages';
-import { ConversationGrouper } from '@/utils/ConversationGrouper';
+import { MessageService } from '@/services/MessageService';
+import { ChannelConversation, ChannelMessage } from '@/types/messages';
+import { DetailedLogger } from '@/services/DetailedLogger';
 
 export const useChannelConversationsRefactored = (channelId: string) => {
   const [conversations, setConversations] = useState<ChannelConversation[]>([]);
@@ -12,7 +13,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
-      console.log('❌ [CONVERSATIONS_HOOK] No channelId provided');
+      DetailedLogger.warn('useChannelConversationsRefactored', 'Nenhum channelId fornecido');
       setConversations([]);
       setLoading(false);
       return;
@@ -21,26 +22,22 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
-        console.log(`🔄 [CONVERSATIONS_HOOK] Manual refresh for channel: ${channelId}`);
+        DetailedLogger.info('useChannelConversationsRefactored', `Atualização manual para o canal: ${channelId}`);
       } else {
         setLoading(true);
       }
       setError(null);
 
-      console.log(`🔄 [CONVERSATIONS_HOOK] Loading conversations for channel: ${channelId}`);
+      DetailedLogger.info('useChannelConversationsRefactored', `Carregando conversas para o canal: ${channelId}`);
 
       const channelService = new ChannelService(channelId);
-      const rawMessages = await channelService.fetchMessages();
+      const conversations = await channelService.getConversations();
 
-      console.log(`📨 [CONVERSATIONS_HOOK] Fetched ${rawMessages.length} raw messages`);
-
-      const groupedConversations = ConversationGrouper.groupMessagesByPhone(rawMessages, channelId);
-      console.log(`📱 [CONVERSATIONS_HOOK] Grouped into ${groupedConversations.length} conversations`);
-
-      setConversations(groupedConversations);
+      DetailedLogger.info('useChannelConversationsRefactored', `Conversas carregadas com sucesso`, { count: conversations.length });
+      setConversations(conversations);
     } catch (err) {
-      console.error(`❌ [CONVERSATIONS_HOOK] Error loading conversations for channel ${channelId}:`, err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      DetailedLogger.error('useChannelConversationsRefactored', `Erro ao carregar conversas para o canal ${channelId}`, { error: err });
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
       setConversations([]);
     } finally {
       setLoading(false);
@@ -49,40 +46,32 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   }, [channelId]);
 
   const refreshConversations = useCallback(() => {
-    console.log(`🔄 [CONVERSATIONS_HOOK] Manual refresh triggered for channel: ${channelId}`);
+    DetailedLogger.info('useChannelConversationsRefactored', `Atualização manual acionada para o canal: ${channelId}`);
     loadConversations(true);
   }, [channelId, loadConversations]);
 
   useEffect(() => {
     loadConversations();
 
-    // Setup realtime subscription with proper cleanup
     let channel: any = null;
-    
+
     if (channelId) {
-      const channelService = new ChannelService(channelId);
-      channel = channelService
-        .createRealtimeChannel(`-conversations-${Date.now()}`) // Add timestamp to ensure unique channel
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: channelService.getTableName(),
-          },
-          (payload) => {
-            console.log(`🔴 [CONVERSATIONS_HOOK] New message via realtime for ${channelId}:`, payload);
-            console.log(`📝 [CONVERSATIONS_HOOK] Message received but not auto-reloading conversations to prevent overlay refresh`);
-          }
-        );
+      const messageService = new MessageService(channelId);
+      const channelSuffix = `-conversations-${Date.now()}`;
       
-      // Subscribe to the channel
+      channel = messageService.createRealtimeSubscription((payload) => {
+        DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
+        // Recarregar conversas para refletir as novas mensagens
+        loadConversations();
+      }, channelSuffix);
+
       channel.subscribe();
+      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
     }
 
     return () => {
       if (channel) {
-        console.log(`🔌 [CONVERSATIONS_HOOK] Unsubscribing from channel ${channelId}`);
+        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         channel.unsubscribe();
       }
     };

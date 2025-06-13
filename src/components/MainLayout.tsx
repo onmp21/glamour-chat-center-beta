@@ -8,6 +8,8 @@ import { SEOProvider } from './layout/SEOProvider';
 import { MainLayoutContainer } from './layout/MainLayoutContainer';
 import { useLayout } from './layout/LayoutProvider';
 
+import { ChannelProvider } from '@/contexts/ChannelContext';
+
 const MainLayoutContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { activeSection } = useLayout();
