@@ -25,7 +25,7 @@ export class MediaMigrationService {
         table_name: tableName,
         record_id: parseInt(messageId),
         media_url: uploadResult.url,
-        placeholder_message: null
+        placeholder_message: this.getPlaceholderMessage(base64Content)
       });
 
       if (updateError) {
@@ -115,29 +115,16 @@ export class MediaMigrationService {
     return base64Pattern.test(content.replace(/\s/g, ''));
   }
 
-  static async autoMigrateOnLoad(
-    tableName: string,
-    messageId: string,
-    content: string
-  ): Promise<string> {
-    // Se já é URL do storage, retornar como está
-    if (this.isStorageUrl(content)) {
-      return content;
+  private static getPlaceholderMessage(base64Content: string): string {
+    if (base64Content.includes('image/') || base64Content.startsWith('/9j/') || base64Content.startsWith('iVBORw')) {
+      return '[Imagem]';
     }
-
-    // Se é base64, migrar em background
-    if (this.isBase64Content(content)) {
-      console.log(`🔄 [MEDIA_MIGRATION] Auto-migrating base64 for message ${messageId}`);
-      
-      // Migrar em background sem bloquear a UI
-      setTimeout(async () => {
-        await this.migrateMessageMedia(tableName, messageId, content);
-      }, 100);
-
-      // Retornar o base64 para exibição imediata
-      return content;
+    if (base64Content.includes('audio/') || base64Content.startsWith('SUQz') || base64Content.startsWith('//uQ')) {
+      return '[Áudio]';
     }
-
-    return content;
+    if (base64Content.includes('video/') || base64Content.startsWith('AAAAGG')) {
+      return '[Vídeo]';
+    }
+    return '[Mídia]';
   }
 }

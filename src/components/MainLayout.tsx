@@ -7,7 +7,6 @@ import { LayoutProvider } from './layout/LayoutProvider';
 import { SEOProvider } from './layout/SEOProvider';
 import { MainLayoutContainer } from './layout/MainLayoutContainer';
 import { useLayout } from './layout/LayoutProvider';
-import { AuthDebug } from './debug/AuthDebug';
 
 const MainLayoutContent: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
@@ -28,7 +27,6 @@ const MainLayoutContent: React.FC = () => {
         keywords="login, acesso, villa glamour, atendimento"
       >
         <LoginForm />
-        <AuthDebug />
       </SEOHead>
     );
   }
@@ -37,7 +35,6 @@ const MainLayoutContent: React.FC = () => {
   return (
     <SEOProvider activeSection={activeSection}>
       <MainLayoutContainer />
-      <AuthDebug />
     </SEOProvider>
   );
 };

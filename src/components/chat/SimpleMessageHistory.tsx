@@ -2,9 +2,8 @@
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
-import { MediaRendererFixed } from './MediaRendererFixed';
+import { MediaRenderer } from './MediaRenderer';
 import { MediaMigrationService } from '@/services/MediaMigrationService';
-import { getTableNameForChannel } from '@/utils/channelMapping';
 
 interface SimpleMessageHistoryProps {
   channelId: string;
@@ -29,47 +28,52 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages]);
 
-  // Função para detectar se é mídia
+  // Função melhorada para detectar se é mídia
   const isMediaMessage = (message: any) => {
-    return (
-      message.media_base64 ||
-      (message.mensagemtype && message.mensagemtype !== 'text' && message.mensagemtype !== 'conversation') ||
-      (message.message && message.message.startsWith('data:')) ||
-      (message.message && MediaMigrationService.isStorageUrl(message.message))
-    );
-  };
-
-  // Função para obter conteúdo da mídia com migração automática
-  const getMediaContent = async (message: any) => {
-    const tableName = getTableNameForChannel(channelId);
-    
-    // Priorizar media_base64 se existir
+    // Priorizar verificação de media_base64
     if (message.media_base64) {
-      return await MediaMigrationService.autoMigrateOnLoad(
-        tableName,
-        message.id,
-        message.media_base64
-      );
+      return MediaMigrationService.isBase64Content(message.media_base64) || 
+             MediaMigrationService.isStorageUrl(message.media_base64);
     }
 
-    // Verificar message field
+    // Verificar mensagemtype
+    if (message.mensagemtype && 
+        message.mensagemtype !== 'text' && 
+        message.mensagemtype !== 'conversation') {
+      return true;
+    }
+
+    // Verificar campo message
     if (message.message) {
-      // Se é URL do storage, retornar diretamente
       if (MediaMigrationService.isStorageUrl(message.message)) {
-        return message.message;
+        return true;
       }
       
-      // Se é base64, migrar automaticamente
-      if (message.message.startsWith('data:') || MediaMigrationService.isBase64Content(message.message)) {
-        return await MediaMigrationService.autoMigrateOnLoad(
-          tableName,
-          message.id,
-          message.message
-        );
+      if (message.message.startsWith('data:') || 
+          MediaMigrationService.isBase64Content(message.message)) {
+        return true;
       }
     }
 
-    return null;
+    return false;
+  };
+
+  // Função para obter conteúdo da mídia
+  const getMediaContent = (message: any): string => {
+    // Priorizar media_base64
+    if (message.media_base64) {
+      return message.media_base64;
+    }
+
+    // Usar message se for mídia
+    if (message.message && 
+        (MediaMigrationService.isStorageUrl(message.message) || 
+         message.message.startsWith('data:') ||
+         MediaMigrationService.isBase64Content(message.message))) {
+      return message.message;
+    }
+
+    return '';
   };
 
   if (loading) {
@@ -140,8 +144,10 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                       : "bg-white text-gray-900 border border-gray-200"
                 )}>
                   {isMedia ? (
-                    <MediaMessageRenderer 
-                      message={message}
+                    <MediaRenderer 
+                      content={getMediaContent(message)}
+                      messageType={message.mensagemtype || 'text'}
+                      messageId={message.id}
                       channelId={channelId}
                       isDarkMode={isDarkMode}
                       balloonColor={isAgent ? 'sent' : 'received'}
@@ -177,84 +183,5 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
         <div ref={messagesEndRef} />
       </div>
     </div>
-  );
-};
-
-// Componente para renderizar mensagens de mídia com migração
-const MediaMessageRenderer: React.FC<{
-  message: any;
-  channelId: string;
-  isDarkMode: boolean;
-  balloonColor: 'sent' | 'received';
-}> = ({ message, channelId, isDarkMode, balloonColor }) => {
-  const [mediaContent, setMediaContent] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const loadMedia = async () => {
-      const tableName = getTableNameForChannel(channelId);
-      
-      try {
-        let content = null;
-        
-        // Priorizar media_base64
-        if (message.media_base64) {
-          content = await MediaMigrationService.autoMigrateOnLoad(
-            tableName,
-            message.id,
-            message.media_base64
-          );
-        } else if (message.message) {
-          // Verificar se é URL do storage
-          if (MediaMigrationService.isStorageUrl(message.message)) {
-            content = message.message;
-          } 
-          // Verificar se é base64
-          else if (message.message.startsWith('data:') || MediaMigrationService.isBase64Content(message.message)) {
-            content = await MediaMigrationService.autoMigrateOnLoad(
-              tableName,
-              message.id,
-              message.message
-            );
-          }
-        }
-        
-        setMediaContent(content);
-      } catch (error) {
-        console.error('❌ [MEDIA_RENDERER] Error loading media:', error);
-        setMediaContent(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMedia();
-  }, [message.id, message.media_base64, message.message, channelId]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center space-x-2 p-2">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-        <span className="text-xs">Carregando mídia...</span>
-      </div>
-    );
-  }
-
-  if (!mediaContent) {
-    return (
-      <p className="break-words whitespace-pre-wrap">
-        {message.message}
-      </p>
-    );
-  }
-
-  return (
-    <MediaRendererFixed
-      content={mediaContent}
-      messageType={message.mensagemtype || 'text'}
-      messageId={message.id}
-      isDarkMode={isDarkMode}
-      balloonColor={balloonColor}
-    />
   );
 };
