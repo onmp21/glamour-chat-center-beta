@@ -58,7 +58,7 @@ export class MessageService {
       return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${this.channelId}:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -91,7 +91,7 @@ export class MessageService {
       return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${this.channelId}:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -103,13 +103,14 @@ export class MessageService {
       const { data, error } = await repository.findMessagesAfterTimestamp(afterTimestamp);
       
       if (error) {
-        throw error;
+        console.error(`❌ [MESSAGE_SERVICE] Error getting new messages:`, error);
+        return [];
       }
       
       return data || [];
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting new messages for channel ${this.channelId}:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -123,7 +124,6 @@ export class MessageService {
       MessageService.queryCache.clear();
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error marking conversation as read:`, error);
-      throw error;
     }
   }
 
@@ -138,17 +138,29 @@ export class MessageService {
     try {
       console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
       
-      // Query otimizada com timeout personalizado
+      // Verificar se a tabela existe
+      const { data: tableExists } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', tableName)
+        .maybeSingle();
+
+      if (!tableExists) {
+        console.log(`⚠️ [MESSAGE_SERVICE] Table ${tableName} does not exist`);
+        return [];
+      }
+
+      // Query otimizada sem timeout
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
         .order('read_at', { ascending: false })
-        .limit(limit)
-        .abortSignal(AbortSignal.timeout(15000)); // 15 segundos timeout
+        .limit(limit);
 
       if (error) {
         console.error(`❌ [MESSAGE_SERVICE] Database error:`, error);
-        throw error;
+        return [];
       }
 
       const conversationsMap = new Map<string, ChannelConversation>();
@@ -176,7 +188,6 @@ export class MessageService {
       return conversations;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting conversations:`, error);
-      // Retornar array vazio em caso de erro para não quebrar a UI
       return [];
     }
   }
@@ -190,15 +201,30 @@ export class MessageService {
     const tableName = repository.getTableName();
     
     try {
+      // Verificar se a tabela existe
+      const { data: tableExists } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', tableName)
+        .maybeSingle();
+
+      if (!tableExists) {
+        console.log(`⚠️ [MESSAGE_SERVICE] Table ${tableName} does not exist`);
+        return { data: [] };
+      }
+
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
         .eq('session_id', sessionId)
         .order('read_at', { ascending: true })
-        .limit(limit)
-        .abortSignal(AbortSignal.timeout(10000)); // 10 segundos timeout
+        .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
+        return { data: [] };
+      }
 
       const mappedData = (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
       const result = { data: mappedData };

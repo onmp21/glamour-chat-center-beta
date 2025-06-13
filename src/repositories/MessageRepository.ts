@@ -38,16 +38,28 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`📋 [MESSAGE_REPOSITORY] Fetching ${limit} messages from ${this.tableName}`);
     
     try {
+      // Verificar se a tabela existe primeiro
+      const { data: tableExists } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', this.tableName)
+        .maybeSingle();
+
+      if (!tableExists) {
+        console.log(`⚠️ [MESSAGE_REPOSITORY] Table ${this.tableName} does not exist`);
+        return [];
+      }
+
       const { data, error } = await supabase
         .from(this.tableName as any)
         .select('*')
         .order('id', { ascending: false })
-        .limit(Math.min(limit, 100)) // Máximo 100 para evitar sobrecarga
-        .abortSignal(AbortSignal.timeout(10000)); // 10 segundos timeout
+        .limit(Math.min(limit, 100));
 
       if (error) {
         console.error(`❌ [MESSAGE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
-        throw error;
+        return [];
       }
 
       const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
@@ -55,7 +67,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error in findAll for ${this.tableName}:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -89,12 +101,11 @@ export class MessageRepository extends BaseRepository<RawMessage> {
         .select('*')
         .ilike("session_id", `%${phoneNumber}%`)
         .order("id", { ascending: true })
-        .limit(100) // Limite para evitar sobrecarga
-        .abortSignal(AbortSignal.timeout(8000)); // 8 segundos timeout
+        .limit(100);
 
       if (error) {
         console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
-        throw error;
+        return [];
       }
 
       const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
@@ -102,7 +113,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error in findByPhoneNumber:`, error);
-      throw error;
+      return [];
     }
   }
 
@@ -115,8 +126,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
         .select('*')
         .gt('read_at', timestamp)
         .order("id", { ascending: true })
-        .limit(50) // Limite menor para new messages
-        .abortSignal(AbortSignal.timeout(5000)); // 5 segundos timeout
+        .limit(50);
 
       if (error) {
         console.error(`❌ [MESSAGE_REPOSITORY] Error fetching messages after timestamp from ${this.tableName}:`, error);

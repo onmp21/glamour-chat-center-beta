@@ -19,11 +19,23 @@ export class ConversationCountService {
       const tableName = getTableNameForChannel(channelId);
       console.log(`🔢 [COUNT_SERVICE] Counting conversations for ${channelId} in ${tableName}`);
       
+      // Verificar se a tabela existe primeiro
+      const { data: tableExists } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', tableName)
+        .maybeSingle();
+
+      if (!tableExists) {
+        console.log(`⚠️ [COUNT_SERVICE] Table ${tableName} does not exist`);
+        return 0;
+      }
+
       // Query otimizada - só conta session_ids únicos
       const { data, error } = await supabase
         .from(tableName as any)
-        .select('session_id', { count: 'exact', head: true })
-        .abortSignal(AbortSignal.timeout(5000));
+        .select('session_id', { count: 'exact', head: true });
 
       if (error) {
         console.error(`❌ [COUNT_SERVICE] Error counting for ${channelId}:`, error);
@@ -55,12 +67,24 @@ export class ConversationCountService {
     try {
       const tableName = getTableNameForChannel(channelId);
       
+      // Verificar se a tabela existe primeiro
+      const { data: tableExists } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', tableName)
+        .maybeSingle();
+
+      if (!tableExists) {
+        console.log(`⚠️ [COUNT_SERVICE] Table ${tableName} does not exist for unread count`);
+        return 0;
+      }
+      
       // Query otimizada - só conta mensagens não lidas
       const { count, error } = await supabase
         .from(tableName as any)
         .select('id', { count: 'exact', head: true })
-        .eq('is_read', false)
-        .abortSignal(AbortSignal.timeout(3000));
+        .eq('is_read', false);
 
       if (error) {
         console.error(`❌ [COUNT_SERVICE] Error counting unread for ${channelId}:`, error);

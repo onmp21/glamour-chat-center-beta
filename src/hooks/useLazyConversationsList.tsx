@@ -10,6 +10,7 @@ export const useLazyConversationsList = (channelId: string | null) => {
 
   const loadConversations = useCallback(async () => {
     if (!channelId) {
+      console.log('📋 [LAZY_CONVERSATIONS] No channelId provided, clearing conversations');
       setConversations([]);
       return;
     }
@@ -17,15 +18,19 @@ export const useLazyConversationsList = (channelId: string | null) => {
     try {
       setLoading(true);
       setError(null);
-      console.log(`📋 [LAZY_CONVERSATIONS] Loading conversations for ${channelId}`);
+      console.log(`📋 [LAZY_CONVERSATIONS] Loading conversations for channel: ${channelId}`);
       
       const conversations = await OptimizedConversationService.getConversationsList(channelId, 20);
       setConversations(conversations);
       
-      console.log(`✅ [LAZY_CONVERSATIONS] Loaded ${conversations.length} conversations for ${channelId}`);
+      console.log(`✅ [LAZY_CONVERSATIONS] Successfully loaded ${conversations.length} conversations for ${channelId}`);
+      
+      if (conversations.length === 0) {
+        console.log(`⚠️ [LAZY_CONVERSATIONS] No conversations found for channel ${channelId}. This might be normal if the channel is new or has no messages.`);
+      }
     } catch (err) {
       console.error(`❌ [LAZY_CONVERSATIONS] Error loading conversations for ${channelId}:`, err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setError(err instanceof Error ? err.message : 'Erro desconhecido ao carregar conversas');
       setConversations([]);
     } finally {
       setLoading(false);
@@ -35,8 +40,10 @@ export const useLazyConversationsList = (channelId: string | null) => {
   // Só carrega conversas quando há um canal ativo
   useEffect(() => {
     if (channelId) {
+      console.log(`🚀 [LAZY_CONVERSATIONS] Effect triggered for channelId: ${channelId}`);
       loadConversations();
     } else {
+      console.log('🚀 [LAZY_CONVERSATIONS] Effect triggered but no channelId, clearing state');
       setConversations([]);
       setError(null);
     }
