@@ -1,31 +1,16 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { MessageService } from '@/services/MessageService';
-import { ChannelMessage, RawMessage } from '@/types/messages';
+import { MessageServiceV2 } from '@/services/MessageServiceV2';
+import { RawMessage } from '@/types/messages';
 
-export const useLazyChannelMessages = (channelId: string | null, conversationId?: string) => {
-  const [messages, setMessages] = useState<ChannelMessage[]>([]);
+export const useLazyChannelMessages = (channelId: string | null, conversationId: string | null) => {
+  const [messages, setMessages] = useState<RawMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const convertRawToChannelMessage = (raw: RawMessage): ChannelMessage => {
-    return {
-      id: raw.id.toString(),
-      content: raw.content,
-      sender: raw.sender,
-      timestamp: raw.timestamp,
-      type: 'text',
-      isFromUser: raw.sender === 'customer',
-      session_id: raw.session_id,
-      tipo_remetente: raw.tipo_remetente,
-      mensagemtype: raw.mensagemtype,
-      Nome_do_contato: raw.Nome_do_contato,
-      nome_do_contato: raw.nome_do_contato
-    };
-  };
-
   const loadMessages = useCallback(async () => {
-    if (!channelId) {
+    if (!channelId || !conversationId) {
+      console.log('📋 [LAZY_MESSAGES] No channelId or conversationId provided, clearing messages');
       setMessages([]);
       return;
     }
@@ -33,51 +18,58 @@ export const useLazyChannelMessages = (channelId: string | null, conversationId?
     try {
       setLoading(true);
       setError(null);
-      console.log(`📬 [LAZY_MESSAGES] Loading messages for ${channelId}, conversation: ${conversationId}`);
+      console.log(`📋 [LAZY_MESSAGES] Loading messages for channel: ${channelId}, conversation: ${conversationId}`);
       
-      const messageService = new MessageService(channelId);
+      const messageService = new MessageServiceV2(channelId);
+      const result = await messageService.getMessagesByConversation(conversationId, 50);
       
-      let result: RawMessage[] | { data: RawMessage[] };
-      if (conversationId) {
-        result = await messageService.getMessagesByConversation(conversationId);
-      } else {
-        result = await messageService.getAllMessages(50);
-      }
-
-      const rawMessages = Array.isArray(result) ? result : (result?.data || []);
-      const convertedMessages = rawMessages.map(convertRawToChannelMessage);
+      setMessages(result.data);
       
-      setMessages(convertedMessages);
-      console.log(`✅ [LAZY_MESSAGES] Loaded ${convertedMessages.length} messages for ${channelId}`);
+      console.log(`✅ [LAZY_MESSAGES] Successfully loaded ${result.data.length} messages`);
+      
+      // Iniciar otimização em background
+      messageService.processBackgroundOptimization();
+      
     } catch (err) {
-      console.error(`❌ [LAZY_MESSAGES] Error loading messages for ${channelId}:`, err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      console.error(`❌ [LAZY_MESSAGES] Error loading messages:`, err);
+      setError(err instanceof Error ? err.message : 'Erro desconhecido ao carregar mensagens');
       setMessages([]);
     } finally {
       setLoading(false);
     }
   }, [channelId, conversationId]);
 
-  // Só carrega mensagens quando há um canal ativo
+  const addMessage = useCallback((message: RawMessage) => {
+    console.log(`➕ [LAZY_MESSAGES] Adding new message:`, message.id);
+    setMessages(prev => [...prev, message]);
+  }, []);
+
+  const updateMessage = useCallback((messageId: string, updates: Partial<RawMessage>) => {
+    console.log(`🔄 [LAZY_MESSAGES] Updating message:`, messageId);
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      )
+    );
+  }, []);
+
   useEffect(() => {
-    if (channelId) {
+    if (channelId && conversationId) {
+      console.log(`🚀 [LAZY_MESSAGES] Effect triggered for channel: ${channelId}, conversation: ${conversationId}`);
       loadMessages();
     } else {
+      console.log('🚀 [LAZY_MESSAGES] Effect triggered but missing parameters, clearing state');
       setMessages([]);
       setError(null);
     }
   }, [loadMessages]);
 
-  const addMessage = useCallback((newMessage: RawMessage) => {
-    const convertedMessage = convertRawToChannelMessage(newMessage);
-    setMessages(prev => [...prev, convertedMessage]);
-  }, []);
-
   return {
     messages,
     loading,
     error,
-    refetch: loadMessages,
-    addMessage
+    addMessage,
+    updateMessage,
+    refreshMessages: loadMessages
   };
 };

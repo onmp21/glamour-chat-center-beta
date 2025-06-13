@@ -719,6 +719,15 @@ export type Database = {
         Args: { base64_content: string; message_type?: string }
         Returns: string
       }
+      get_base64_messages: {
+        Args: { table_name: string; batch_size?: number }
+        Returns: {
+          id: number
+          media_base64: string
+          session_id: string
+          message: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -784,6 +793,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      process_base64_to_storage: {
+        Args: { base64_content: string; file_name?: string; mime_type?: string }
+        Returns: string
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
@@ -795,6 +808,15 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      update_media_url: {
+        Args: {
+          table_name: string
+          record_id: number
+          media_url: string
+          placeholder_message?: string
+        }
+        Returns: boolean
       }
       update_user_with_hash: {
         Args: {

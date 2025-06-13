@@ -1,29 +1,16 @@
-import React, { useRef, useLayoutEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ChatMessage } from './ChatMessage';
+import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
 import { cn } from '@/lib/utils';
-import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
-import { useAuth } from '@/contexts/AuthContext';
-import { format, isToday, isYesterday, parseISO } from 'date-fns'; 
-import { ptBR } from 'date-fns/locale';
-import { MediaMessageRenderer } from './MediaMessageRenderer';
 
 interface MessageHistoryProps {
   channelId: string;
-  conversationId?: string;
+  conversationId: string;
   isDarkMode: boolean;
   className?: string;
 }
-
-const convertToBrasiliaTime = (timestamp: string): Date => {
-  try {
-    const date = parseISO(timestamp);
-    const brasiliaTimeString = date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
-    return new Date(brasiliaTimeString);
-  } catch (error) {
-    console.error(`Error converting timestamp ${timestamp} to Brasília time:`, error);
-    const nowBrasiliaString = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
-    return new Date(nowBrasiliaString);
-  }
-};
 
 export const MessageHistory: React.FC<MessageHistoryProps> = ({
   channelId,
@@ -31,101 +18,77 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
   isDarkMode,
   className
 }) => {
-  const { user } = useAuth();
-  const { messages, loading } = useChannelMessagesRefactored(channelId, conversationId);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { messages, loading, error, refreshMessages } = useLazyChannelMessages(channelId, conversationId);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // SCROLL FORÇADO PARA O FINAL - MÚLTIPLAS ESTRATÉGIAS
-  useLayoutEffect(() => {
-    const scrollToBottom = () => {
-      if (containerRef.current) {
-        const container = containerRef.current;
-        
-        // Estratégia 1: Scroll direto para o máximo
-        container.scrollTop = container.scrollHeight;
-        
-        // Estratégia 2: scrollIntoView no elemento final
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ 
-            behavior: 'auto',
-            block: 'end'
-          });
-        }
-        
-        console.log('📜 [SCROLL] Forced scroll to bottom. ScrollTop:', container.scrollTop, 'ScrollHeight:', container.scrollHeight);
-      }
-    };
+  // Auto-refresh a cada 30 segundos se não há erro
+  useEffect(() => {
+    if (!autoRefresh || error) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 [MESSAGE_HISTORY] Auto-refreshing messages');
+      refreshMessages();
+    }, 30000);
 
+    return () => clearInterval(interval);
+  }, [autoRefresh, error, refreshMessages]);
+
+  // Scroll para o final quando novas mensagens chegam
+  useEffect(() => {
     if (messages.length > 0) {
-      // Scroll imediato
-      scrollToBottom();
-      
-      // Múltiplas tentativas com delays diferentes
-      const timeouts = [0, 10, 50, 100, 200, 500, 1000].map(delay =>
-        setTimeout(scrollToBottom, delay)
-      );
-      
-      return () => timeouts.forEach(clearTimeout);
-    }
-  }, [messages.length, conversationId, channelId]);
-
-  const formatMessageTime = (timestamp: string) => {
-    try {
-      const brasiliaDate = convertToBrasiliaTime(timestamp);
-      return format(brasiliaDate, 'HH:mm', { locale: ptBR });
-    } catch (error) {
-      console.error("Error formatting message time:", error);
-      return '--:--';
-    }
-  };
-
-  const formatDateSeparator = (timestamp: string) => {
-    try {
-      const brasiliaDate = convertToBrasiliaTime(timestamp);
-      if (isToday(brasiliaDate)) {
-        return 'Hoje';
-      } else if (isYesterday(brasiliaDate)) {
-        return 'Ontem';
-      } else {
-        return format(brasiliaDate, 'dd \'de\' MMMM', { locale: ptBR });
+      const scrollArea = document.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollArea) {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
       }
-    } catch (error) {
-      console.error("Error formatting date separator:", error);
-      return 'Data inválida';
     }
-  };
+  }, [messages]);
 
-  const groupMessagesByDate = (messages: any[]) => {
-    const groups: { [key: string]: any[] } = {};
-    
-    messages.forEach((message) => {
-      try {
-        const brasiliaDate = convertToBrasiliaTime(message.timestamp);
-        const dateKey = format(brasiliaDate, 'yyyy-MM-dd');
-        
-        if (!groups[dateKey]) {
-          groups[dateKey] = [];
-        }
-        groups[dateKey].push(message);
-      } catch (error) {
-        console.error("Error grouping message by date:", message, error);
-      }
-    });
-    
-    return groups;
-  };
-
-  if (loading) {
+  if (loading && messages.length === 0) {
     return (
-      <div className={cn("flex items-center justify-center p-4", className)}>
+      <div className={cn(
+        "flex items-center justify-center h-full",
+        className
+      )}>
         <div className={cn(
-          "animate-spin rounded-full h-6 w-6 border-b-2",
-          isDarkMode ? "border-[#fafafa]" : "border-gray-900"
-        )}></div>
-        <span className={cn("ml-2", isDarkMode ? "text-[#a1a1aa]" : "text-gray-600")}>
-          Carregando mensagens...
-        </span>
+          "flex flex-col items-center space-y-2",
+          isDarkMode ? "text-white" : "text-gray-900"
+        )}>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
+          <p className="text-sm">Carregando mensagens...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={cn(
+        "flex items-center justify-center h-full",
+        className
+      )}>
+        <div className={cn(
+          "flex flex-col items-center space-y-4 p-4",
+          isDarkMode ? "text-white" : "text-gray-900"
+        )}>
+          <div className="text-red-500">
+            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div className="text-center">
+            <p className="font-medium">Erro ao carregar mensagens</p>
+            <p className="text-sm opacity-70 mt-1">{error}</p>
+            <button
+              onClick={() => {
+                setAutoRefresh(true);
+                refreshMessages();
+              }}
+              className="mt-3 px-4 py-2 bg-[#b5103c] text-white rounded hover:bg-[#9d0e34] transition-colors"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -133,149 +96,59 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
   if (messages.length === 0) {
     return (
       <div className={cn(
-        "flex items-center justify-center p-8 text-center",
+        "flex items-center justify-center h-full",
         className
       )}>
-        <div>
-          <p className={cn(
-            "text-lg font-medium mb-2",
-            isDarkMode ? "text-[#fafafa]" : "text-gray-600"
-          )}>
-            Selecione uma conversa à esquerda para visualizar
-          </p>
-          <p className={cn(
-            "text-sm",
-            isDarkMode ? "text-[#a1a1aa]" : "text-gray-500"
-          )}>
-            {conversationId ? 
-              `Não há mensagens para ${conversationId}` : 
-              `Escolha uma conversa para começar`
-            }
-          </p>
+        <div className={cn(
+          "text-center",
+          isDarkMode ? "text-gray-400" : "text-gray-500"
+        )}>
+          <div className="text-4xl mb-4">💬</div>
+          <p>Nenhuma mensagem encontrada</p>
+          <p className="text-sm mt-1">Esta conversa ainda não possui mensagens</p>
         </div>
       </div>
     );
   }
 
-  const groupedMessages = groupMessagesByDate(messages);
-  const sortedDates = Object.keys(groupedMessages).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
   return (
-    <div 
-      ref={containerRef}
-      className={cn("flex-1 overflow-y-auto", className)}
-      style={{ 
-        scrollBehavior: 'auto',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column-reverse' // Inverte a direção para começar de baixo
-      }}
-    >      
+    <ScrollArea className={cn("h-full", className)}>
       <div className="space-y-4 p-4">
-        {/* Elemento para forçar scroll */}
-        <div 
-          ref={messagesEndRef} 
-          style={{ height: '20px', marginBottom: '20px' }}
-          aria-hidden="true"
-        />
-        
-        {sortedDates.map((dateKey) => (
-          <div key={dateKey} className="space-y-3">
-            {/* Separador de data */}
-            <div className="flex items-center justify-center my-6 sticky top-2 z-10">
-              <div className={cn(
-                "px-4 py-2 rounded-full text-xs font-medium shadow-lg backdrop-blur-md border",
-                isDarkMode 
-                  ? "bg-zinc-800/90 text-zinc-300 border-zinc-700/60" 
-                  : "bg-white/95 text-gray-600 border-gray-200/60"
-              )}>
-                {formatDateSeparator(groupedMessages[dateKey][0].timestamp)}
-              </div>
+        {loading && messages.length > 0 && (
+          <div className="text-center">
+            <div className="inline-flex items-center space-x-2 text-sm text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#b5103c]"></div>
+              <span>Atualizando mensagens...</span>
             </div>
-
-            {/* Mensagens do dia */}
-            {groupedMessages[dateKey]
-              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-              .map((message, index) => {
-              const isAgentMessage = 
-                message.tipo_remetente === 'USUARIO_INTERNO' || 
-                message.tipo_remetente === 'Yelena-ai' ||
-                message.tipo_remetente === 'AGENTE' ||
-                message.sender === 'agent';
-              
-              const contactName = message.Nome_do_contato || message.nome_do_contato || message.contactName;
-              const messageType = message.mensagemtype || 'text';
-              const isMediaMessage = messageType !== 'text' && messageType !== undefined;
-              
-              console.log(`🎯 [MESSAGE_HISTORY] Rendering message ${message.id}:`, {
-                messageType,
-                isMediaMessage,
-                isAgent: isAgentMessage,
-                contentLength: message.content?.length || 0,
-                contentPreview: message.content?.substring(0, 30),
-                channelId,
-                rawMessageType: message.mensagemtype, // Log the raw messageType
-                rawContentStart: message.content?.substring(0, 50) // Log start of raw content
-              });
-              
-              return (
-                <div
-                  key={`${message.id}-${index}`}
-                  className={cn(
-                    "flex mb-3",
-                    isAgentMessage ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <div className={cn(
-                    "max-w-[85%] space-y-1",
-                    isAgentMessage ? "items-end" : "items-start"
-                  )}>
-                    <div className={cn(
-                      "px-3 py-2 text-sm shadow-sm relative",
-                      isAgentMessage
-                        ? "bg-[#b5103c] text-white rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-md"
-                        : isDarkMode
-                          ? "bg-[#18181b] text-[#fafafa] rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl border border-zinc-800"
-                          : "bg-white text-gray-900 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl border border-gray-200",
-                      // Adicionar a "rabinha" do WhatsApp
-                      isAgentMessage 
-                        ? "after:content-[''] after:absolute after:top-0 after:right-[-8px] after:w-0 after:h-0 after:border-l-[8px] after:border-l-[#b5103c] after:border-t-[8px] after:border-t-transparent"
-                        : isDarkMode
-                          ? "before:content-[''] before:absolute before:top-0 before:left-[-8px] before:w-0 before:h-0 before:border-r-[8px] before:border-r-[#18181b] before:border-t-[8px] before:border-t-transparent"
-                          : "before:content-[''] before:absolute before:top-0 before:left-[-8px] before:w-0 before:h-0 before:border-r-[8px] before:border-r-white before:border-t-[8px] before:border-t-transparent"
-                    )}>
-                      {isMediaMessage ? (
-                        <MediaMessageRenderer
-                          content={message.content}
-                          messageType={messageType}
-                          messageId={message.id}
-                          isDarkMode={isDarkMode}
-                          balloonColor={isAgentMessage ? 'sent' : 'received'}
-                        />
-                      ) : (
-                        <p className="break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      )}
-                    </div>
-
-                    <div className={cn(
-                      "flex items-center space-x-2 text-xs px-1",
-                      isAgentMessage ? "flex-row-reverse space-x-reverse" : "flex-row",
-                      isDarkMode ? "text-[#a1a1aa]" : "text-gray-500"
-                    )}>
-                      <span className="font-medium">
-                        {isAgentMessage ? 'Agente' : contactName || 'Cliente'}
-                      </span>
-                      <span>{formatMessageTime(message.timestamp)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        ))}
+        )}
+        
+        {messages.map((message, index) => {
+          // Converter RawMessage para o formato esperado pelo ChatMessage
+          const chatMessage = {
+            id: message.id,
+            content: message.content || message.message,
+            timestamp: message.timestamp || message.read_at || new Date().toISOString(),
+            sender: message.sender,
+            tipo_remetente: message.tipo_remetente,
+            Nome_do_contato: message.Nome_do_contato,
+            nome_do_contato: message.nome_do_contato,
+            mensagemtype: message.mensagemtype
+          };
+
+          return (
+            <ChatMessage
+              key={`${message.id}-${index}`}
+              message={chatMessage}
+              isDarkMode={isDarkMode}
+              channelId={channelId}
+            />
+          );
+        })}
+        
+        {/* Spacer para scroll automático */}
+        <div className="h-1" />
       </div>
-    </div>
+    </ScrollArea>
   );
 };
-
-
