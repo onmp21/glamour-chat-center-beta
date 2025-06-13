@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -13,6 +12,11 @@ interface ProfilePictureProps {
   userName: string;
 }
 
+// Type guard to check if object has avatar_url property
+const hasAvatarUrl = (obj: any): obj is { avatar_url?: string } => {
+  return obj && typeof obj === 'object';
+};
+
 export const ProfilePicture: React.FC<ProfilePictureProps> = ({ 
   isDarkMode, 
   userName
@@ -24,7 +28,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   useEffect(() => {
     if (user) {
       loadProfile(user.id).then(profile => {
-        if (profile?.avatar_url) {
+        if (hasAvatarUrl(profile) && profile.avatar_url) {
           setSelectedImage(profile.avatar_url);
         }
       });

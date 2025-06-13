@@ -12,10 +12,15 @@ import { toast } from 'sonner';
 
 interface AIProviderFormProps {
   provider?: AIProvider | null;
-  onClose: () => void;
+  onSave?: () => void;
+  onCancel?: () => void;
 }
 
-export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClose }) => {
+export const AIProviderForm: React.FC<AIProviderFormProps> = ({
+  provider,
+  onSave,
+  onCancel
+}) => {
   const [formData, setFormData] = useState<AIProviderFormData>({
     name: '',
     provider_type: 'openai',
@@ -30,7 +35,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const { createProvider, updateProvider, testProvider } = useAIProviders();
+  const { createProvider, updateProvider, testProvider, deleteProvider } = useAIProviders();
 
   useEffect(() => {
     if (provider) {
@@ -58,7 +63,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
         await createProvider(formData);
         toast.success('Provedor criado com sucesso!');
       }
-      onClose();
+      onSave && onSave();
     } catch (error) {
       toast.error(provider ? 'Erro ao atualizar provedor' : 'Erro ao criar provedor');
     } finally {
@@ -103,6 +108,17 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
       default_model: DEFAULT_MODELS[value as keyof typeof DEFAULT_MODELS][0] || ''
     };
     setFormData(newFormData);
+  };
+
+  const handleDelete = async () => {
+    if (provider && window.confirm('Tem certeza que deseja deletar este provedor?')) {
+      try {
+        await deleteProvider(Number(provider.id)); // Convert to number
+        onCancel && onCancel();
+      } catch (error) {
+        console.error('Error deleting provider:', error);
+      }
+    }
   };
 
   return (
@@ -268,4 +284,3 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
     </div>
   );
 };
-

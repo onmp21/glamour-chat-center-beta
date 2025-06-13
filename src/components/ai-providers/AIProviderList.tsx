@@ -12,11 +12,14 @@ interface AIProviderListProps {
   loading: boolean;
 }
 
-export const AIProviderList: React.FC<AIProviderListProps> = ({ providers, loading }) => {
+export const AIProviderList: React.FC<AIProviderListProps> = ({
+  providers,
+  loading
+}) => {
   const [showForm, setShowForm] = useState(false);
   const [editingProvider, setEditingProvider] = useState<AIProvider | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
-  const { deleteProvider, testProvider } = useAIProviders();
+  const { deleteProvider, testProvider, updateProvider } = useAIProviders();
 
   const handleEdit = (provider: AIProvider) => {
     setEditingProvider(provider);
@@ -56,6 +59,14 @@ export const AIProviderList: React.FC<AIProviderListProps> = ({ providers, loadi
       toast.error('Erro ao testar provedor');
     } finally {
       setTestingProvider(null);
+    }
+  };
+
+  const handleToggleActive = async (providerId: string, currentStatus: boolean) => {
+    try {
+      await updateProvider(Number(providerId), { is_active: !currentStatus }); // Convert to number
+    } catch (error) {
+      console.error('Error updating provider:', error);
     }
   };
 
@@ -209,4 +220,3 @@ export const AIProviderList: React.FC<AIProviderListProps> = ({ providers, loadi
     </div>
   );
 };
-

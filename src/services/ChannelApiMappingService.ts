@@ -1,3 +1,4 @@
+
 import { Database } from "@/types/supabase";
 import { supabase } from "../lib/supabase";
 
@@ -8,7 +9,8 @@ export class ChannelApiMappingService {
   private static isFetching: boolean = false;
   private static fetchPromise: Promise<ChannelApiMapping[] | null> | null = null;
 
-  private constructor() {}
+  // Make constructor public to fix access errors
+  constructor() {}
 
   static async fetchMappings(): Promise<ChannelApiMapping[] | null> {
     if (this.mappings !== null) {
@@ -52,26 +54,15 @@ export class ChannelApiMappingService {
     return this.mappings;
   }
 
-  static getChannelUuid(channelId: string): string | null {
-    if (!this.mappings) {
-      console.warn("Channel mappings not yet loaded. Attempting to fetch.");
-      this.fetchMappings().then(() => {
-        if (this.mappings) {
-          return this.mappings.find(mapping => mapping.channel_id === channelId)?.api_instance_uuid || null;
-        } else {
-          console.error("Failed to load channel mappings.");
-          return null;
-        }
-      });
+  // Make getChannelUuid public and fix implementation
+  static async getChannelUuid(channelId: string): Promise<string | null> {
+    const mappings = await this.getMappings();
+    if (!mappings) {
+      console.warn("Channel mappings not yet loaded.");
       return null;
     }
 
-    return this.mappings.find(mapping => mapping.channel_id === channelId)?.api_instance_uuid || null;
-  }
-
-  // Make getChannelUuid public to fix access error
-  public static getChannelUuid(channelId: string): string | null {
-    return this.getChannelUuid(channelId);
+    return mappings.find(mapping => mapping.channel_id === channelId)?.api_instance_uuid || null;
   }
 
   static clearCache(): void {

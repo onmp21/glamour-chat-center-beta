@@ -9,7 +9,7 @@ export interface UserProfile {
   assigned_tabs: string[];
   created_at: string;
   updated_at: string;
-  avatar_url?: string; // Add missing avatar_url property
+  avatar_url?: string;
 }
 
 export interface AuthUser {
@@ -26,8 +26,27 @@ export interface LoginCredentials {
   password: string;
 }
 
+// Add missing exports
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  role: UserRole;
+  assignedTabs: string[];
+  assignedCities: string[];
+  createdAt: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+}
+
+export type UserRole = 'admin' | 'manager' | 'salesperson' | 'manager_external' | 'manager_store';
+
 export interface AuthContextType {
   user: AuthUser | null;
+  isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
