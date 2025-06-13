@@ -94,7 +94,6 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         isDarkMode={isDarkMode}
         onClose={onClose}
         onSidebarToggle={onSidebarToggle}
-        isSidebarOpen={isSidebarOpen}
       />
 
       {/* Barra de Pesquisa */}
