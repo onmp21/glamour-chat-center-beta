@@ -21,6 +21,8 @@ export const useSimpleConversations = (channelId: string | null) => {
   const { isAuthenticated, user } = useAuth();
 
   const getTableName = (channelId: string): string => {
+    console.log(`🔍 [SIMPLE_CONVERSATIONS] Mapeando canal: ${channelId}`);
+    
     const mapping: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
@@ -32,7 +34,10 @@ export const useSimpleConversations = (channelId: string | null) => {
       'gerente-externo': 'gerente_externo_conversas',
       'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
     };
-    return mapping[channelId] || 'yelena_ai_conversas';
+    
+    const tableName = mapping[channelId] || 'yelena_ai_conversas';
+    console.log(`✅ [SIMPLE_CONVERSATIONS] Canal: ${channelId} -> Tabela: ${tableName}`);
+    return tableName;
   };
 
   const extractPhoneFromSession = (sessionId: string): string => {
@@ -41,8 +46,15 @@ export const useSimpleConversations = (channelId: string | null) => {
   };
 
   const loadConversations = async () => {
-    if (!channelId || !isAuthenticated) {
-      console.log('🔍 [SIMPLE_CONVERSATIONS] Parâmetros insuficientes:', { channelId, isAuthenticated });
+    if (!channelId) {
+      console.log('⚠️ [SIMPLE_CONVERSATIONS] Nenhum canal fornecido');
+      setConversations([]);
+      return;
+    }
+
+    if (!isAuthenticated) {
+      console.log('⚠️ [SIMPLE_CONVERSATIONS] Usuário não autenticado');
+      setConversations([]);
       return;
     }
 
@@ -51,13 +63,13 @@ export const useSimpleConversations = (channelId: string | null) => {
       setError(null);
       
       const tableName = getTableName(channelId);
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Carregando da tabela: ${tableName}`);
+      console.log(`📋 [SIMPLE_CONVERSATIONS] Iniciando query na tabela: ${tableName}, usuário: ${user?.name}`);
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
         .select('session_id, Nome_do_contato, nome_do_contato, message, read_at, tipo_remetente')
         .order('read_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (queryError) {
         console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryError);
@@ -65,7 +77,7 @@ export const useSimpleConversations = (channelId: string | null) => {
         return;
       }
 
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Dados recebidos:`, rawData?.length || 0);
+      console.log(`📋 [SIMPLE_CONVERSATIONS] Query executada. Registros recebidos:`, rawData?.length || 0);
 
       const conversationsMap = new Map<string, SimpleConversation>();
       
@@ -98,24 +110,36 @@ export const useSimpleConversations = (channelId: string | null) => {
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
-      console.log(`✅ [SIMPLE_CONVERSATIONS] Carregadas ${conversations.length} conversas`);
+      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas`);
+      
+      if (conversations.length > 0) {
+        console.log(`📋 [SIMPLE_CONVERSATIONS] Primeira conversa:`, conversations[0]);
+      }
+      
       setConversations(conversations);
 
     } catch (err) {
       console.error('❌ [SIMPLE_CONVERSATIONS] Erro inesperado:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setConversations([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log(`🚀 [SIMPLE_CONVERSATIONS] Effect acionado para usuário: ${user?.name}`);
+    console.log(`🚀 [SIMPLE_CONVERSATIONS] Effect acionado:`, {
+      channelId,
+      isAuthenticated,
+      user: user?.name
+    });
+    
     if (isAuthenticated && channelId) {
       loadConversations();
     } else {
-      console.log('⏳ [SIMPLE_CONVERSATIONS] Aguardando parâmetros...');
+      console.log('⏳ [SIMPLE_CONVERSATIONS] Aguardando parâmetros necessários...');
       setConversations([]);
+      setError(null);
     }
   }, [channelId, isAuthenticated, user?.name]);
 

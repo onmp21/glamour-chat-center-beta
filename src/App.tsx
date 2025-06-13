@@ -13,24 +13,24 @@ import { MainLayout } from './components/MainLayout';
 const queryClient = new QueryClient();
 
 function App() {
-  console.log('🚀 [APP] Inicializando aplicação');
+  console.log('🚀 [APP] Inicializando aplicação - estrutura corrigida');
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-          <TooltipProvider>
-            <AuthProvider>
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+            <TooltipProvider>
               <ChannelProvider>
                 <MainLayout />
+                <Toaster />
+                <Sonner />
               </ChannelProvider>
-              <Toaster />
-              <Sonner />
-            </AuthProvider>
-          </TooltipProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+            </TooltipProvider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </AuthProvider>
   );
 }
 

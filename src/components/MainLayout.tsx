@@ -10,18 +10,22 @@ import { useLayout } from './layout/LayoutProvider';
 import { AuthDebug } from './debug/AuthDebug';
 
 const MainLayoutContent: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { activeSection } = useLayout();
 
-  console.log('🔍 [MAIN_LAYOUT] Estado de autenticação:', { isAuthenticated });
+  console.log('🔍 [MAIN_LAYOUT] Verificando autenticação:', { 
+    isAuthenticated, 
+    user: user?.name,
+    activeSection 
+  });
 
   if (!isAuthenticated) {
-    console.log('🔍 [MAIN_LAYOUT] Usuário não autenticado, mostrando LoginForm');
+    console.log('🔍 [MAIN_LAYOUT] Usuário não autenticado - mostrando LoginForm');
     return (
       <SEOHead 
-        title="Login"
-        description="Acesse o Glamour Chat Center. Sistema profissional de gestão de atendimento e comunicação."
-        keywords="login, acesso, glamour chat center, atendimento"
+        title="Login - Villa Glamour"
+        description="Acesse o sistema de atendimento Villa Glamour"
+        keywords="login, acesso, villa glamour, atendimento"
       >
         <LoginForm />
         <AuthDebug />
@@ -29,7 +33,7 @@ const MainLayoutContent: React.FC = () => {
     );
   }
 
-  console.log('🔍 [MAIN_LAYOUT] Usuário autenticado, mostrando layout principal');
+  console.log('✅ [MAIN_LAYOUT] Usuário autenticado - mostrando aplicação principal');
   return (
     <SEOProvider activeSection={activeSection}>
       <MainLayoutContainer />

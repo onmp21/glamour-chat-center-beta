@@ -22,6 +22,8 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   const { isAuthenticated, user } = useAuth();
 
   const getTableName = (channelId: string): string => {
+    console.log(`🔍 [SIMPLE_MESSAGES] Mapeando canal: ${channelId}`);
+    
     const mapping: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
@@ -33,12 +35,22 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       'gerente-externo': 'gerente_externo_conversas',
       'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
     };
-    return mapping[channelId] || 'yelena_ai_conversas';
+    
+    const tableName = mapping[channelId] || 'yelena_ai_conversas';
+    console.log(`✅ [SIMPLE_MESSAGES] Canal: ${channelId} -> Tabela: ${tableName}`);
+    return tableName;
   };
 
   const loadMessages = async () => {
-    if (!channelId || !sessionId || !isAuthenticated) {
-      console.log('🔍 [SIMPLE_MESSAGES] Parâmetros insuficientes:', { channelId, sessionId, isAuthenticated });
+    if (!channelId || !sessionId) {
+      console.log('⚠️ [SIMPLE_MESSAGES] Parâmetros insuficientes:', { channelId, sessionId });
+      setMessages([]);
+      return;
+    }
+
+    if (!isAuthenticated) {
+      console.log('⚠️ [SIMPLE_MESSAGES] Usuário não autenticado');
+      setMessages([]);
       return;
     }
 
@@ -47,7 +59,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       setError(null);
       
       const tableName = getTableName(channelId);
-      console.log(`📋 [SIMPLE_MESSAGES] Carregando da tabela: ${tableName}, sessão: ${sessionId}`);
+      console.log(`📋 [SIMPLE_MESSAGES] Iniciando query na tabela: ${tableName}, sessão: ${sessionId}, usuário: ${user?.name}`);
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
@@ -61,7 +73,11 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         return;
       }
 
-      console.log(`✅ [SIMPLE_MESSAGES] Carregadas ${rawData?.length || 0} mensagens`);
+      console.log(`✅ [SIMPLE_MESSAGES] Query executada com sucesso. Dados recebidos:`, rawData?.length || 0);
+      
+      if (rawData && rawData.length > 0) {
+        console.log(`📋 [SIMPLE_MESSAGES] Primeira mensagem exemplo:`, rawData[0]);
+      }
       
       const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
         id: row.id?.toString() || '',
@@ -75,23 +91,32 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         media_base64: row.media_base64
       }));
 
+      console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
       setMessages(processedMessages);
 
     } catch (err) {
       console.error('❌ [SIMPLE_MESSAGES] Erro inesperado:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setMessages([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado para usuário: ${user?.name}`);
+    console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado:`, {
+      channelId,
+      sessionId,
+      isAuthenticated,
+      user: user?.name
+    });
+    
     if (isAuthenticated && channelId && sessionId) {
       loadMessages();
     } else {
-      console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros...');
+      console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros necessários...');
       setMessages([]);
+      setError(null);
     }
   }, [channelId, sessionId, isAuthenticated, user?.name]);
 

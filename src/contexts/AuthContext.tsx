@@ -11,29 +11,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: false
   });
 
+  console.log('🔐 [AUTH_PROVIDER] Inicializando AuthProvider');
+
   useEffect(() => {
-    console.log('🔐 [AUTH] AuthProvider inicializando...');
+    console.log('🔐 [AUTH_PROVIDER] Verificando usuário salvo no localStorage');
     
     const savedUser = localStorage.getItem('villa_glamour_user');
     if (savedUser) {
       try {
         const user = JSON.parse(savedUser);
-        console.log('🔐 [AUTH] Usuário restaurado do localStorage:', user.name);
+        console.log('🔐 [AUTH_PROVIDER] Usuário restaurado:', user.name);
         setAuthState({ user, isAuthenticated: true });
       } catch (error) {
-        console.error('🔐 [AUTH] Erro ao parsear usuário salvo:', error);
+        console.error('🔐 [AUTH_PROVIDER] Erro ao parsear usuário:', error);
         localStorage.removeItem('villa_glamour_user');
       }
     } else {
-      console.log('🔐 [AUTH] Nenhum usuário no localStorage');
+      console.log('🔐 [AUTH_PROVIDER] Nenhum usuário no localStorage');
     }
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     try {
-      console.log('🔐 [AUTH] Tentando fazer login com:', credentials.username);
+      console.log('🔐 [AUTH_PROVIDER] Tentando login:', credentials.username);
       
-      // BYPASS TEMPORÁRIO APENAS PARA DEMONSTRAÇÃO
+      // Login demo para testes
       if (credentials.username === 'demo' && credentials.password === 'demo') {
         const user: User = {
           id: 'demo-user',
@@ -47,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setAuthState({ user, isAuthenticated: true });
         localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('🔐 [AUTH] Login demo realizado com sucesso');
+        console.log('✅ [AUTH_PROVIDER] Login demo realizado com sucesso');
         return true;
       }
       
@@ -57,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         input_password: credentials.password
       });
 
-      console.log('🔐 [AUTH] Resultado verificação usuário:', { userData, userError });
+      console.log('🔐 [AUTH_PROVIDER] Resultado verificação:', { userData, userError });
 
       if (!userError && userData && userData.length > 0) {
         const userInfo = userData[0];
@@ -73,28 +75,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setAuthState({ user, isAuthenticated: true });
         localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('🔐 [AUTH] Login realizado com sucesso para usuário:', user.role);
+        console.log('✅ [AUTH_PROVIDER] Login realizado com sucesso:', user.role);
         return true;
       }
 
-      console.log('🔐 [AUTH] Credenciais inválidas ou usuário não encontrado');
+      console.log('❌ [AUTH_PROVIDER] Credenciais inválidas');
       return false;
       
     } catch (error) {
-      console.error('🔐 [AUTH] Erro durante login:', error);
+      console.error('❌ [AUTH_PROVIDER] Erro durante login:', error);
       return false;
     }
   };
 
   const logout = () => {
-    console.log('🔐 [AUTH] Fazendo logout');
+    console.log('🔐 [AUTH_PROVIDER] Fazendo logout');
     setAuthState({ user: null, isAuthenticated: false });
     localStorage.removeItem('villa_glamour_user');
   };
 
-  // Debug do estado de autenticação
+  // Debug do estado atual
   useEffect(() => {
-    console.log('🔐 [AUTH] Estado atual:', {
+    console.log('🔐 [AUTH_PROVIDER] Estado atual:', {
       isAuthenticated: authState.isAuthenticated,
       user: authState.user?.name || 'nenhum'
     });
