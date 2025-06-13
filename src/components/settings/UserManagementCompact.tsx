@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +35,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
   const getRoleLabel = (role: UserRole) => {
     const labels: Record<UserRole, string> = {
       admin: 'Admin',
+      manager: 'Gerente',
       manager_external: 'Gerente Ext.',
       manager_store: 'Gerente Loja',
       salesperson: 'Vendedora'
@@ -47,6 +47,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
     switch (role) {
       case 'admin':
         return Shield;
+      case 'manager':
       case 'manager_external':
         return UserCog;
       case 'manager_store':
@@ -66,7 +67,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role === 'admin').length,
-    managers: users.filter(u => u.role === 'manager_external' || u.role === 'manager_store').length,
+    managers: users.filter(u => u.role === 'manager' || u.role === 'manager_external' || u.role === 'manager_store').length,
     salespersons: users.filter(u => u.role === 'salesperson').length
   };
 
@@ -289,7 +290,10 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
       <UserCreateModal 
         isOpen={isCreateModalOpen} 
         onClose={() => setIsCreateModalOpen(false)} 
-        onCreateUser={handleCreateUser} 
+        onUserCreated={() => {
+          setIsCreateModalOpen(false);
+          refreshUsers();
+        }}
         isDarkMode={isDarkMode} 
       />
 

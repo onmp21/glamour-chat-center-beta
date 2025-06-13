@@ -22,7 +22,7 @@ export const MobileChatInputBar: React.FC<MobileChatInputBarProps> = ({
 }) => {
   const [message, setMessage] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
-  const { sendMessage, sending } = useMessageSender();
+  const { sendMessage, sending } = useMessageSender(channelId || '', conversationId || '', () => {});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = async () => {

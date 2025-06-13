@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,15 +92,16 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       setRecentReports([
         {
           id: '1', // Fix: string instead of number
-          report_type: 'conversations',
+          title: 'Relatório',
           prompt: 'Resumo das conversas de dezembro',
-          generated_report: 'Relatório de conversas de dezembro...',
+          generated_at: '2024-12-15T10:00:00Z',
+          created_at: '2024-12-15T10:00:00Z',
+          provider_used: 'OpenAI',
           provider_id: '1', // Fix: string instead of number
           provider_name: 'OpenAI',
           model_used: 'gpt-4',
           tokens_used: 1200,
           generation_time: 5.2,
-          created_at: '2024-12-15T10:00:00Z',
           metadata: {},
           query: 'Análise de conversas',
           result: {
@@ -111,9 +111,13 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
             created_at: '2024-12-15T10:00:00Z',
             provider_id: '1',
             report_content: 'Relatório de conversas de dezembro...',
-            report_type: 'conversations'
+            report_type: 'conversations',
+            status: 'completed'
           },
-          timestamp: '2024-12-15T10:00:00Z'
+          timestamp: '2024-12-15T10:00:00Z',
+          status: 'success',
+          report_type: 'conversations',
+          generated_report: 'Relatório de conversas de dezembro...'
         }
       ]);
     } catch (error) {
@@ -140,7 +144,8 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         created_at: new Date().toISOString(),
         provider_id: selectedProvider,
         report_content: `Relatório baseado na consulta: ${filters.custom_prompt || 'Análise padrão'}`,
-        report_type: filters.report_type
+        report_type: filters.report_type,
+        status: 'completed'
       };
       
       setReportResult(result);
@@ -161,7 +166,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     }
   };
 
-  const downloadReport = (reportContent: string, reportType: string, reportId?: string) => { // Fix: string instead of number
+  const downloadReport = (reportContent: string, reportType: string, reportId?: string) => {
     const filename = `relatorio_${reportType}_${reportId || new Date().toISOString().split('T')[0]}.md`;
     const blob = new Blob([reportContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
