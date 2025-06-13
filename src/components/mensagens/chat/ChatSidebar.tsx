@@ -130,7 +130,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </Button>
       </div>
 
-      {/* Lista de Conversas com Scroll */}
+      {/* Lista de Conversas com Scroll - SEM AVATARES */}
       <div className="flex-1 overflow-y-auto">
         {filteredConversations.length === 0 ? (
           <div className="p-4 text-center">
@@ -154,14 +154,8 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     : (isDarkMode ? "hover:bg-[#27272a]" : "hover:bg-gray-50")
                 )}
               >
-                {/* Avatar e Nome */}
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm",
-                    "bg-gradient-to-r from-blue-500 to-purple-600"
-                  )}>
-                    {conversation.contact_name.substring(0, 2).toUpperCase()}
-                  </div>
+                {/* Nome e Telefone - SEM AVATAR */}
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <div className={cn(
                       "font-medium text-sm truncate",

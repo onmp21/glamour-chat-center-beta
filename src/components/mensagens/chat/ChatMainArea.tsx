@@ -69,15 +69,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
             </Button>
           )}
           
-          {/* Avatar */}
-          <div className={cn(
-            "w-10 h-10 rounded-full flex items-center justify-center text-white font-medium mr-3",
-            "bg-gradient-to-r from-blue-500 to-purple-600"
-          )}>
-            {conversationForHeader.contactName.substring(0, 2).toUpperCase()}
-          </div>
-          
-          {/* Nome e Número */}
+          {/* Nome e Número - SEM AVATAR */}
           <div className="flex-1">
             <div className={cn(
               "font-semibold text-base",
@@ -151,7 +143,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         )}
       </div>
 
-      {/* Input de Mensagem Fixo */}
+      {/* Input de Mensagem Fixo - RESTAURADO */}
       {selectedConv && (
         <div className={cn(
           "border-t p-4",
