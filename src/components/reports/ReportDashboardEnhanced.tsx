@@ -77,7 +77,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       const activeProviders = await AIProviderService.getProviders();
       setProviders(activeProviders);
       if (activeProviders.length > 0) {
-        setSelectedProvider(activeProviders[0].id);
+        setSelectedProvider(String(activeProviders[0].id));
       }
     } catch (error) {
       console.error('Erro ao carregar provedores:', error);
@@ -199,7 +199,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
     setError('');
     setFilters({ report_type: 'conversations' });
-    setSelectedProvider(providers.length > 0 ? providers[0].id : '');
+    setSelectedProvider(providers.length > 0 ? String(providers[0].id) : '');
   };
 
   return (
@@ -305,7 +305,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
                     </SelectTrigger>
                     <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
                       {providers.map(provider => (
-                        <SelectItem key={provider.id} value={provider.id}>
+                        <SelectItem key={provider.id} value={String(provider.id)}>
                           {provider.name} ({AIProviderService.getProviderTypeLabel(provider.provider_type)})
                         </SelectItem>
                       ))}
