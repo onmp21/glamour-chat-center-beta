@@ -14,7 +14,7 @@ import { UserEditModal } from './UserEditModal';
 import { UserRole } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
 
-interface User {
+interface DatabaseUser {
   id: string;
   username: string;
   name: string;
@@ -36,7 +36,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<DatabaseUser | null>(null);
 
   const { users, loading, createUser, updateUser, deleteUser, refreshUsers } = useUsers();
 
@@ -59,7 +59,20 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
     return colors[role] || 'bg-gray-500';
   };
 
-  const filteredUsers = users.filter(user =>
+  // Convert users to DatabaseUser format
+  const databaseUsers: DatabaseUser[] = users.map(user => ({
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    assigned_tabs: user.assignedTabs || [],
+    assigned_cities: user.assignedCities || [],
+    is_active: true, // Default to active since the User type doesn't have this field
+    created_at: user.createdAt || new Date().toISOString(),
+    updated_at: user.updatedAt || new Date().toISOString()
+  }));
+
+  const filteredUsers = databaseUsers.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -102,7 +115,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
     }
   };
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: DatabaseUser) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
   };
@@ -163,7 +176,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
               <div>
                 <p className="text-sm text-muted-foreground">Administradores</p>
                 <p className="text-xl font-bold">
-                  {users.filter(u => u.role === 'admin').length}
+                  {databaseUsers.filter(u => u.role === 'admin').length}
                 </p>
               </div>
             </div>
@@ -179,7 +192,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
               <div>
                 <p className="text-sm text-muted-foreground">Gerentes</p>
                 <p className="text-xl font-bold">
-                  {users.filter(u => u.role === 'manager' || u.role === 'manager_external' || u.role === 'manager_store').length}
+                  {databaseUsers.filter(u => u.role === 'manager' || u.role === 'manager_external' || u.role === 'manager_store').length}
                 </p>
               </div>
             </div>
@@ -195,7 +208,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
               <div>
                 <p className="text-sm text-muted-foreground">Vendedoras</p>
                 <p className="text-xl font-bold">
-                  {users.filter(u => u.role === 'salesperson').length}
+                  {databaseUsers.filter(u => u.role === 'salesperson').length}
                 </p>
               </div>
             </div>
@@ -210,7 +223,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-xl font-bold">{users.length}</p>
+                <p className="text-xl font-bold">{databaseUsers.length}</p>
               </div>
             </div>
           </CardContent>

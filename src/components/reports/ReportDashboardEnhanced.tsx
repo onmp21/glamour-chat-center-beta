@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label'; // Add missing import
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   FileText,
@@ -67,7 +67,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const loadProviders = async () => {
     try {
-      const activeProviders = await AIProviderService.getProviders(); // Fix method name
+      const activeProviders = await AIProviderService.getProviders();
       setProviders(activeProviders);
       if (activeProviders.length > 0) {
         setSelectedProvider(activeProviders[0].id);
@@ -91,13 +91,13 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       // Mock implementation for now
       setRecentReports([
         {
-          id: '1', // Fix: string instead of number
+          id: '1',
           title: 'Relatório',
           prompt: 'Resumo das conversas de dezembro',
           generated_at: '2024-12-15T10:00:00Z',
           created_at: '2024-12-15T10:00:00Z',
           provider_used: 'OpenAI',
-          provider_id: '1', // Fix: string instead of number
+          provider_id: '1',
           provider_name: 'OpenAI',
           model_used: 'gpt-4',
           tokens_used: 1200,

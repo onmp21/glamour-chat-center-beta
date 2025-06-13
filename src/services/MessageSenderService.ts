@@ -1,3 +1,4 @@
+
 import { supabase } from '../integrations/supabase/client';
 import { ChannelApiMappingService } from './ChannelApiMappingService';
 import { RawMessage } from '@/types/messageTypes';
@@ -10,6 +11,7 @@ export class MessageSenderService {
   private retryCount: number = 3;
   private retryDelay: number = 1000;
   private retryManager: RetryManager;
+  private logger: DetailedLogger;
 
   constructor() {
     this.retryManager = new RetryManager({
@@ -18,6 +20,7 @@ export class MessageSenderService {
       maxDelay: 5000,
       backoffMultiplier: 2
     });
+    this.logger = new DetailedLogger('MESSAGE_SENDER');
   }
 
   private getMessageTypeForMedia(mediaType: 'image' | 'audio' | 'video' | 'document'): string {
@@ -42,18 +45,18 @@ export class MessageSenderService {
     const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
     
     if (!apiInstance) {
-      console.error(`❌ [MESSAGE_SENDER] Nenhuma instância da API configurada para o canal ${channelId}`);
+      this.logger.error(`Nenhuma instância da API configurada para o canal ${channelId}`);
       return false;
     }
 
     const isConnected = await this.checkInstanceConnection(apiInstance.base_url, apiInstance.api_key, apiInstance.instance_name);
     
     if (!isConnected) {
-      console.error(`❌ [MESSAGE_SENDER] Instância ${apiInstance.instance_name} não está conectada`);
+      this.logger.error(`Instância ${apiInstance.instance_name} não está conectada`);
       return false;
     }
 
-    console.log(`✅ [MESSAGE_SENDER] API Evolution configurada e conectada para canal ${channelId}: ${apiInstance.instance_name}`);
+    this.logger.info(`API Evolution configurada e conectada para canal ${channelId}: ${apiInstance.instance_name}`);
     return true;
   }
 
@@ -104,7 +107,7 @@ export class MessageSenderService {
 
   async sendTextMessage(channelId: string, to: string, text: string): Promise<RawMessage> {
     return await RetryManager.executeWithRetry(async () => {
-      DetailedLogger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
+      this.logger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
 
       const isConfigured = await this.validateApiConfiguration(channelId);
       if (!isConfigured) {
@@ -137,7 +140,7 @@ export class MessageSenderService {
         text: text
       };
 
-      DetailedLogger.debug('Enviando texto para API Evolution', { 
+      this.logger.debug('Enviando texto para API Evolution', { 
         endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}` 
       });
 
@@ -152,7 +155,7 @@ export class MessageSenderService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        DetailedLogger.error('Erro na resposta da API Evolution', { 
+        this.logger.error('Erro na resposta da API Evolution', { 
           status: response.status, 
           statusText: response.statusText, 
           body: errorText 
@@ -186,7 +189,7 @@ export class MessageSenderService {
 
       await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
 
-      DetailedLogger.info('Mensagem de texto enviada com sucesso', { messageId: result.id });
+      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.id });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -226,7 +229,7 @@ export class MessageSenderService {
 
   async sendMediaMessage(channelId: string, to: string, mediaUrl: string, caption: string, mediaType: 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
     return await RetryManager.executeWithRetry(async () => {
-      DetailedLogger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
+      this.logger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
 
       const isConfigured = await this.validateApiConfiguration(channelId);
       if (!isConfigured) {
@@ -259,7 +262,7 @@ export class MessageSenderService {
       const fileExtension = this.getFileExtensionFromMimeType(mimeType);
 
       if (mediaType === 'audio') {
-        DetailedLogger.info('Comprimindo áudio antes do envio');
+        this.logger.info('Comprimindo áudio antes do envio');
         const compressionResult = await AudioCompressor.compressAudio(base64Content, {
           quality: 0.7,
           maxSizeKB: 500,
@@ -268,16 +271,16 @@ export class MessageSenderService {
 
         if (compressionResult.success && compressionResult.compressedData) {
           base64Content = this.extractBase64FromDataUrl(compressionResult.compressedData);
-          DetailedLogger.info('Áudio comprimido com sucesso', {
+          this.logger.info('Áudio comprimido com sucesso', {
             originalSize: compressionResult.originalSize,
             compressedSize: compressionResult.compressedSize,
             compressionRatio: compressionResult.compressionRatio
           });
         } else {
-          DetailedLogger.warn('Falha na compressão de áudio, usando original', { error: compressionResult.error });
+          this.logger.warn('Falha na compressão de áudio, usando original', { error: compressionResult.error });
         }
       } else if (mediaType === 'video') {
-        DetailedLogger.info('Comprimindo vídeo antes do envio');
+        this.logger.info('Comprimindo vídeo antes do envio');
         const compressionResult = await VideoCompressor.compressVideo(base64Content, {
           quality: 0.7,
           maxSizeKB: 2000,
@@ -286,13 +289,13 @@ export class MessageSenderService {
 
         if (compressionResult.success && compressionResult.compressedData) {
           base64Content = this.extractBase64FromDataUrl(compressionResult.compressedData);
-          DetailedLogger.info('Vídeo comprimido com sucesso', {
+          this.logger.info('Vídeo comprimido com sucesso', {
             originalSize: compressionResult.originalSize,
             compressedSize: compressionResult.compressedSize,
             compressionRatio: compressionResult.compressionRatio
           });
         } else {
-          DetailedLogger.warn('Falha na compressão de vídeo, usando original', { error: compressionResult.error });
+          this.logger.warn('Falha na compressão de vídeo, usando original', { error: compressionResult.error });
         }
       }
 
@@ -306,7 +309,7 @@ export class MessageSenderService {
         fileName: `media_${Date.now()}.${fileExtension}`
       };
 
-      DetailedLogger.debug('Enviando mídia para API Evolution', { endpoint: `${apiInstance.base_url}${endpoint}`, mediaType });
+      this.logger.debug('Enviando mídia para API Evolution', { endpoint: `${apiInstance.base_url}${endpoint}`, mediaType });
 
       const response = await fetch(`${apiInstance.base_url}${endpoint}`, {
         method: "POST",
@@ -319,7 +322,7 @@ export class MessageSenderService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        DetailedLogger.error('Erro na resposta da API Evolution', { 
+        this.logger.error('Erro na resposta da API Evolution', { 
           status: response.status, 
           statusText: response.statusText, 
           body: errorText 
@@ -353,7 +356,7 @@ export class MessageSenderService {
 
       await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
 
-      DetailedLogger.info('Mensagem de mídia enviada com sucesso', { messageId: result.id, mediaType });
+      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.id, mediaType });
       return messageData;
     }, {
       maxRetries: this.retryCount,
