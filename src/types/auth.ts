@@ -3,7 +3,7 @@ export interface UserProfile {
   id: string;
   username: string;
   name: string;
-  role: 'admin' | 'manager' | 'salesperson';
+  role: 'admin' | 'manager' | 'salesperson' | 'manager_external' | 'manager_store';
   is_active: boolean;
   assigned_cities: string[];
   assigned_tabs: string[];
@@ -16,7 +16,7 @@ export interface AuthUser {
   id: string;
   username: string;
   name: string;
-  role: 'admin' | 'manager' | 'salesperson';
+  role: 'admin' | 'manager' | 'salesperson' | 'manager_external' | 'manager_store';
   assigned_cities: string[];
   assigned_tabs: string[];
 }

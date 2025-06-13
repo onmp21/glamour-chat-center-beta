@@ -22,11 +22,24 @@ export interface ChannelMessage {
   sender: 'customer' | 'agent';
   tipo_remetente?: string;
   messageType?: string;
+  Nome_do_contato?: string;
+  nome_do_contato?: string;
+  mensagemtype?: string;
   fileData?: {
     fileName?: string;
     mimeType?: string;
     base64?: string;
   };
+}
+
+export interface ChannelConversation {
+  id: string;
+  contact_name: string;
+  contact_phone: string;
+  last_message?: string;
+  last_message_time?: string;
+  status: 'unread' | 'in_progress' | 'resolved';
+  message_count?: number;
 }
 
 export interface CursorPaginationResult<T> {

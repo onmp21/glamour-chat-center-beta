@@ -5,287 +5,201 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
 import { UserRole } from '@/types/auth';
+import { useUsers } from '@/hooks/useUsers';
+import { toast } from 'sonner';
 
 interface UserCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateUser: (userData: {
-    username: string;
-    password: string;
-    name: string;
-    role: UserRole;
-    assignedTabs: string[];
-    assignedCities: string[];
-  }) => void;
-  isDarkMode: boolean;
+  onUserCreated: () => void;
 }
 
-const availableTabs = [
-  { id: 'general', name: 'Canal Geral' },
-  { id: 'canarana', name: 'Canarana' },
-  { id: 'souto-soares', name: 'Souto Soares' },
-  { id: 'joao-dourado', name: 'João Dourado' },
-  { id: 'america-dourada', name: 'América Dourada' },
-  { id: 'manager-store', name: 'Gerente das Lojas' },
-  { id: 'manager-external', name: 'Gerente do Externo' }
-];
+const ROLE_TABS: Record<UserRole, string[]> = {
+  admin: ['dashboard', 'mensagens', 'exames', 'configuracoes', 'relatorios'],
+  manager: ['dashboard', 'mensagens', 'exames', 'relatorios'],
+  manager_external: ['dashboard', 'mensagens', 'exames', 'relatorios'],
+  manager_store: ['dashboard', 'mensagens', 'exames', 'relatorios'],
+  salesperson: ['dashboard', 'mensagens', 'exames']
+};
 
-const availableCities = [
-  'Canarana',
-  'Souto Soares', 
-  'João Dourado',
-  'América Dourada'
-];
-
-const rolePermissions: Record<UserRole, string[]> = {
-  admin: ['general', 'canarana', 'souto-soares', 'joao-dourado', 'america-dourada', 'manager-store', 'manager-external'],
-  manager_external: ['general', 'manager-external'],
-  manager_store: ['general', 'canarana', 'souto-soares', 'joao-dourado', 'america-dourada', 'manager-store'],
-  salesperson: ['general']
+const ROLE_CITIES: Record<UserRole, string[]> = {
+  admin: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
+  manager: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
+  manager_external: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
+  manager_store: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
+  salesperson: []
 };
 
 export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   isOpen,
   onClose,
-  onCreateUser,
-  isDarkMode
+  onUserCreated
 }) => {
+  const { createUser } = useUsers();
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
     name: '',
-    role: '' as UserRole,
-    assignedTabs: [] as string[],
-    assignedCities: [] as string[]
+    password: '',
+    role: 'salesperson' as UserRole,
+    assigned_tabs: [] as string[],
+    assigned_cities: [] as string[]
   });
+
+  const availableTabs = ['dashboard', 'mensagens', 'exames', 'configuracoes', 'relatorios'];
+  const availableCities = ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'];
+
+  const roleLabels: Record<UserRole, string> = {
+    admin: 'Administrador',
+    manager: 'Gerente',
+    manager_external: 'Gerente Externo',
+    manager_store: 'Gerente de Loja',
+    salesperson: 'Vendedor'
+  };
 
   const handleRoleChange = (role: UserRole) => {
     setFormData(prev => ({
       ...prev,
       role,
-      assignedTabs: rolePermissions[role] || [],
+      assigned_tabs: ROLE_TABS[role],
+      assigned_cities: ROLE_CITIES[role]
     }));
   };
 
-  const handleTabToggle = (tabId: string) => {
+  const handleTabChange = (tab: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assignedTabs: prev.assignedTabs.includes(tabId)
-        ? prev.assignedTabs.filter(id => id !== tabId)
-        : [...prev.assignedTabs, tabId]
+      assigned_tabs: checked
+        ? [...prev.assigned_tabs, tab]
+        : prev.assigned_tabs.filter(t => t !== tab)
     }));
   };
 
-  const handleCityToggle = (cityName: string) => {
+  const handleCityChange = (city: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assignedCities: prev.assignedCities.includes(cityName)
-        ? prev.assignedCities.filter(city => city !== cityName)
-        : [...prev.assignedCities, cityName]
+      assigned_cities: checked
+        ? [...prev.assigned_cities, city]
+        : prev.assigned_cities.filter(c => c !== city)
     }));
   };
 
-  const handleSubmit = () => {
-    if (formData.username && formData.password && formData.name && formData.role) {
-      onCreateUser(formData);
-      setFormData({ username: '', password: '', name: '', role: '' as UserRole, assignedTabs: [], assignedCities: [] });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      await createUser(formData);
+      toast.success('Usuário criado com sucesso!');
+      onUserCreated();
       onClose();
+    } catch (error) {
+      toast.error('Erro ao criar usuário');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const getRoleLabel = (role: UserRole) => {
-    const labels: Record<UserRole, string> = {
-      admin: 'Administrador',
-      manager_external: 'Gerente Externo',
-      manager_store: 'Gerente de Loja',
-      salesperson: 'Vendedora'
-    };
-    return labels[role];
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        "max-w-md max-h-[90vh] overflow-y-auto"
-      )} style={{
-        backgroundColor: isDarkMode ? '#3a3a3a' : '#ffffff',
-        borderColor: isDarkMode ? '#686868' : '#e5e7eb'
-      }}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className={cn(
-            isDarkMode ? "text-white" : "text-gray-900"
-          )}>
-            Criar Novo Usuário
-          </DialogTitle>
+          <DialogTitle>Criar Usuário</DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username" className={cn(
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            )}>Nome de Usuário</Label>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="username">Usuário</Label>
             <Input
               id="username"
               value={formData.username}
               onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-              placeholder="Digite o nome de usuário"
-              style={{
-                backgroundColor: isDarkMode ? '#000000' : '#ffffff',
-                borderColor: isDarkMode ? '#686868' : '#d1d5db',
-                color: isDarkMode ? '#ffffff' : '#111827'
-              }}
+              placeholder="Nome de usuário"
+              required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className={cn(
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            )}>Senha</Label>
+          <div>
+            <Label htmlFor="name">Nome Completo</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Nome completo"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="password">Senha</Label>
             <Input
               id="password"
               type="password"
               value={formData.password}
               onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-              placeholder="Digite a senha"
-              style={{
-                backgroundColor: isDarkMode ? '#000000' : '#ffffff',
-                borderColor: isDarkMode ? '#686868' : '#d1d5db',
-                color: isDarkMode ? '#ffffff' : '#111827'
-              }}
+              placeholder="Senha"
+              required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name" className={cn(
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            )}>Nome Completo</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Digite o nome completo"
-              style={{
-                backgroundColor: isDarkMode ? '#000000' : '#ffffff',
-                borderColor: isDarkMode ? '#686868' : '#d1d5db',
-                color: isDarkMode ? '#ffffff' : '#111827'
-              }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className={cn(
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            )}>Função</Label>
+          <div>
+            <Label>Função</Label>
             <Select value={formData.role} onValueChange={handleRoleChange}>
-              <SelectTrigger style={{
-                backgroundColor: isDarkMode ? '#000000' : '#ffffff',
-                borderColor: isDarkMode ? '#686868' : '#d1d5db',
-                color: isDarkMode ? '#ffffff' : '#111827'
-              }}>
-                <SelectValue placeholder="Selecione uma função" />
+              <SelectTrigger>
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(rolePermissions).map(([role]) => (
-                  <SelectItem key={role} value={role}>
-                    {getRoleLabel(role as UserRole)}
+                {Object.entries(roleLabels).map(([key, label]) => (
+                  <SelectItem key={key} value={key as UserRole}>
+                    {label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {formData.role && (
-            <>
-              <div className="space-y-2">
-                <Label className={cn(
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>Cidades com Acesso</Label>
-                <div className="space-y-2 max-h-24 overflow-y-auto border rounded p-2" style={{
-                  backgroundColor: isDarkMode ? '#000000' : '#f9f9f9',
-                  borderColor: isDarkMode ? '#686868' : '#d1d5db'
-                }}>
-                  {availableCities.map(city => (
-                    <div key={city} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`city-${city}`}
-                        checked={formData.assignedCities.includes(city)}
-                        onCheckedChange={() => handleCityToggle(city)}
-                      />
-                      <Label htmlFor={`city-${city}`} className={cn(
-                        "text-sm",
-                        isDarkMode ? "text-gray-300" : "text-gray-700"
-                      )}>
-                        {city}
-                      </Label>
-                    </div>
-                  ))}
+          <div>
+            <Label>Permissões</Label>
+            <div className="space-y-1">
+              {availableTabs.map(tab => (
+                <div key={tab} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`tab-${tab}`}
+                    checked={formData.assigned_tabs.includes(tab)}
+                    onCheckedChange={(checked) => handleTabChange(tab, !!checked)}
+                  />
+                  <Label htmlFor={`tab-${tab}`}>{tab}</Label>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="space-y-2">
-                <Label className={cn(
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                )}>Canais Atribuídos</Label>
-                <div className="space-y-2 max-h-32 overflow-y-auto border rounded p-2" style={{
-                  backgroundColor: isDarkMode ? '#000000' : '#f9f9f9',
-                  borderColor: isDarkMode ? '#686868' : '#d1d5db'
-                }}>
-                  {availableTabs.map(tab => (
-                    <div key={tab.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={tab.id}
-                        checked={formData.assignedTabs.includes(tab.id)}
-                        onCheckedChange={() => handleTabToggle(tab.id)}
-                        disabled={formData.role !== 'admin' && !rolePermissions[formData.role]?.includes(tab.id)}
-                      />
-                      <Label htmlFor={tab.id} className={cn(
-                        "text-sm",
-                        isDarkMode ? "text-gray-300" : "text-gray-700"
-                      )}>
-                        {tab.name}
-                        {tab.id === 'general' && (
-                          <span className={cn(
-                            "text-xs ml-2",
-                            isDarkMode ? "text-gray-400" : "text-gray-500"
-                          )}>
-                            (Somente admin pode enviar mensagens)
-                          </span>
-                        )}
-                      </Label>
-                    </div>
-                  ))}
+          <div>
+            <Label>Cidades</Label>
+            <div className="space-y-1">
+              {availableCities.map(city => (
+                <div key={city} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`city-${city}`}
+                    checked={formData.assigned_cities.includes(city)}
+                    onCheckedChange={(checked) => handleCityChange(city, !!checked)}
+                  />
+                  <Label htmlFor={`city-${city}`}>{city}</Label>
                 </div>
-              </div>
-            </>
-          )}
-        </div>
+              ))}
+            </div>
+          </div>
 
-        <div className="flex justify-end space-x-2 pt-4">
-          <Button 
-            variant="outline" 
-            onClick={onClose}
-            style={{
-              backgroundColor: 'transparent',
-              borderColor: isDarkMode ? '#686868' : '#d1d5db',
-              color: isDarkMode ? '#ffffff' : '#374151'
-            }}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={!formData.username || !formData.password || !formData.name || !formData.role}
-            style={{
-              backgroundColor: '#b5103c',
-              color: '#ffffff'
-            }}
-            className="hover:opacity-90"
-          >
-            Salvar
-          </Button>
-        </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? 'Criando...' : 'Criar'}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

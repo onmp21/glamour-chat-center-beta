@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { ConversationItem } from './chat/ConversationItem';
 import { cn } from '@/lib/utils';
@@ -16,7 +15,6 @@ import { extractPhoneFromSessionId } from '@/utils/sessionIdParser';
 
 interface UnifiedConversation extends ChannelConversation {
   channelId: string;
-  message_count: number;
 }
 
 interface ChannelsPageLayoutProps {
@@ -382,7 +380,7 @@ export const ChannelsPageLayout: React.FC<ChannelsPageLayoutProps> = ({
                       
                       <div className="flex items-center gap-1 text-xs text-gray-500">
                         <Users className="h-3 w-3" />
-                        {conversation.message_count} msgs
+                        {conversation.message_count || 0} msgs
                       </div>
                     </div>
                   </div>
