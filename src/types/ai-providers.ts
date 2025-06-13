@@ -10,6 +10,32 @@ export interface AIProvider {
   advanced_settings?: any;
   created_at: string;
   updated_at: string;
+  test_status?: 'success' | 'error' | 'pending';
+}
+
+export interface AIProviderFormData {
+  name: string;
+  provider_type: string;
+  api_key: string;
+  base_url?: string;
+  default_model?: string;
+  is_active: boolean;
+  advanced_settings?: any;
+}
+
+export interface ReportResult {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  provider_id: string;
+}
+
+export interface ReportHistory {
+  id: string;
+  query: string;
+  result: ReportResult;
+  timestamp: string;
 }
 
 export const PROVIDER_TYPES = {

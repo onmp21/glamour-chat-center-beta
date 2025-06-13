@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -23,7 +22,7 @@ interface Message {
   timestamp: string;
   sender: 'customer' | 'agent';
   tipo_remetente?: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  type: 'text' | 'image' | 'audio' | 'video' | 'file';
   fileUrl?: string;
   fileName?: string;
   read: boolean;
@@ -66,7 +65,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
     try {
       const base64Content = await fileToBase64(file);
-      const messageType = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "document";
+      const messageType = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
 
       const success = await sendAppMessage({
         conversationId: selectedConversation,
@@ -99,7 +98,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       const success = await sendAppMessage({
         conversationId: selectedConversation,
         channelId: channelId,
-        content: "", // Áudio não tem conteúdo de texto direto
+        content: "",
         sender: "agent",
         messageType: "audio",
         fileData: {
@@ -287,16 +286,16 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
         isSidebarOpen={isSidebarOpen}
         isDarkMode={isDarkMode}
         onClose={onClose}
-        onConversationSelect={handleConversationSelect}
+        onConversationSelect={setSelectedConversation}
         onSidebarToggle={setIsSidebarOpen}
-        onRefresh={handleRefreshConversations}
+        onRefresh={refreshConversations}
       />
 
       <div className="flex-1 flex flex-col">
         <ChatMainArea
           selectedConv={selectedConv}
           conversationForHeader={conversationForHeader}
-          displayMessages={displayMessages}
+          messages={displayMessages}
           messagesLoading={messagesLoading}
           isSidebarOpen={isSidebarOpen}
           isDarkMode={isDarkMode}
@@ -311,5 +310,3 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     </div>
   );
 };
-
-

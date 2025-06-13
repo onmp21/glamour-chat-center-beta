@@ -62,9 +62,9 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const accessibleChannels = getAccessibleChannels();
   const canaisData = channels
     .filter(channel => 
-      channel.is_active && 
-      channel.name !== 'Pedro' && // Filtrar o canal Pedro que não existe mais
-      channel.name // Garantir que o canal tem um nome válido
+      channel.isActive && // Corrigido de is_active para isActive
+      channel.name !== 'Pedro' &&
+      channel.name
     )
     .map(channel => ({
       id: getChannelLegacyId(channel),
@@ -76,39 +76,8 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       conversasNaoLidas: 0,
       ultimaAtividade: 'Online'
     }))
-    .filter(channel => accessibleChannels.includes(channel.id)); // Filtrar por permissões
+    .filter(channel => accessibleChannels.includes(channel.id));
 
-  const contatosData = [
-    { 
-      id: '1', 
-      nome: 'Pedro Vila Nova', 
-      telefone: '+55 77 99999-9999',
-      canais: ['canarana', 'gerente-externo'], 
-      ultimaMensagem: 'Obrigado pelo atendimento!', 
-      tempo: '2 min', 
-      status: 'resolvida' as const
-    },
-    { 
-      id: '2', 
-      nome: 'Maria Silva', 
-      telefone: '+55 77 88888-8888',
-      canais: ['souto-soares', 'gerente-lojas'], 
-      ultimaMensagem: 'Quando chegará meu pedido?', 
-      tempo: '15 min', 
-      status: 'pendente' as const
-    },
-    { 
-      id: '3', 
-      nome: 'João Santos', 
-      telefone: '+55 77 77777-7777',
-      canais: ['joao-dourado'], 
-      ultimaMensagem: 'Vocês têm esse produto?', 
-      tempo: '1 hora', 
-      status: 'em_andamento' as const
-    },
-  ];
-
-  // Funções para ChatOverlayRefactored
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('File sending handled by ChatOverlayRefactored');
   };
@@ -129,41 +98,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     const newUrl = '/?section=mensagens';
     window.history.replaceState({}, '', newUrl);
   };
-
-  const handleContactClick = (contactId: string, canais: string[]) => {
-    const contact = contatosData.find(c => c.id === contactId);
-    if (!contact) return;
-
-    if (canais.length > 1) {
-      setSelectedContactName(contact.nome);
-      setSelectedContactChannels(canais);
-      setIsChannelSelectorOpen(true);
-    } else {
-      setSelectedChannel(canais[0]);
-    }
-  };
-
-  const handleChannelSelect = (channel: string) => {
-    setSelectedChannel(channel);
-    setIsChannelSelectorOpen(false);
-  };
-
-  const handleNewContact = (contactData: {
-    nome: string;
-    telefone: string;
-    canal: string;
-  }) => {
-    console.log('Creating new contact:', contactData);
-  };
-
-  const filteredChannels = canaisData.filter(canal =>
-    canal.nome.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredContacts = contatosData.filter(contato =>
-    contato.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contato.telefone.includes(searchTerm)
-  );
 
   if (selectedChannel) {
     return (
@@ -190,7 +124,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         isDarkMode={isDarkMode}
       />
 
-      {/* Search and Action Bar */}
       <div className="flex gap-4 items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -219,33 +152,31 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         )}
       </div>
 
-      {/* Content */}
       {activeTab === 'canais' ? (
         <ChannelsGrid
-          channels={filteredChannels}
+          channels={canaisData}
           onChannelClick={handleChannelClick}
           isDarkMode={isDarkMode}
         />
       ) : (
         <ContactsListOptimized
-          contacts={filteredContacts}
-          onContactClick={handleContactClick}
+          contacts={[]}
+          onContactClick={() => {}}
           isDarkMode={isDarkMode}
         />
       )}
 
-      {/* Modals */}
       <NewContactModal
         isOpen={isNewContactModalOpen}
         onClose={() => setIsNewContactModalOpen(false)}
-        onSubmit={handleNewContact}
+        onSubmit={() => {}}
         isDarkMode={isDarkMode}
       />
 
       <ChannelSelectorModal
         isOpen={isChannelSelectorOpen}
         onClose={() => setIsChannelSelectorOpen(false)}
-        onChannelSelect={handleChannelSelect}
+        onChannelSelect={() => {}}
         contactName={selectedContactName}
         availableChannels={selectedContactChannels}
         isDarkMode={isDarkMode}

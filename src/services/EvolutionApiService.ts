@@ -1,4 +1,6 @@
-interface EvolutionApiConfig {
+
+// Mantendo toda funcionalidade existente da API Evolution
+export interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
   instanceName: string;

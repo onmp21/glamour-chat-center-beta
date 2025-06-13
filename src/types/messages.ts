@@ -1,3 +1,4 @@
+
 export interface ChannelConversation {
   id: string;
   contact_name: string;
@@ -39,7 +40,7 @@ export interface ProcessedMessage {
 }
 
 export interface RawMessage {
-  id: number;
+  id: string; // Mudando para string para consistência
   session_id: string;
   message: string;
   read_at: string;
@@ -47,4 +48,7 @@ export interface RawMessage {
   mensagemtype: string;
   tipo_remetente: string;
   media_base64?: string;
+  sender?: 'customer' | 'agent';
+  timestamp?: string;
+  content?: string;
 }

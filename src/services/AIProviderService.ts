@@ -1,3 +1,4 @@
+
 import { supabase } from "../lib/supabase"
 
 export class AIProviderService {
@@ -147,5 +148,25 @@ export class AIProviderService {
       custom: 'Custom'
     };
     return labels[type] || type;
+  }
+
+  static getDefaultBaseUrl(type: string): string {
+    const baseUrls: Record<string, string> = {
+      openai: 'https://api.openai.com/v1',
+      anthropic: 'https://api.anthropic.com',
+      google: 'https://generativelanguage.googleapis.com',
+      custom: ''
+    };
+    return baseUrls[type] || '';
+  }
+
+  static getDefaultModels(type: string): string[] {
+    const models: Record<string, string[]> = {
+      openai: ['gpt-4', 'gpt-3.5-turbo'],
+      anthropic: ['claude-3-sonnet', 'claude-3-haiku'],
+      google: ['gemini-pro', 'gemini-pro-vision'],
+      custom: []
+    };
+    return models[type] || [];
   }
 }
