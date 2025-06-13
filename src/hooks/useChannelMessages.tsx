@@ -36,13 +36,22 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
     queryKey: ['channel-messages', channelId, conversationId],
     queryFn: async () => {
       const messageService = new MessageService(channelId);
+      let rawResult;
+      
       if (conversationId) {
-        const result = await messageService.getMessagesByConversation(conversationId);
-        const rawMessages = Array.isArray(result) ? result : (result?.data || []);
-        return rawMessages.map(convertRawToChannelMessage);
+        rawResult = await messageService.getMessagesByConversation(conversationId);
+      } else {
+        rawResult = await messageService.getAllMessages();
       }
-      const result = await messageService.getAllMessages();
-      const rawMessages = Array.isArray(result) ? result : (result?.data || []);
+      
+      // Handle different response formats
+      let rawMessages: RawMessage[] = [];
+      if (Array.isArray(rawResult)) {
+        rawMessages = rawResult;
+      } else if (rawResult && typeof rawResult === 'object' && 'data' in rawResult) {
+        rawMessages = (rawResult as { data: RawMessage[] }).data || [];
+      }
+      
       return rawMessages.map(convertRawToChannelMessage);
     },
     refetchInterval: 5000,

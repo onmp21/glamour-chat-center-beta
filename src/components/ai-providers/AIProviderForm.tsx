@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { X } from 'lucide-react';
-import { AIProvider, PROVIDER_TYPES, AIProviderFormData } from '@/types/ai-providers';
+import { AIProvider, AIProviderFormData } from '@/types/ai-providers';
 import { useAIProviders } from '@/hooks/useAIProviders';
 import { toast } from 'sonner';
 
@@ -39,7 +39,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
       setFormData({
         name: provider.name,
         provider_type: provider.provider_type,
-        api_key: provider.api_key,
+        api_key: provider.api_key || '',
         base_url: provider.base_url || '',
         default_model: provider.default_model || '',
         is_active: provider.is_active,
@@ -53,14 +53,19 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
     setLoading(true);
 
     try {
+      let result;
       if (provider) {
-        await updateProvider(Number(provider.id), formData);
-        toast.success('Provedor atualizado com sucesso!');
+        result = await updateProvider(provider.id, formData);
       } else {
-        await createProvider(formData);
-        toast.success('Provedor criado com sucesso!');
+        result = await createProvider(formData);
       }
-      onClose();
+      
+      if (result.success) {
+        toast.success(result.message || 'Operação realizada com sucesso!');
+        onClose();
+      } else {
+        toast.error(result.message || 'Erro na operação');
+      }
     } catch (error) {
       toast.error('Erro ao salvar provedor');
     } finally {
@@ -127,11 +132,10 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(PROVIDER_TYPES).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
           </div>

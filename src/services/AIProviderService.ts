@@ -17,7 +17,15 @@ export class AIProviderService {
 
     return (data || []).map(provider => ({
       ...provider,
-      provider_type: provider.provider_type as ProviderType
+      provider_type: provider.provider_type as ProviderType,
+      advanced_settings: (provider.advanced_settings as Record<string, any>) || {},
+      created_at: provider.created_at || new Date().toISOString(),
+      updated_at: provider.updated_at || new Date().toISOString(),
+      is_active: provider.is_active ?? true,
+      api_key: provider.api_key || '',
+      base_url: provider.base_url || '',
+      default_model: provider.default_model || '',
+      user_id: provider.user_id || ''
     }));
   }
 

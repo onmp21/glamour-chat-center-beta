@@ -37,8 +37,11 @@ export const useAIProviders = () => {
 
   const createProvider = async (formData: AIProviderFormData) => {
     try {
-      await AIProviderService.createProvider(formData);
-      await loadProviders();
+      const result = await AIProviderService.createProvider(formData);
+      if (result.success) {
+        await loadProviders();
+      }
+      return result;
     } catch (err) {
       throw err;
     }
@@ -46,8 +49,11 @@ export const useAIProviders = () => {
 
   const updateProvider = async (id: string, formData: AIProviderFormData) => {
     try {
-      await AIProviderService.updateProvider(id, formData);
-      await loadProviders();
+      const result = await AIProviderService.updateProvider(id, formData);
+      if (result.success) {
+        await loadProviders();
+      }
+      return result;
     } catch (err) {
       throw err;
     }
@@ -64,7 +70,6 @@ export const useAIProviders = () => {
 
   const testProvider = async (formData: AIProviderFormData) => {
     try {
-      // Since we don't have an ID yet, we'll test with a mock ID
       return await AIProviderService.testProvider('test');
     } catch (err) {
       throw err;

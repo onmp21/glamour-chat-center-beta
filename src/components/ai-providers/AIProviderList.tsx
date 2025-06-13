@@ -25,7 +25,7 @@ export const AIProviderList: React.FC<AIProviderListProps> = ({ isDarkMode }) =>
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este provedor?')) {
-      await deleteProvider(Number(id));
+      await deleteProvider(id);
     }
   };
 
