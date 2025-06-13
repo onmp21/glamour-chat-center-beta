@@ -1,7 +1,8 @@
 
 import { MessageRepository } from '@/repositories/MessageRepository';
-import { RawMessage } from '@/types/messages';
+import { RawMessage, ChannelConversation } from '@/types/messages';
 import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
+import { supabase } from '@/integrations/supabase/client';
 
 export class MessageService {
   private repositories: Map<string, MessageRepository> = new Map();
@@ -78,6 +79,88 @@ export class MessageService {
       console.error(`❌ [MESSAGE_SERVICE] Error marking conversation as read:`, error);
       throw error;
     }
+  }
+
+  // Legacy methods for backward compatibility
+  async getConversations(channelId: string): Promise<ChannelConversation[]> {
+    const repository = this.getRepository(channelId);
+    const tableName = repository.getTableName();
+    
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .order('read_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group messages by session_id to create conversations
+      const conversationsMap = new Map<string, ChannelConversation>();
+      
+      (data || []).forEach((message: any) => {
+        const sessionId = message.session_id;
+        if (!conversationsMap.has(sessionId)) {
+          conversationsMap.set(sessionId, {
+            id: sessionId,
+            contact_name: message.nome_do_contato || message.Nome_do_contato || 'Unknown',
+            contact_phone: this.extractPhoneFromSessionId(sessionId),
+            last_message: message.message,
+            last_message_time: message.read_at || new Date().toISOString(),
+            status: message.is_read ? 'resolved' : 'unread',
+            updated_at: message.read_at || new Date().toISOString(),
+            unread_count: message.is_read ? 0 : 1
+          });
+        }
+      });
+
+      return Array.from(conversationsMap.values());
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting conversations:`, error);
+      throw error;
+    }
+  }
+
+  async getMessagesByConversation(channelId: string, sessionId: string): Promise<RawMessage[]> {
+    const repository = this.getRepository(channelId);
+    const tableName = repository.getTableName();
+    
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('read_at', { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
+      throw error;
+    }
+  }
+
+  async getAllMessages(channelId: string): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(channelId);
+  }
+
+  extractPhoneFromSessionId(sessionId: string): string {
+    // Extract phone number from session_id format like "5511999999999@s.whatsapp.net"
+    const match = sessionId.match(/(\d+)@/);
+    return match ? match[1] : sessionId;
+  }
+
+  async createRealtimeSubscription(channelId: string, callback: (payload: any) => void) {
+    const repository = this.getRepository(channelId);
+    const tableName = repository.getTableName();
+    
+    return supabase
+      .channel(`${tableName}-changes`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: tableName },
+        callback
+      )
+      .subscribe();
   }
 
   // Get statistics for a channel

@@ -16,6 +16,16 @@ export interface AIProvider {
   user_id: string;
 }
 
+export interface AIProviderFormData {
+  name: string;
+  provider_type: ProviderType;
+  api_key: string;
+  base_url?: string;
+  default_model?: string;
+  is_active: boolean;
+  advanced_settings?: Record<string, any>;
+}
+
 export interface ReportResult {
   id: string;
   title: string;

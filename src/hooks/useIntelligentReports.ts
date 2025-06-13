@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { IntelligentReportsService } from '@/services/IntelligentReportsService';
 
 interface GenerateReportParams {
-  provider_id: string; // Changed from number to string
+  provider_id: string;
   report_type: 'conversations' | 'channels' | 'custom';
   data: any;
   custom_prompt?: string;

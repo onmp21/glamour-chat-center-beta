@@ -15,7 +15,7 @@ export abstract class BaseRepository<T> {
 
   async findAll(limit?: number): Promise<T[]> {
     const query = supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .select('*')
       .order('id', { ascending: false });
 
@@ -35,7 +35,7 @@ export abstract class BaseRepository<T> {
 
   async findById(id: string | number): Promise<T | null> {
     const { data, error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .select('*')
       .eq('id', id)
       .maybeSingle();
@@ -50,7 +50,7 @@ export abstract class BaseRepository<T> {
 
   async create(data: Partial<T>): Promise<T> {
     const { data: created, error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .insert(data)
       .select()
       .single();
@@ -65,7 +65,7 @@ export abstract class BaseRepository<T> {
 
   async update(id: string | number, data: Partial<T>): Promise<T> {
     const { data: updated, error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .update(data)
       .eq('id', id)
       .select()
@@ -81,7 +81,7 @@ export abstract class BaseRepository<T> {
 
   async delete(id: string | number): Promise<void> {
     const { error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .delete()
       .eq('id', id);
 

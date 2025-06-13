@@ -9,7 +9,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     super(tableName);
   }
 
-  private mapDatabaseRowToRawMessage(row: any): RawMessage {
+  mapDatabaseRowToRawMessage(row: any): RawMessage {
     return {
       id: row.id?.toString() || '',
       session_id: row.session_id || '',
@@ -34,6 +34,26 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     return 'customer';
   }
 
+  async findAll(limit?: number): Promise<RawMessage[]> {
+    const query = supabase
+      .from(this.tableName as any)
+      .select('*')
+      .order('id', { ascending: false });
+
+    if (limit) {
+      query.limit(limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
+      throw error;
+    }
+
+    return (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+  }
+
   async insertMessage(sessionId: string, message: string, contactName?: string): Promise<RawMessage> {
     const insertData = {
       session_id: sessionId,
@@ -52,7 +72,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
 
   async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
     const { data, error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .select('*')
       .ilike("session_id", `%${phoneNumber}%`)
       .order("id", { ascending: true })
@@ -70,7 +90,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages after ${timestamp} in ${this.tableName}`);
     
     const { data, error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .select('*')
       .gt('read_at', timestamp)
       .order("id", { ascending: true })
@@ -87,7 +107,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
 
   async markAsRead(sessionId: string): Promise<void> {
     const { error } = await supabase
-      .from(this.tableName)
+      .from(this.tableName as any)
       .update({ 
         read_at: new Date().toISOString() 
       })
