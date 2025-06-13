@@ -25,7 +25,7 @@ interface Message {
   fileUrl?: string;
   fileName?: string;
   read: boolean;
-  Nome_do_contato?: string;
+  nome_do_contato?: string;
   mensagemtype?: string;
 }
 
@@ -133,7 +133,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       tipo_remetente: msg.tipo_remetente,
       type: 'text',
       read: true,
-      Nome_do_contato: msg.Nome_do_contato,
+      nome_do_contato: msg.nome_do_contato,
       mensagemtype: msg.mensagemtype
     };
   });
