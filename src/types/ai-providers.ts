@@ -1,6 +1,13 @@
 
 export type ProviderType = 'openai' | 'anthropic' | 'google' | 'custom';
 
+export const PROVIDER_TYPES: Record<ProviderType, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic', 
+  google: 'Google',
+  custom: 'Personalizado'
+};
+
 export interface AIProvider {
   id: string;
   name: string;

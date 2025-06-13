@@ -1,54 +1,39 @@
 
 export interface RawMessage {
-  id: string;
+  id: number;
   session_id: string;
   message: string;
-  sender: 'customer' | 'agent';
-  timestamp: string;
-  content: string;
-  tipo_remetente?: string;
   mensagemtype?: string;
-  Nome_do_contato?: string;
+  tipo_remetente?: string;
   nome_do_contato?: string;
   media_base64?: string;
-  read_at?: string;
   is_read?: boolean;
+  read_at?: string;
+  sender: string;
+  timestamp: string;
+  content: string;
 }
 
 export interface ChannelMessage {
   id: string;
   content: string;
+  sender: string;
   timestamp: string;
-  sender: 'customer' | 'agent';
-  tipo_remetente?: string;
-  messageType?: string;
-  Nome_do_contato?: string;
-  nome_do_contato?: string;
-  mensagemtype?: string;
-  contactName?: string;
-  isOwn?: boolean;
-  agentName?: string;
-  fileData?: {
-    fileName?: string;
-    mimeType?: string;
-    base64?: string;
-  };
-}
-
-export interface ChannelConversation {
-  id: string;
-  contact_name: string;
-  contact_phone: string;
-  last_message: string;
-  last_message_time: string;
-  status: 'unread' | 'in_progress' | 'resolved';
-  message_count?: number;
-  updated_at: string;
-  unread_count: number;
+  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  isFromUser: boolean;
+  mediaUrl?: string;
+  session_id: string;
 }
 
 export interface CursorPaginationResult<T> {
   data: T[];
-  nextCursor?: string;
   hasMore: boolean;
+  nextCursor?: string;
+}
+
+export interface ConversationStats {
+  totalConversations: number;
+  activeConversations: number;
+  totalMessages: number;
+  unreadMessages: number;
 }

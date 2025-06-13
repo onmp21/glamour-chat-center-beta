@@ -23,7 +23,7 @@ export class PaginationService {
     const { limit = 20, cursor, sortBy = 'created_at', sortOrder = 'desc' } = options;
 
     let query = supabase
-      .from(tableName)
+      .from(tableName as any)
       .select('*')
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .limit(limit + 1); // Get one extra to check if there are more
@@ -39,7 +39,7 @@ export class PaginationService {
       throw error;
     }
 
-    const results = data as T[] || [];
+    const results = (data as T[]) || [];
     const hasMore = results.length > limit;
     
     if (hasMore) {

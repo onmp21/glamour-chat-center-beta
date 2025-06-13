@@ -115,4 +115,25 @@ export class IntelligentReportsService {
       generated_report: data.generated_report
     };
   }
+
+  static async generateReport(params: {
+    provider_id: string;
+    report_type: 'conversations' | 'channels' | 'custom';
+    data: any;
+    custom_prompt?: string;
+  }): Promise<ReportHistory> {
+    // Mock implementation for now
+    const mockReport = await this.createReport({
+      prompt: params.custom_prompt || `Generate ${params.report_type} report`,
+      report_type: params.report_type,
+      generated_report: `Mock report generated for ${params.report_type}`,
+      provider_id: params.provider_id,
+      model_used: 'mock-model',
+      tokens_used: 100,
+      generation_time: 2.5,
+      metadata: { data_source: params.report_type }
+    });
+
+    return mockReport;
+  }
 }

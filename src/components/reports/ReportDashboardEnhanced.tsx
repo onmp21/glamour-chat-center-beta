@@ -62,7 +62,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   const [stats, setStats] = useState({
     totalReports: 0,
     reportsThisMonth: 0,
-    averageGenerationTime: 0
+    averageGenerationTime: '0'
   });
 
   // Carregar provedores, canais e histórico de relatórios ao montar
@@ -95,45 +95,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const loadRecentReports = async () => {
     try {
-      // Mock implementation for now
-      setRecentReports([
-        {
-          id: '1',
-          title: 'Relatório',
-          prompt: 'Resumo das conversas de dezembro',
-          generated_at: '2024-12-15T10:00:00Z',
-          created_at: '2024-12-15T10:00:00Z',
-          provider_used: 'OpenAI',
-          provider_id: '1',
-          provider_name: 'OpenAI',
-          model_used: 'gpt-4',
-          tokens_used: 1200,
-          generation_time: 5.2,
-          metadata: {},
-          query: 'Análise de conversas',
-          result: {
-            id: '1',
-            title: 'Relatório',
-            content: 'Conteúdo',
-            created_at: '2024-12-15T10:00:00Z',
-            provider_id: '1',
-            report_content: 'Relatório de conversas de dezembro...',
-            report_type: 'conversations',
-            status: 'completed'
-          },
-          timestamp: '2024-12-15T10:00:00Z',
-          status: 'success',
-          report_type: 'conversations',
-          generated_report: 'Relatório de conversas de dezembro...'
-        }
-      ]);
-    } catch (error) {
-      console.error('Erro ao carregar relatórios recentes:', error);
-    }
-  };
-
-  const fetchReports = async () => {
-    try {
       setLoading(true);
       const reports = await IntelligentReportsService.getReports();
       setRecentReports(reports);
@@ -154,10 +115,10 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       setStats({
         totalReports: total,
         reportsThisMonth: thisMonth,
-        averageGenerationTime: avgTime
+        averageGenerationTime: avgTime.toFixed(1)
       });
     } catch (error) {
-      console.error('Error fetching reports:', error);
+      console.error('Erro ao carregar relatórios recentes:', error);
     } finally {
       setLoading(false);
     }
@@ -174,19 +135,14 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
-      // Mock implementation for now
-      const result: ReportResult = {
-        id: Date.now().toString(),
-        title: 'Relatório Gerado',
-        content: `Relatório baseado na consulta: ${filters.custom_prompt || 'Análise padrão'}`,
-        created_at: new Date().toISOString(),
+      const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
-        report_content: `Relatório baseado na consulta: ${filters.custom_prompt || 'Análise padrão'}`,
         report_type: filters.report_type,
-        status: 'completed'
-      };
+        data: {},
+        custom_prompt: filters.custom_prompt
+      });
       
-      setReportResult(result);
+      setReportResult(result.result);
       toast({
         title: "Sucesso",
         description: "Relatório gerado com sucesso",
@@ -305,10 +261,10 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               <CardContent className="p-3 flex items-center gap-2">
                 <Activity size={16} className="text-primary" />
                 <span className={cn("text-sm font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-                  Tokens Utilizados (Mês)
+                  Tempo Médio (s)
                 </span>
                 <p className={cn("text-lg font-bold ml-auto", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-                  ~50k
+                  {stats.averageGenerationTime}
                 </p>
               </CardContent>
             </Card>
