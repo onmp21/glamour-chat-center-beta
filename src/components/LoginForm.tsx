@@ -122,10 +122,8 @@ export const LoginForm: React.FC = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Digite seu usuário"
                 disabled={isLoading}
-                readOnly={false}
                 autoComplete="username"
-                className="h-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                style={{ backgroundColor: 'white', color: 'black' }}
+                className="h-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700"
               />
             </div>
             
@@ -141,15 +139,13 @@ export const LoginForm: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Digite sua senha"
                   disabled={isLoading}
-                  readOnly={false}
                   autoComplete="current-password"
-                  className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  style={{ backgroundColor: 'white', color: 'black' }}
+                  className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors z-10"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                   disabled={isLoading}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}

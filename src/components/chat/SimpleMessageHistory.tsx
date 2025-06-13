@@ -70,7 +70,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
       <div className="space-y-4">
         {messages.map((message, index) => {
           const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai';
-          const contactName = message.Nome_do_contato || message.nome_do_contato || 'Cliente';
+          const contactName = message.nome_do_contato || 'Cliente';
           
           return (
             <div

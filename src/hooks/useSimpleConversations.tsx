@@ -67,7 +67,7 @@ export const useSimpleConversations = (channelId: string | null) => {
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select('session_id, Nome_do_contato, nome_do_contato, message, read_at, tipo_remetente')
+        .select('session_id, nome_do_contato, message, read_at, tipo_remetente')
         .order('read_at', { ascending: false })
         .limit(200);
 
@@ -86,9 +86,7 @@ export const useSimpleConversations = (channelId: string | null) => {
         
         if (!conversationsMap.has(sessionId)) {
           let contactName = 'Cliente';
-          if (message.Nome_do_contato) {
-            contactName = message.Nome_do_contato;
-          } else if (message.nome_do_contato) {
+          if (message.nome_do_contato) {
             contactName = message.nome_do_contato;
           } else {
             contactName = extractPhoneFromSession(sessionId);

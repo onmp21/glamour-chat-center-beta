@@ -9,7 +9,6 @@ interface SimpleMessage {
   message: string;
   read_at: string;
   tipo_remetente?: string;
-  Nome_do_contato?: string;
   nome_do_contato?: string;
   mensagemtype?: string;
   media_base64?: string;
@@ -63,7 +62,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select('id, session_id, message, read_at, tipo_remetente, Nome_do_contato, nome_do_contato, mensagemtype, media_base64')
+        .select('id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64')
         .eq('session_id', sessionId)
         .order('read_at', { ascending: true });
 
@@ -85,7 +84,6 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         message: row.message || '',
         read_at: row.read_at || new Date().toISOString(),
         tipo_remetente: row.tipo_remetente,
-        Nome_do_contato: row.Nome_do_contato,
         nome_do_contato: row.nome_do_contato,
         mensagemtype: row.mensagemtype,
         media_base64: row.media_base64

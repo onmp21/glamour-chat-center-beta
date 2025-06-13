@@ -402,7 +402,7 @@ export type Database = {
           media_base64: string | null
           mensagemtype: string | null
           message: string
-          Nome_do_contato: string | null
+          nome_do_contato: string | null
           read_at: string | null
           session_id: string
           tipo_remetente: string | null
@@ -413,7 +413,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
           tipo_remetente?: string | null
@@ -424,7 +424,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id?: string
           tipo_remetente?: string | null
@@ -649,7 +649,7 @@ export type Database = {
           media_base64: string | null
           mensagemtype: string | null
           message: string
-          Nome_do_contato: string | null
+          nome_do_contato: string | null
           read_at: string | null
           session_id: string
           tipo_remetente: string | null
@@ -659,7 +659,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
           tipo_remetente?: string | null
@@ -669,7 +669,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id?: string
           tipo_remetente?: string | null
