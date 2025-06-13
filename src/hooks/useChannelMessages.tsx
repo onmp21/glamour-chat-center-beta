@@ -22,16 +22,10 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
       const messageService = new MessageService(channelId);
       if (conversationId) {
         const result = await messageService.getMessagesByConversation(conversationId);
-        if (Array.isArray(result)) {
-          return result;
-        }
-        return (result as CursorPaginationResult<ChannelMessage>)?.data || [];
+        return result.data || [];
       }
       const result = await messageService.getAllMessages();
-      if (Array.isArray(result)) {
-        return result;
-      }
-      return (result as CursorPaginationResult<ChannelMessage>)?.data || [];
+      return result || [];
     },
     refetchInterval: 5000,
   });

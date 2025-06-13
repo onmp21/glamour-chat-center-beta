@@ -1,92 +1,74 @@
 
-import { useState, useEffect } from 'react'
-import { AIProviderService } from '../services/AIProviderService'
-import { useAuth } from '../contexts/AuthContext'
+import { useState, useEffect } from 'react';
+import { AIProviderService } from '@/services/AIProviderService';
+import { AIProvider, AIProviderFormData } from '@/types/ai-providers';
 
-export function useAIProviders() {
-  const [providers, setProviders] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { user } = useAuth()
+export const useAIProviders = () => {
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchProviders = async () => {
+  const loadProviders = async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const data = await AIProviderService.getProviders()
-      setProviders(data)
+      setLoading(true);
+      const data = await AIProviderService.getProviders();
+      setProviders(data);
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
-
-  const refreshProviders = async () => {
-    try {
-      setRefreshing(true)
-      setError(null)
-      const data = await AIProviderService.getProviders()
-      setProviders(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar')
-    } finally {
-      setRefreshing(false)
-    }
-  }
+  };
 
   useEffect(() => {
-    fetchProviders()
-  }, [user]) // Recarregar quando o usuário mudar
+    loadProviders();
+  }, []);
 
-  const createProvider = async (providerData: any) => {
+  const createProvider = async (formData: AIProviderFormData) => {
     try {
-      const result = await AIProviderService.createProvider(providerData)
-      await fetchProviders() // Recarregar lista
-      return result
-    } catch (err) {
-      throw err
+      await AIProviderService.createProvider(formData);
+      await loadProviders();
+    } catch (error) {
+      throw error;
     }
-  }
+  };
 
-  const updateProvider = async (id: number, updates: any) => {
+  const updateProvider = async (id: string, formData: AIProviderFormData) => {
     try {
-      const result = await AIProviderService.updateProvider(id, updates)
-      await fetchProviders() // Recarregar lista
-      return result
-    } catch (err) {
-      throw err
+      await AIProviderService.updateProvider(id, formData);
+      await loadProviders();
+    } catch (error) {
+      throw error;
     }
-  }
+  };
 
-  const deleteProvider = async (id: number) => {
+  const deleteProvider = async (id: string) => {
     try {
-      await AIProviderService.deleteProvider(id)
-      await fetchProviders() // Recarregar lista
-    } catch (err) {
-      throw err
+      await AIProviderService.deleteProvider(id);
+      await loadProviders();
+    } catch (error) {
+      throw error;
     }
-  }
+  };
 
-  const testProvider = async (providerData: any) => {
+  const testProvider = async (formData: AIProviderFormData) => {
     try {
-      return await AIProviderService.testProvider(providerData)
-    } catch (err) {
-      throw err
+      const result = await AIProviderService.testProvider('test');
+      return result;
+    } catch (error) {
+      throw error;
     }
-  }
+  };
 
   return {
     providers,
     loading,
-    refreshing,
     error,
-    refetch: fetchProviders,
-    refreshProviders,
     createProvider,
     updateProvider,
     deleteProvider,
-    testProvider
-  }
-}
+    testProvider,
+    refreshProviders: loadProviders
+  };
+};

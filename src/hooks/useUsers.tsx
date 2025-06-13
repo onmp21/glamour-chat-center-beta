@@ -1,18 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { User, UserRole } from '@/types/auth';
-
-interface DatabaseUser {
-  id: string;
-  username: string;
-  name: string;
-  role: UserRole;
-  assigned_tabs: string[];
-  assigned_cities: string[];
-  is_active: boolean;
-  created_at: string;
-}
+import { User, UserRole, DatabaseUser } from '@/types/auth';
 
 export const useUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -39,7 +28,7 @@ export const useUsers = () => {
         id: user.id,
         username: user.username,
         name: user.name,
-        role: user.role,
+        role: user.role as UserRole,
         assignedTabs: user.assigned_tabs || [],
         assignedCities: user.assigned_cities || [],
         createdAt: user.created_at
@@ -72,7 +61,7 @@ export const useUsers = () => {
         p_username: userData.username,
         p_password: userData.password,
         p_name: userData.name,
-        p_role: userData.role,
+        p_role: userData.role as any,
         p_assigned_tabs: userData.assignedTabs,
         p_assigned_cities: userData.assignedCities
       });
@@ -103,7 +92,7 @@ export const useUsers = () => {
           p_username: userData.username || null,
           p_password: userData.password,
           p_name: userData.name || null,
-          p_role: userData.role || null,
+          p_role: userData.role as any || null,
           p_assigned_tabs: userData.assignedTabs || null,
           p_assigned_cities: userData.assignedCities || null
         });

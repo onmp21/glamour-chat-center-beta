@@ -60,9 +60,9 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   const [recentReports, setRecentReports] = useState<ReportHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalReports: '',
-    reportsThisMonth: '',
-    averageGenerationTime: ''
+    totalReports: 0,
+    reportsThisMonth: 0,
+    averageGenerationTime: '0s'
   });
 
   // Carregar provedores, canais e histórico de relatórios ao montar
@@ -136,7 +136,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     try {
       setLoading(true);
       const reports = await IntelligentReportsService.getReports();
-      setReports(reports);
+      setRecentReports(reports);
       
       // Calculate stats
       const total = reports.length;
@@ -152,8 +152,8 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         : 0;
       
       setStats({
-        totalReports: total.toString(), // Convert to string
-        reportsThisMonth: thisMonth.toString(), // Convert to string
+        totalReports: total,
+        reportsThisMonth: thisMonth,
         averageGenerationTime: `${avgTime.toFixed(1)}s`
       });
     } catch (error) {
@@ -284,7 +284,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
                   Relatórios Gerados
                 </span>
                 <p className={cn("text-lg font-bold ml-auto", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-                  {recentReports.length}
+                  {stats.totalReports}
                 </p>
               </CardContent>
             </Card>

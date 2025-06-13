@@ -93,13 +93,13 @@ export class AIProviderService {
     }
   }
 
-  static async testProvider(id: string): Promise<{ success: boolean; error?: string }> {
+  static async testProvider(id: string): Promise<{ success: boolean; error?: string; message?: string }> {
     try {
       // Mock test implementation
       console.log(`Testing provider ${id}`);
-      return { success: true };
+      return { success: true, message: 'Provider test successful' };
     } catch (error) {
-      return { success: false, error: String(error) };
+      return { success: false, error: String(error), message: 'Provider test failed' };
     }
   }
 
