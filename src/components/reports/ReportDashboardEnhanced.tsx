@@ -62,7 +62,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   const [stats, setStats] = useState({
     totalReports: 0,
     reportsThisMonth: 0,
-    averageGenerationTime: '0s'
+    averageGenerationTime: 0
   });
 
   // Carregar provedores, canais e histórico de relatórios ao montar
@@ -154,7 +154,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       setStats({
         totalReports: total,
         reportsThisMonth: thisMonth,
-        averageGenerationTime: `${avgTime.toFixed(1)}s`
+        averageGenerationTime: avgTime
       });
     } catch (error) {
       console.error('Error fetching reports:', error);

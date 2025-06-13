@@ -1,11 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, AuthState, LoginCredentials, UserRole } from '@/types/auth';
-import { supabase } from '@/integrations/supabase/client';
 
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<boolean>;
-  logout: () => void;
-}
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, AuthState, LoginCredentials, UserRole, AuthContextType } from '@/types/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -106,4 +102,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

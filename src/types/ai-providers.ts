@@ -1,6 +1,5 @@
 
-export const PROVIDER_TYPES = ['openai', 'anthropic', 'google', 'custom'] as const;
-export type ProviderType = typeof PROVIDER_TYPES[number];
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'custom';
 
 export interface AIProvider {
   id: string;
@@ -9,11 +8,11 @@ export interface AIProvider {
   api_key?: string;
   base_url?: string;
   default_model?: string;
-  advanced_settings?: Record<string, any>;
   is_active: boolean;
+  advanced_settings?: Record<string, any>;
   created_at: string;
   updated_at: string;
-  user_id: string;
+  user_id?: string;
 }
 
 export interface AIProviderFormData {

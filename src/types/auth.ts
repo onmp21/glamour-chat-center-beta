@@ -1,5 +1,5 @@
 
-export type UserRole = 'admin' | 'salesperson' | 'manager_external' | 'manager_store';
+export type UserRole = 'admin' | 'salesperson' | 'manager_external' | 'manager_store' | 'manager';
 
 export interface User {
   id: string;
@@ -22,9 +22,18 @@ export interface DatabaseUser {
   is_active: boolean;
 }
 
-export interface AuthContextType {
+export interface AuthState {
   user: User | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  isAuthenticated: boolean;
+}
+
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+export interface AuthContextType extends AuthState {
+  login: (credentials: LoginCredentials) => Promise<boolean>;
   logout: () => void;
-  isLoading: boolean;
+  isLoading?: boolean;
 }
