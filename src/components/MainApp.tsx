@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { AIConfigSection } from './AIConfigSection';
-import { ReportDashboardEnhanced } from './ReportDashboardEnhanced';
+import { ReportDashboardEnhanced } from './reports/ReportDashboardEnhanced';
 
 export function MainApp() {
   return (
@@ -11,11 +12,9 @@ export function MainApp() {
           <AIConfigSection />
         </div>
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <ReportDashboardEnhanced />
+          <ReportDashboardEnhanced isDarkMode={false} />
         </div>
       </div>
     </div>
   );
 }
-
-

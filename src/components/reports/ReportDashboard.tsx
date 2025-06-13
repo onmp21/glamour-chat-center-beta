@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, BarChart2, PieChart, LineChart, Users, MessageSquare } from 'lucide-react';
 import { useReportStats } from '../../hooks/useReportStats';
-import { ReportGenerator } from './ReportGenerator';
+import { LegacyReportGenerator } from './LegacyReportGenerator';
 import { ConversationReportGenerator } from './ConversationReportGenerator';
 
 interface ReportDashboardProps {
@@ -234,7 +234,7 @@ export const ReportDashboard: React.FC<ReportDashboardProps> = ({ isDarkMode }) 
                     </Select>
                   </div>
                   
-                  <ReportGenerator
+                  <LegacyReportGenerator
                     reportType={reportType}
                     reportTitle={getReportTitle()}
                     reportData={getReportData()}
@@ -297,7 +297,7 @@ export const ReportDashboard: React.FC<ReportDashboardProps> = ({ isDarkMode }) 
               <CardTitle>Relatório de Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <ReportGenerator
+              <LegacyReportGenerator
                 reportType="performance"
                 reportTitle="Relatório de Performance"
                 reportData={performanceStats}
@@ -317,7 +317,7 @@ export const ReportDashboard: React.FC<ReportDashboardProps> = ({ isDarkMode }) 
               <CardTitle>Relatório de Canais</CardTitle>
             </CardHeader>
             <CardContent>
-              <ReportGenerator
+              <LegacyReportGenerator
                 reportType="channels"
                 reportTitle="Relatório de Canais"
                 reportData={channelStats}
@@ -377,4 +377,3 @@ export const ReportDashboard: React.FC<ReportDashboardProps> = ({ isDarkMode }) 
     </div>
   );
 };
-
