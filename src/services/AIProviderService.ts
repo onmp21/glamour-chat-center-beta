@@ -15,7 +15,14 @@ export class AIProviderService {
       throw new Error('Erro ao carregar provedores de IA');
     }
 
-    return data || [];
+    return (data || []).map(provider => ({
+      ...provider,
+      provider_type: provider.provider_type as ProviderType
+    }));
+  }
+
+  static async getActiveProviders(): Promise<AIProvider[]> {
+    return this.getProviders();
   }
 
   static async createProvider(formData: AIProviderFormData): Promise<{ success: boolean; error?: string; message?: string }> {

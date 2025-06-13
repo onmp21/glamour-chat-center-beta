@@ -31,13 +31,14 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       setLoading(true);
       const messageService = new MessageService(channelId);
       
-      let rawMessages: RawMessage[];
+      let result: RawMessage[] | { data: RawMessage[] };
       if (conversationId) {
-        rawMessages = await messageService.getMessagesByConversation(conversationId) || [];
+        result = await messageService.getMessagesByConversation(conversationId) || [];
       } else {
-        rawMessages = await messageService.getAllMessages() || [];
+        result = await messageService.getAllMessages() || [];
       }
 
+      const rawMessages = Array.isArray(result) ? result : (result?.data || []);
       const convertedMessages = rawMessages.map(convertRawToChannelMessage);
       setMessages(convertedMessages);
       setError(null);

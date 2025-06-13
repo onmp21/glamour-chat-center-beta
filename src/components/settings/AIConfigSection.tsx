@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,8 +28,9 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     base_url: '',
     default_model: '',
     is_active: true,
-    advanced_settings: '{}'
+    advanced_settings: {}
   });
+  const [advancedSettingsString, setAdvancedSettingsString] = useState('{}');
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -56,7 +56,17 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
 
   const handleCreate = async () => {
     try {
-      const response = await AIProviderService.createProvider(formData);
+      let parsedSettings = {};
+      try {
+        parsedSettings = JSON.parse(advancedSettingsString);
+      } catch {
+        parsedSettings = {};
+      }
+
+      const response = await AIProviderService.createProvider({
+        ...formData,
+        advanced_settings: parsedSettings
+      });
       
       if (response.success) {
         toast({
@@ -88,7 +98,17 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     if (!editingProvider) return;
     
     try {
-      const response = await AIProviderService.updateProvider(editingProvider.id, formData);
+      let parsedSettings = {};
+      try {
+        parsedSettings = JSON.parse(advancedSettingsString);
+      } catch {
+        parsedSettings = {};
+      }
+
+      const response = await AIProviderService.updateProvider(editingProvider.id, {
+        ...formData,
+        advanced_settings: parsedSettings
+      });
       
       if (response.success) {
         toast({
@@ -147,8 +167,9 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
       base_url: provider.base_url || '',
       default_model: provider.default_model || '',
       is_active: provider.is_active,
-      advanced_settings: JSON.stringify(provider.advanced_settings || {}, null, 2)
+      advanced_settings: provider.advanced_settings || {}
     });
+    setAdvancedSettingsString(JSON.stringify(provider.advanced_settings || {}, null, 2));
   };
 
   const resetForm = () => {
@@ -159,8 +180,9 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
       base_url: '',
       default_model: '',
       is_active: true,
-      advanced_settings: '{}'
+      advanced_settings: {}
     });
+    setAdvancedSettingsString('{}');
     setShowCreateForm(false);
     setEditingProvider(null);
   };
@@ -282,8 +304,8 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                 <Label htmlFor="advanced_settings" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Configurações Avançadas (JSON)</Label>
                 <Textarea
                   id="advanced_settings"
-                  value={formData.advanced_settings}
-                  onChange={(e) => setFormData({...formData, advanced_settings: e.target.value})}
+                  value={advancedSettingsString}
+                  onChange={(e) => setAdvancedSettingsString(e.target.value)}
                   placeholder='{"temperature": 0.7, "max_tokens": 2000}'
                   rows={3}
                   className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}

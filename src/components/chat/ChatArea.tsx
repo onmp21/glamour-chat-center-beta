@@ -1,13 +1,13 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ChannelConversation } from '@/hooks/useChannelConversations';
+import { ChannelConversation } from '@/types/messages';
 import { MessageHistory } from './MessageHistory';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
-import { RawMessage } from '@/types/messageTypes'; // Import correto
+import { RawMessage } from '@/types/messages';
 
 interface ChatAreaProps {
   isDarkMode: boolean;

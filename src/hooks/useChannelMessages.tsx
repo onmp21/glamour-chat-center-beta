@@ -38,10 +38,12 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
       const messageService = new MessageService(channelId);
       if (conversationId) {
         const result = await messageService.getMessagesByConversation(conversationId);
-        return (result || []).map(convertRawToChannelMessage);
+        const rawMessages = Array.isArray(result) ? result : (result?.data || []);
+        return rawMessages.map(convertRawToChannelMessage);
       }
       const result = await messageService.getAllMessages();
-      return (result || []).map(convertRawToChannelMessage);
+      const rawMessages = Array.isArray(result) ? result : (result?.data || []);
+      return rawMessages.map(convertRawToChannelMessage);
     },
     refetchInterval: 5000,
   });

@@ -1,6 +1,6 @@
 
 export interface RawMessage {
-  id: number;
+  id: string;
   session_id: string;
   message: string;
   mensagemtype?: string;
