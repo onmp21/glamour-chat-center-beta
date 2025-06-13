@@ -64,7 +64,7 @@ export const AIProviderList: React.FC<AIProviderListProps> = ({
 
   const handleToggleActive = async (providerId: string, currentStatus: boolean) => {
     try {
-      await updateProvider(Number(providerId), { is_active: !currentStatus }); // Convert to number
+      await updateProvider(providerId, { is_active: !currentStatus });
     } catch (error) {
       console.error('Error updating provider:', error);
     }

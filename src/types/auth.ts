@@ -26,7 +26,6 @@ export interface LoginCredentials {
   password: string;
 }
 
-// Add missing exports
 export interface User {
   id: string;
   username: string;
@@ -35,6 +34,7 @@ export interface User {
   assignedTabs: string[];
   assignedCities: string[];
   createdAt: string;
+  avatar_url?: string;
 }
 
 export interface AuthState {

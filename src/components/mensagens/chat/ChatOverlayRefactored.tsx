@@ -210,27 +210,23 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
   const selectedConv = conversations.find(c => c.id === selectedConversation);
 
-  // ... keep existing code (displayMessages mapping logic)
+  // Create display messages with proper sender determination
   const displayMessages: Message[] = messages.map(msg => {
     let sender: 'customer' | 'agent';
     
-    // Diferenciação específica para canal Andressa e outros canais
     if (channelId === 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7' || channelId === 'gerente-externo') {
-      // Canal Andressa - usar tipo_remetente para diferenciar
       if (msg.tipo_remetente === 'USUARIO_INTERNO') {
-        sender = 'agent'; // Mensagem da Andressa
+        sender = 'agent';
       } else {
-        sender = 'customer'; // Mensagem do cliente
+        sender = 'customer';
       }
     } else if (channelId === 'chat' || channelId === 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6') {
-      // Canal Yelena
       if (msg.tipo_remetente === 'Yelena-ai' || msg.tipo_remetente === 'USUARIO_INTERNO') {
         sender = 'agent';
       } else {
         sender = 'customer';
       }
     } else {
-      // Outros canais - usar lógica existente
       if (msg.tipo_remetente) {
         if (msg.tipo_remetente === 'USUARIO_INTERNO') {
           sender = 'agent';

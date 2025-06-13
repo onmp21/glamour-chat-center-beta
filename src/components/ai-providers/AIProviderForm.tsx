@@ -14,12 +14,14 @@ interface AIProviderFormProps {
   provider?: AIProvider | null;
   onSave?: () => void;
   onCancel?: () => void;
+  onClose?: () => void;
 }
 
 export const AIProviderForm: React.FC<AIProviderFormProps> = ({
   provider,
   onSave,
-  onCancel
+  onCancel,
+  onClose
 }) => {
   const [formData, setFormData] = useState<AIProviderFormData>({
     name: '',
@@ -113,11 +115,19 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
   const handleDelete = async () => {
     if (provider && window.confirm('Tem certeza que deseja deletar este provedor?')) {
       try {
-        await deleteProvider(Number(provider.id)); // Convert to number
-        onCancel && onCancel();
+        await deleteProvider(provider.id);
+        onClose && onClose();
       } catch (error) {
         console.error('Error deleting provider:', error);
       }
+    }
+  };
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else if (onCancel) {
+      onCancel();
     }
   };
 
@@ -128,7 +138,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {provider ? 'Editar Provedor' : 'Adicionar Provedor'}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 dark:text-[#a1a1aa] hover:bg-gray-100 dark:hover:bg-[#27272a]">
+          <Button variant="ghost" size="sm" onClick={handleClose} className="text-gray-500 dark:text-[#a1a1aa] hover:bg-gray-100 dark:hover:bg-[#27272a]">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -265,7 +275,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
               <Button 
                 type="button" 
                 variant="outline" 
-                onClick={onClose}
+                onClick={handleClose}
                 className="border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#27272a]"
               >
                 Cancelar

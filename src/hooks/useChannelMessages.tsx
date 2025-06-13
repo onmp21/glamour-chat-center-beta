@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { MessageService } from '@/services/MessageService';
-import { ChannelMessage } from '@/types/messages';
+import { ChannelMessage, CursorPaginationResult } from '@/types/messages';
 
 export interface UseChannelMessagesResult {
   messages: ChannelMessage[];
@@ -12,7 +12,7 @@ export interface UseChannelMessagesResult {
 
 export const useChannelMessages = (channelId: string, conversationId?: string): UseChannelMessagesResult => {
   const {
-    data: messages = [],
+    data: result = [],
     isLoading: loading,
     error,
     refetch,
@@ -21,15 +21,18 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
     queryFn: async () => {
       const messageService = new MessageService(channelId);
       if (conversationId) {
-        return await messageService.getMessagesByConversation(conversationId);
+        const result = await messageService.getMessagesByConversation(conversationId);
+        // Handle both array and pagination result
+        return Array.isArray(result) ? result : result.data;
       }
-      return await messageService.getAllMessages();
+      const result = await messageService.getAllMessages();
+      return Array.isArray(result) ? result : result.data;
     },
     refetchInterval: 5000,
   });
 
   return {
-    messages,
+    messages: Array.isArray(result) ? result : [],
     loading,
     error: error as Error | null,
     refetch,

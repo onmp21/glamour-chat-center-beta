@@ -1,9 +1,10 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSenderService } from '@/services/MessageSenderService';
 import { FileService } from '@/services/FileService';
 import { FileData, RawMessage } from '@/types/messageTypes';
-import { ChannelApiMappingService } from '@/services/ChannelApiMappingService'; // Importar
+import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
 
 export interface ExtendedMessageData {
   conversationId: string;
@@ -19,7 +20,6 @@ export const useMessageSenderExtended = () => {
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
   const messageSenderService = new MessageSenderService();
-  const channelApiMappingService = new ChannelApiMappingService(); // Instanciar
 
   const sendMessage = async (
     messageData: ExtendedMessageData, 
@@ -29,29 +29,24 @@ export const useMessageSenderExtended = () => {
     console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
     
     try {
-      // Extrair número de telefone do conversationId
       let phoneNumber = messageData.conversationId;
       console.log('[useMessageSenderExtended] conversationId original:', messageData.conversationId);
       
-      // Se conversationId contém underscore, extrair a parte antes dele
       if (phoneNumber.includes("_")) {
         phoneNumber = phoneNumber.split("_")[0];
         console.log('[useMessageSenderExtended] phoneNumber após extração:', phoneNumber);
       }
 
-      // Converter channelId para UUID antes de usar
-      const processedChannelId = channelApiMappingService.getChannelUuid(messageData.channelId); // Usar getChannelUuid
+      const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
       console.log('[useMessageSenderExtended] channelId processado para UUID:', processedChannelId);
 
       let resultMessage: RawMessage;
 
       if (messageData.fileData) {
         console.log('[useMessageSenderExtended] Detectado envio de mídia.');
-        // Envio de mídia
         const fileType = FileService.getFileType(messageData.fileData.mimeType);
         console.log('[useMessageSenderExtended] Tipo de arquivo detectado:', fileType);
 
-        // Preparar base64 com prefixo se necessário
         let mediaContent = messageData.fileData.base64;
         if (!mediaContent.startsWith("data:")) {
           mediaContent = `data:${messageData.fileData.mimeType};base64,${mediaContent}`;
@@ -60,7 +55,7 @@ export const useMessageSenderExtended = () => {
         console.log('[useMessageSenderExtended] Conteúdo da mídia (base64, primeiros 50 chars):', mediaContent.substring(0, 50) + '...');
 
         resultMessage = await messageSenderService.sendMediaMessage(
-          processedChannelId, // Usar o channelId processado
+          processedChannelId || messageData.channelId,
           phoneNumber,
           mediaContent,
           messageData.content || messageData.fileData.fileName,
@@ -69,16 +64,14 @@ export const useMessageSenderExtended = () => {
         console.log('[useMessageSenderExtended] Resultado de sendMediaMessage:', resultMessage);
       } else {
         console.log('[useMessageSenderExtended] Detectado envio de texto.');
-        // Envio de texto
         resultMessage = await messageSenderService.sendTextMessage(
-          processedChannelId, // Usar o channelId processado
+          processedChannelId || messageData.channelId,
           phoneNumber,
           messageData.content
         );
         console.log('[useMessageSenderExtended] Resultado de sendTextMessage:', resultMessage);
       }
 
-      // Adicionar mensagem ao estado se callback fornecido
       if (addMessageToState && resultMessage) {
         addMessageToState(resultMessage);
         console.log('[useMessageSenderExtended] Mensagem adicionada ao estado.');
@@ -126,5 +119,3 @@ export const useMessageSenderExtended = () => {
     sending
   };
 };
-
-
