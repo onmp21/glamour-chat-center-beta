@@ -28,6 +28,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     api_key: '',
     base_url: '',
     default_model: '',
+    is_active: true,
     advanced_settings: '{}'
   });
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -55,20 +56,24 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
 
   const handleCreate = async () => {
     try {
-      await AIProviderService.createProvider({
-        ...formData,
-        is_active: true,
-        advanced_settings: JSON.parse(formData.advanced_settings || '{}')
-      });
+      const response = await AIProviderService.createProvider(formData);
       
-      toast({
-        title: "Sucesso",
-        description: "Provedor criado com sucesso",
-      });
-      
-      setShowCreateForm(false);
-      resetForm();
-      loadProviders();
+      if (response.success) {
+        toast({
+          title: "Sucesso",
+          description: response.message || "Provedor criado com sucesso",
+        });
+        
+        setShowCreateForm(false);
+        resetForm();
+        loadProviders();
+      } else {
+        toast({
+          title: "Erro",
+          description: response.message || "Erro ao criar provedor",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Erro ao criar provedor:', error);
       toast({
@@ -83,20 +88,24 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     if (!editingProvider) return;
     
     try {
-      await AIProviderService.updateProvider(editingProvider.id, {
-        ...formData,
-        is_active: true,
-        advanced_settings: JSON.parse(formData.advanced_settings || '{}')
-      });
+      const response = await AIProviderService.updateProvider(editingProvider.id, formData);
       
-      toast({
-        title: "Sucesso",
-        description: "Provedor atualizado com sucesso",
-      });
-      
-      setEditingProvider(null);
-      resetForm();
-      loadProviders();
+      if (response.success) {
+        toast({
+          title: "Sucesso",
+          description: response.message || "Provedor atualizado com sucesso",
+        });
+        
+        setEditingProvider(null);
+        resetForm();
+        loadProviders();
+      } else {
+        toast({
+          title: "Erro",
+          description: response.message || "Erro ao atualizar provedor",
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       console.error('Erro ao atualizar provedor:', error);
       toast({
@@ -137,6 +146,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
       api_key: provider.api_key || '',
       base_url: provider.base_url || '',
       default_model: provider.default_model || '',
+      is_active: provider.is_active,
       advanced_settings: JSON.stringify(provider.advanced_settings || {}, null, 2)
     });
   };
@@ -148,6 +158,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
       api_key: '',
       base_url: '',
       default_model: '',
+      is_active: true,
       advanced_settings: '{}'
     });
     setShowCreateForm(false);
@@ -224,7 +235,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                   <SelectTrigger className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white text-gray-900")}>
+                  <SelectContent>
                     <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="anthropic">Anthropic</SelectItem>
                     <SelectItem value="google">Google</SelectItem>
@@ -240,7 +251,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                   type="password"
                   value={formData.api_key}
                   onChange={(e) => setFormData({...formData, api_key: e.target.value})}
-                  placeholder="Sua API key"
+                  placeholder="API Key do provedor"
                   className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}
                 />
               </div>
@@ -251,18 +262,18 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                   id="base_url"
                   value={formData.base_url}
                   onChange={(e) => setFormData({...formData, base_url: e.target.value})}
-                  placeholder="https://api.openai.com/v1"
+                  placeholder="https://api.exemplo.com"
                   className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}
                 />
               </div>
 
               <div>
-                <Label htmlFor="default_model" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Modelo Padrão</Label>
+                <Label htmlFor="default_model" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Modelo Padrão (opcional)</Label>
                 <Input
                   id="default_model"
                   value={formData.default_model}
                   onChange={(e) => setFormData({...formData, default_model: e.target.value})}
-                  placeholder="gpt-3.5-turbo"
+                  placeholder="gpt-4, claude-3, etc."
                   className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}
                 />
               </div>
@@ -273,18 +284,14 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                   id="advanced_settings"
                   value={formData.advanced_settings}
                   onChange={(e) => setFormData({...formData, advanced_settings: e.target.value})}
-                  placeholder='{"temperature": 0.7, "max_tokens": 1000}'
-                  rows={4}
+                  placeholder='{"temperature": 0.7, "max_tokens": 2000}'
+                  rows={3}
                   className={cn(isDarkMode ? "bg-[#333333] border-[#444444] text-white" : "bg-white border-gray-300")}
                 />
               </div>
 
               <div className="flex justify-end space-x-2">
-                <Button 
-                  variant="outline" 
-                  onClick={resetForm}
-                  className={cn(isDarkMode ? "border-[#333333] text-white hover:bg-[#333333]" : "border-gray-300")}
-                >
+                <Button variant="outline" onClick={resetForm}>
                   Cancelar
                 </Button>
                 <Button 
@@ -304,14 +311,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
             Provedores Configurados ({providers.length})
           </h3>
           
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c] mx-auto"></div>
-              <p className={cn("mt-2", isDarkMode ? "text-gray-300" : "text-gray-600")}>
-                Carregando provedores...
-              </p>
-            </div>
-          ) : providers.length === 0 ? (
+          {providers.length === 0 ? (
             <div className="text-center py-8">
               <Brain className={cn("h-12 w-12 mx-auto mb-4", isDarkMode ? "text-gray-400" : "text-gray-400")} />
               <p className={cn("text-lg", isDarkMode ? "text-gray-300" : "text-gray-600")}>
@@ -321,93 +321,96 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
                 onClick={() => setShowCreateForm(true)}
                 className="mt-4 bg-[#b5103c] hover:bg-[#9a0e35] text-white"
               >
-                Criar Primeiro Provedor
+                Configurar Primeiro Provedor
               </Button>
             </div>
           ) : (
-            providers.map(provider => (
-              <Card 
-                key={provider.id} 
-                className={cn(
+            <div className="grid gap-4">
+              {providers.map((provider) => (
+                <Card key={provider.id} className={cn(
                   "border transition-all duration-200 hover:shadow-md",
-                  isDarkMode ? "bg-[#2a2a2a] border-[#333333] hover:bg-[#333333]" : "bg-white border-gray-200 hover:bg-gray-50"
-                )}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className={cn("font-semibold text-lg", isDarkMode ? "text-white" : "text-gray-900")}>
-                          {provider.name}
-                        </h4>
-                        <Badge className={getStatusColor(provider.is_active)}>
-                          {provider.is_active ? 'Ativo' : 'Inativo'}
-                        </Badge>
-                        <Badge variant="outline" className={cn(isDarkMode ? "border-[#444444] text-gray-300" : "border-gray-300")}>
-                          {getProviderTypeLabel(provider.provider_type)}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>Modelo:</span>
-                          <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                            {provider.default_model || 'Não definido'}
-                          </span>
+                  isDarkMode ? "bg-[#2a2a2a] border-[#333333]" : "bg-white border-gray-200"
+                )}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className={cn("font-semibold text-lg", isDarkMode ? "text-white" : "text-gray-900")}>
+                            {provider.name}
+                          </h4>
+                          <Badge className={getStatusColor(provider.is_active)}>
+                            {provider.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                          <Badge variant="outline">
+                            {getProviderTypeLabel(provider.provider_type)}
+                          </Badge>
                         </div>
-                        <div>
-                          <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>URL Base:</span>
-                          <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                            {provider.base_url || 'Padrão'}
-                          </span>
-                        </div>
-                        <div className="md:col-span-2">
-                          <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>API Key:</span>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className={cn("text-sm font-mono", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                        
+                        <div className="space-y-1 text-sm">
+                          <div>
+                            <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>API Key:</span>
+                            <span className={cn("ml-2 font-mono", isDarkMode ? "text-gray-400" : "text-gray-500")}>
                               {showApiKey[provider.id] 
-                                ? provider.api_key 
-                                : '*'.repeat(Math.min(provider.api_key?.length || 0, 20))
+                                ? provider.api_key || 'Não configurada'
+                                : '••••••••••••••••'
                               }
                             </span>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => toggleApiKeyVisibility(provider.id)}
-                              className={cn("p-1", isDarkMode ? "hover:bg-[#444444]" : "hover:bg-gray-100")}
+                              className="ml-2 h-6 w-6 p-0"
                             >
-                              {showApiKey[provider.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                              {showApiKey[provider.id] ? <EyeOff size={12} /> : <Eye size={12} />}
                             </Button>
                           </div>
+                          
+                          {provider.base_url && (
+                            <div>
+                              <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>URL:</span>
+                              <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                                {provider.base_url}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {provider.default_model && (
+                            <div>
+                              <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>Modelo:</span>
+                              <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                                {provider.default_model}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => startEdit(provider)}
+                          className={cn(
+                            "transition-colors duration-200",
+                            isDarkMode ? "border-[#333333] hover:bg-[#333333] text-white" : "border-gray-300 hover:bg-gray-100"
+                          )}
+                        >
+                          <Edit size={16} />
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDelete(provider.id)}
+                          className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => startEdit(provider)}
-                        className={cn(
-                          "transition-colors duration-200",
-                          isDarkMode ? "border-[#333333] hover:bg-[#333333] text-white" : "border-gray-300 hover:bg-gray-100"
-                        )}
-                      >
-                        <Edit size={16} />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDelete(provider.id)}
-                        className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </div>
       </CardContent>

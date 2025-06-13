@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { MessageService } from '@/services/MessageService';
-import { ChannelMessage, CursorPaginationResult } from '@/types/messages';
+import { ChannelMessage, RawMessage } from '@/types/messages';
 
 export interface UseChannelMessagesResult {
   messages: ChannelMessage[];
@@ -9,6 +9,22 @@ export interface UseChannelMessagesResult {
   error: Error | null;
   refetch: () => void;
 }
+
+const convertRawToChannelMessage = (raw: RawMessage): ChannelMessage => {
+  return {
+    id: raw.id.toString(),
+    content: raw.content,
+    sender: raw.sender,
+    timestamp: raw.timestamp,
+    type: 'text',
+    isFromUser: raw.sender === 'customer',
+    session_id: raw.session_id,
+    tipo_remetente: raw.tipo_remetente,
+    mensagemtype: raw.mensagemtype,
+    Nome_do_contato: raw.Nome_do_contato,
+    nome_do_contato: raw.nome_do_contato
+  };
+};
 
 export const useChannelMessages = (channelId: string, conversationId?: string): UseChannelMessagesResult => {
   const {
@@ -22,10 +38,10 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
       const messageService = new MessageService(channelId);
       if (conversationId) {
         const result = await messageService.getMessagesByConversation(conversationId);
-        return result.data || [];
+        return (result || []).map(convertRawToChannelMessage);
       }
       const result = await messageService.getAllMessages();
-      return result || [];
+      return (result || []).map(convertRawToChannelMessage);
     },
     refetchInterval: 5000,
   });
