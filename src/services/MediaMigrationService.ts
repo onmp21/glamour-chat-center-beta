@@ -20,14 +20,13 @@ export class MediaMigrationService {
         return { success: false, error: uploadResult.error };
       }
 
-      // Atualizar a mensagem na tabela
-      const { error: updateError } = await supabase
-        .from(tableName as any)
-        .update({
-          message: uploadResult.url,
-          media_base64: null // Limpar o base64 após migração
-        })
-        .eq('id', messageId);
+      // Atualizar a mensagem na tabela usando query dinâmica
+      const { error: updateError } = await supabase.rpc('update_media_url', {
+        table_name: tableName,
+        record_id: parseInt(messageId),
+        media_url: uploadResult.url,
+        placeholder_message: null
+      });
 
       if (updateError) {
         console.error(`❌ [MEDIA_MIGRATION] Database update error:`, updateError);
@@ -53,12 +52,11 @@ export class MediaMigrationService {
     try {
       console.log(`🔄 [MEDIA_MIGRATION] Starting batch migration for ${tableName}`);
 
-      // Buscar mensagens com base64
-      const { data: messages, error: fetchError } = await supabase
-        .from(tableName as any)
-        .select('id, media_base64')
-        .not('media_base64', 'is', null)
-        .limit(batchSize);
+      // Buscar mensagens com base64 usando function
+      const { data: messages, error: fetchError } = await supabase.rpc('get_base64_messages', {
+        table_name: tableName,
+        batch_size: batchSize
+      });
 
       if (fetchError) {
         console.error(`❌ [MEDIA_MIGRATION] Fetch error:`, fetchError);
@@ -77,7 +75,7 @@ export class MediaMigrationService {
         if (message.media_base64) {
           const result = await this.migrateMessageMedia(
             tableName,
-            message.id,
+            message.id.toString(),
             message.media_base64
           );
 
