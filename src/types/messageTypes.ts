@@ -4,7 +4,7 @@ export interface FileData {
   mimeType: string;
   fileName: string;
   size?: number;
-  duration?: number; // Adicionar duration para áudio
+  duration?: number;
 }
 
 export interface ExtendedMessageData {
@@ -17,15 +17,19 @@ export interface ExtendedMessageData {
   fileData?: FileData;
 }
 
+// Use the same RawMessage interface as in messages.ts to avoid conflicts
 export interface RawMessage {
-  id: string; // Manter como string para consistência
+  id: string;
   session_id: string;
   message: string;
-  read_at: string;
-  Nome_do_contato: string;
-  mensagemtype: string;
-  tipo_remetente: string;
-  sender?: 'customer' | 'agent';
-  timestamp?: string;
-  content?: string;
+  sender: 'customer' | 'agent';
+  timestamp: string;
+  content: string;
+  tipo_remetente?: string;
+  mensagemtype?: string;
+  Nome_do_contato?: string;
+  nome_do_contato?: string;
+  media_base64?: string;
+  read_at?: string;
+  is_read?: boolean;
 }

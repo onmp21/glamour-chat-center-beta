@@ -6,9 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
-import { AIProvider, PROVIDER_TYPES } from '@/types/ai-providers';
+import { AIProvider, PROVIDER_TYPES, AIProviderFormData } from '@/types/ai-providers';
 import { useAIProviders } from '@/hooks/useAIProviders';
 import { toast } from 'sonner';
 
@@ -25,9 +24,9 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<AIProviderFormData>({
     name: '',
-    provider_type: 'openai' as keyof typeof PROVIDER_TYPES,
+    provider_type: 'openai',
     api_key: '',
     base_url: '',
     default_model: '',
@@ -55,7 +54,7 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
 
     try {
       if (provider) {
-        await updateProvider(provider.id, formData);
+        await updateProvider(Number(provider.id), formData);
         toast.success('Provedor atualizado com sucesso!');
       } else {
         await createProvider(formData);
@@ -120,7 +119,9 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({
             <Label htmlFor="provider_type">Tipo</Label>
             <Select
               value={formData.provider_type}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, provider_type: value as keyof typeof PROVIDER_TYPES }))}
+              onValueChange={(value: 'openai' | 'anthropic' | 'google' | 'custom') => 
+                setFormData(prev => ({ ...prev, provider_type: value }))
+              }
             >
               <SelectTrigger>
                 <SelectValue />

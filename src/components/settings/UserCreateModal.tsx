@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -43,8 +44,8 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     name: '',
     password: '',
     role: 'salesperson' as UserRole,
-    assigned_tabs: [] as string[],
-    assigned_cities: [] as string[]
+    assignedTabs: [] as string[],
+    assignedCities: [] as string[]
   });
 
   const availableTabs = ['dashboard', 'mensagens', 'exames', 'configuracoes', 'relatorios'];
@@ -62,26 +63,26 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     setFormData(prev => ({
       ...prev,
       role,
-      assigned_tabs: ROLE_TABS[role],
-      assigned_cities: ROLE_CITIES[role]
+      assignedTabs: ROLE_TABS[role],
+      assignedCities: ROLE_CITIES[role]
     }));
   };
 
   const handleTabChange = (tab: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assigned_tabs: checked
-        ? [...prev.assigned_tabs, tab]
-        : prev.assigned_tabs.filter(t => t !== tab)
+      assignedTabs: checked
+        ? [...prev.assignedTabs, tab]
+        : prev.assignedTabs.filter(t => t !== tab)
     }));
   };
 
   const handleCityChange = (city: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assigned_cities: checked
-        ? [...prev.assigned_cities, city]
-        : prev.assigned_cities.filter(c => c !== city)
+      assignedCities: checked
+        ? [...prev.assignedCities, city]
+        : prev.assignedCities.filter(c => c !== city)
     }));
   };
 
@@ -166,7 +167,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                 <div key={tab} className="flex items-center space-x-2">
                   <Checkbox
                     id={`tab-${tab}`}
-                    checked={formData.assigned_tabs.includes(tab)}
+                    checked={formData.assignedTabs.includes(tab)}
                     onCheckedChange={(checked) => handleTabChange(tab, !!checked)}
                   />
                   <Label htmlFor={`tab-${tab}`}>{tab}</Label>
@@ -182,7 +183,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
                 <div key={city} className="flex items-center space-x-2">
                   <Checkbox
                     id={`city-${city}`}
-                    checked={formData.assigned_cities.includes(city)}
+                    checked={formData.assignedCities.includes(city)}
                     onCheckedChange={(checked) => handleCityChange(city, !!checked)}
                   />
                   <Label htmlFor={`city-${city}`}>{city}</Label>

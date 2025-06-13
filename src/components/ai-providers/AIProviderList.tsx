@@ -1,72 +1,31 @@
+
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, TestTube, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AIProvider, PROVIDER_TYPES } from '@/types/ai-providers';
-import { AIProviderForm } from './AIProviderForm';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Trash2, Edit, Plus, RefreshCw } from 'lucide-react';
 import { useAIProviders } from '@/hooks/useAIProviders';
-import { toast } from 'sonner';
+import { AIProviderForm } from './AIProviderForm';
+import { AIProvider } from '@/types/ai-providers';
+import { cn } from '@/lib/utils';
 
 interface AIProviderListProps {
-  providers: AIProvider[];
-  loading: boolean;
+  isDarkMode: boolean;
 }
 
-export const AIProviderList: React.FC<AIProviderListProps> = ({
-  providers,
-  loading
-}) => {
+export const AIProviderList: React.FC<AIProviderListProps> = ({ isDarkMode }) => {
+  const { providers, loading, refreshing, deleteProvider, refreshProviders } = useAIProviders();
   const [showForm, setShowForm] = useState(false);
   const [editingProvider, setEditingProvider] = useState<AIProvider | null>(null);
-  const [testingProvider, setTestingProvider] = useState<string | null>(null);
-  const { deleteProvider, testProvider, updateProvider } = useAIProviders();
 
   const handleEdit = (provider: AIProvider) => {
     setEditingProvider(provider);
     setShowForm(true);
   };
 
-  const handleDelete = async (provider: AIProvider) => {
-    if (window.confirm(`Tem certeza que deseja excluir o provedor "${provider.name}"?`)) {
-      try {
-        await deleteProvider(provider.id);
-        toast.success('Provedor excluído com sucesso!');
-      } catch (error) {
-        toast.error('Erro ao excluir provedor');
-      }
-    }
-  };
-
-  const handleTest = async (provider: AIProvider) => {
-    setTestingProvider(provider.id);
-    try {
-      const result = await testProvider({
-        name: provider.name,
-        provider_type: provider.provider_type,
-        api_key: provider.api_key,
-        base_url: provider.base_url,
-        default_model: provider.default_model,
-        is_active: provider.is_active,
-        advanced_settings: provider.advanced_settings
-      });
-
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error) {
-      toast.error('Erro ao testar provedor');
-    } finally {
-      setTestingProvider(null);
-    }
-  };
-
-  const handleToggleActive = async (providerId: string, currentStatus: boolean) => {
-    try {
-      await updateProvider(providerId, { is_active: !currentStatus });
-    } catch (error) {
-      console.error('Error updating provider:', error);
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este provedor?')) {
+      await deleteProvider(Number(id));
     }
   };
 
@@ -75,138 +34,140 @@ export const AIProviderList: React.FC<AIProviderListProps> = ({
     setEditingProvider(null);
   };
 
-  const getStatusIcon = (isActive: boolean) => {
-    return isActive ? (
-      <CheckCircle className="h-4 w-4 text-green-500" />
-    ) : (
-      <XCircle className="h-4 w-4 text-red-500" />
-    );
+  const handleCreateNew = () => {
+    setEditingProvider(null);
+    setShowForm(true);
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    return (
-      <Badge variant={isActive ? "default" : "secondary"}>
-        {isActive ? "Ativo" : "Inativo"}
-      </Badge>
-    );
+  const handleRefresh = () => {
+    refreshProviders();
   };
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse">
-            <div className="h-20 bg-gray-200 dark:bg-[#27272a] rounded-lg"></div>
-          </div>
-        ))}
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-600 dark:text-[#a1a1aa]">
-            {providers.length} provedor(es) configurado(s)
+          <h2 className={cn("text-2xl font-bold", isDarkMode ? "text-white" : "text-gray-900")}>
+            Provedores de IA
+          </h2>
+          <p className={cn("text-sm mt-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+            Configure e gerencie seus provedores de IA
           </p>
         </div>
-        <Button 
-          onClick={() => setShowForm(true)} 
-          className="flex items-center space-x-2 bg-[#b5103c] hover:bg-[#b5103c]/90 text-white"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Adicionar Provedor</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            size="sm"
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            Atualizar
+          </Button>
+          <Button onClick={handleCreateNew} className="gap-2 bg-[#b5103c] hover:bg-[#9d0e34]">
+            <Plus className="h-4 w-4" />
+            Novo Provedor
+          </Button>
+        </div>
       </div>
 
       {providers.length === 0 ? (
-        <div className="text-center py-12">
-          <AlertCircle className="h-12 w-12 text-gray-400 dark:text-[#a1a1aa] mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Nenhum provedor configurado</h3>
-          <p className="text-gray-600 dark:text-[#a1a1aa] mb-4">
-            Configure um provedor de IA para começar a gerar relatórios inteligentes
-          </p>
-          <Button 
-            onClick={() => setShowForm(true)} 
-            className="flex items-center space-x-2 bg-[#b5103c] hover:bg-[#b5103c]/90 text-white"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Adicionar Primeiro Provedor</span>
-          </Button>
-        </div>
+        <Card className={cn(isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "")}>
+          <CardContent className="py-8">
+            <div className="text-center">
+              <p className={cn("text-lg", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                Nenhum provedor configurado
+              </p>
+              <p className={cn("text-sm mt-1", isDarkMode ? "text-gray-500" : "text-gray-500")}>
+                Configure um provedor de IA para começar a usar os recursos avançados
+              </p>
+              <Button 
+                onClick={handleCreateNew} 
+                className="mt-4 bg-[#b5103c] hover:bg-[#9d0e34]"
+              >
+                Criar Primeiro Provedor
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-4">
           {providers.map((provider) => (
-            <div
-              key={provider.id}
-              className="border border-gray-200 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(provider.is_active)}
-                    <div>
-                      <h3 className="font-medium text-gray-900 dark:text-white">{provider.name}</h3>
-                      <p className="text-sm text-gray-600 dark:text-[#a1a1aa]">
-                        {PROVIDER_TYPES[provider.provider_type]}
-                        {provider.default_model && ` • ${provider.default_model}`}
-                      </p>
-                    </div>
+            <Card key={provider.id} className={cn(isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "")}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CardTitle className={cn("text-lg", isDarkMode ? "text-white" : "text-gray-900")}>
+                      {provider.name}
+                    </CardTitle>
+                    <Badge variant={provider.is_active ? "default" : "secondary"}>
+                      {provider.is_active ? "Ativo" : "Inativo"}
+                    </Badge>
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                  {getStatusBadge(provider.is_active)}
-                  
-                  <div className="flex items-center space-x-1">
+                  <div className="flex gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleTest(provider)}
-                      disabled={testingProvider === provider.id}
-                      className="flex items-center space-x-1 border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#27272a]"
-                    >
-                      <TestTube className="h-3 w-3" />
-                      <span>{testingProvider === provider.id ? 'Testando...' : 'Testar'}</span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => handleEdit(provider)}
-                      className="flex items-center space-x-1 border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#27272a]"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1"
                     >
                       <Edit className="h-3 w-3" />
-                      <span>Editar</span>
+                      Editar
                     </Button>
-
                     <Button
+                      onClick={() => handleDelete(provider.id)}
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(provider)}
-                      className="flex items-center space-x-1 border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      className="gap-1 text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-3 w-3" />
-                      <span>Excluir</span>
+                      Excluir
                     </Button>
                   </div>
                 </div>
-              </div>
-
-              {provider.base_url && (
-                <div className="mt-2 text-xs text-gray-500 dark:text-[#a1a1aa]">
-                  URL: {provider.base_url}
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-700")}>
+                      Tipo:
+                    </span>
+                    <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                      {provider.provider_type}
+                    </span>
+                  </div>
+                  {provider.default_model && (
+                    <div>
+                      <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-700")}>
+                        Modelo:
+                      </span>
+                      <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                        {provider.default_model}
+                      </span>
+                    </div>
+                  )}
+                  {provider.base_url && (
+                    <div className="col-span-2">
+                      <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-700")}>
+                        URL Base:
+                      </span>
+                      <span className={cn("ml-2 break-all", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                        {provider.base_url}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-
-              <div className="mt-2 text-xs text-gray-500 dark:text-[#a1a1aa]">
-                Criado em: {new Date(provider.created_at).toLocaleDateString('pt-BR')}
-                {provider.updated_at !== provider.created_at && (
-                  <span> • Atualizado em: {new Date(provider.updated_at).toLocaleDateString('pt-BR')}</span>
-                )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

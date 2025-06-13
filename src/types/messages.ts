@@ -40,6 +40,8 @@ export interface ChannelConversation {
   last_message_time?: string;
   status: 'unread' | 'in_progress' | 'resolved';
   message_count?: number;
+  updated_at?: string;
+  unread_count?: number;
 }
 
 export interface CursorPaginationResult<T> {
