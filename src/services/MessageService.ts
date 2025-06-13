@@ -6,54 +6,60 @@ import { supabase } from '@/integrations/supabase/client';
 
 export class MessageService {
   private repositories: Map<string, MessageRepository> = new Map();
+  private channelId: string;
 
-  private getRepository(channelId: string): MessageRepository {
-    if (!this.repositories.has(channelId)) {
-      const tableName = getTableNameForChannel(channelId);
-      this.repositories.set(channelId, new MessageRepository(tableName));
-    }
-    return this.repositories.get(channelId)!;
+  constructor(channelId?: string) {
+    this.channelId = channelId || '';
   }
 
-  async getMessagesForChannel(channelId: string, limit?: number): Promise<RawMessage[]> {
-    const repository = this.getRepository(channelId);
-    console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${channelId} from table ${repository.getTableName()}`);
+  private getRepository(channelId?: string): MessageRepository {
+    const targetChannelId = channelId || this.channelId;
+    if (!this.repositories.has(targetChannelId)) {
+      const tableName = getTableNameForChannel(targetChannelId);
+      this.repositories.set(targetChannelId, new MessageRepository(tableName));
+    }
+    return this.repositories.get(targetChannelId)!;
+  }
+
+  async getMessagesForChannel(limit?: number): Promise<RawMessage[]> {
+    const repository = this.getRepository();
+    console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
       return await repository.findAll(limit);
     } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${channelId}:`, error);
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${this.channelId}:`, error);
       throw error;
     }
   }
 
-  async saveMessage(channelId: string, messageData: Partial<RawMessage>): Promise<RawMessage> {
-    const repository = this.getRepository(channelId);
-    console.log(`💾 [MESSAGE_SERVICE] Saving message to channel ${channelId}`);
+  async saveMessage(messageData: Partial<RawMessage>): Promise<RawMessage> {
+    const repository = this.getRepository();
+    console.log(`💾 [MESSAGE_SERVICE] Saving message to channel ${this.channelId}`);
     
     try {
       return await repository.create(messageData);
     } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error saving message to channel ${channelId}:`, error);
+      console.error(`❌ [MESSAGE_SERVICE] Error saving message to channel ${this.channelId}:`, error);
       throw error;
     }
   }
 
-  async getMessagesByPhoneNumber(channelId: string, phoneNumber: string): Promise<RawMessage[]> {
-    const repository = this.getRepository(channelId);
-    console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${channelId}`);
+  async getMessagesByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
+    const repository = this.getRepository();
+    console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${this.channelId}`);
     
     try {
       return await repository.findByPhoneNumber(phoneNumber);
     } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${channelId}:`, error);
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${this.channelId}:`, error);
       throw error;
     }
   }
 
-  async getNewMessages(channelId: string, afterTimestamp: string): Promise<RawMessage[]> {
-    const repository = this.getRepository(channelId);
-    console.log(`🆕 [MESSAGE_SERVICE] Getting new messages after ${afterTimestamp} for channel ${channelId}`);
+  async getNewMessages(afterTimestamp: string): Promise<RawMessage[]> {
+    const repository = this.getRepository();
+    console.log(`🆕 [MESSAGE_SERVICE] Getting new messages after ${afterTimestamp} for channel ${this.channelId}`);
     
     try {
       const { data, error } = await repository.findMessagesAfterTimestamp(afterTimestamp);
@@ -64,14 +70,14 @@ export class MessageService {
       
       return data || [];
     } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting new messages for channel ${channelId}:`, error);
+      console.error(`❌ [MESSAGE_SERVICE] Error getting new messages for channel ${this.channelId}:`, error);
       throw error;
     }
   }
 
-  async markConversationAsRead(channelId: string, sessionId: string): Promise<void> {
-    const repository = this.getRepository(channelId);
-    console.log(`✅ [MESSAGE_SERVICE] Marking conversation as read: ${sessionId} in channel ${channelId}`);
+  async markConversationAsRead(sessionId: string): Promise<void> {
+    const repository = this.getRepository();
+    console.log(`✅ [MESSAGE_SERVICE] Marking conversation as read: ${sessionId} in channel ${this.channelId}`);
     
     try {
       await repository.markAsRead(sessionId);
@@ -81,20 +87,18 @@ export class MessageService {
     }
   }
 
-  // Legacy methods for backward compatibility
-  async getConversations(channelId: string): Promise<ChannelConversation[]> {
-    const repository = this.getRepository(channelId);
+  async getConversations(): Promise<ChannelConversation[]> {
+    const repository = this.getRepository();
     const tableName = repository.getTableName();
     
     try {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .select('*')
         .order('read_at', { ascending: false });
 
       if (error) throw error;
 
-      // Group messages by session_id to create conversations
       const conversationsMap = new Map<string, ChannelConversation>();
       
       (data || []).forEach((message: any) => {
@@ -120,57 +124,56 @@ export class MessageService {
     }
   }
 
-  async getMessagesByConversation(channelId: string, sessionId: string): Promise<RawMessage[]> {
-    const repository = this.getRepository(channelId);
+  async getMessagesByConversation(sessionId: string): Promise<{ data: RawMessage[] }> {
+    const repository = this.getRepository();
     const tableName = repository.getTableName();
     
     try {
       const { data, error } = await supabase
-        .from(tableName)
+        .from(tableName as any)
         .select('*')
         .eq('session_id', sessionId)
         .order('read_at', { ascending: true });
 
       if (error) throw error;
 
-      return (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
+      const mappedData = (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
+      return { data: mappedData };
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
       throw error;
     }
   }
 
-  async getAllMessages(channelId: string): Promise<RawMessage[]> {
-    return this.getMessagesForChannel(channelId);
+  async getAllMessages(): Promise<RawMessage[]> {
+    return this.getMessagesForChannel();
   }
 
   extractPhoneFromSessionId(sessionId: string): string {
-    // Extract phone number from session_id format like "5511999999999@s.whatsapp.net"
     const match = sessionId.match(/(\d+)@/);
     return match ? match[1] : sessionId;
   }
 
-  async createRealtimeSubscription(channelId: string, callback: (payload: any) => void) {
-    const repository = this.getRepository(channelId);
+  createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
+    const repository = this.getRepository();
     const tableName = repository.getTableName();
     
     return supabase
-      .channel(`${tableName}-changes`)
+      .channel(`${tableName}-changes${channelSuffix}`)
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: tableName },
+        { event: '*', schema: 'public', table: tableName as any },
         callback
       )
       .subscribe();
   }
 
-  // Get statistics for a channel
-  async getChannelStats(channelId: string): Promise<{
+  async getChannelStats(): Promise<{
     totalMessages: number;
     totalConversations: number;
     unreadMessages: number;
   }> {
-    const repository = this.getRepository(channelId);
-    console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${channelId} from table ${repository.getTableName()}`);
+    const repository = this.getRepository();
+    console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
       const messages = await repository.findAll();

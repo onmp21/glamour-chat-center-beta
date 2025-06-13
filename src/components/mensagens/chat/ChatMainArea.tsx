@@ -1,12 +1,7 @@
-import React, { useRef, useEffect } from 'react';
+
+import React from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Menu, MoreVertical } from 'lucide-react';
-import { ConversationHeader } from '../ConversationHeader';
-import { ChatInput } from '../ChatInput';
-// Importar o novo componente otimizado
-import { OptimizedMessageList } from '../OptimizedMessageList';
+import { ChannelConversation } from '@/types/messages';
 
 interface Message {
   id: string;
@@ -14,7 +9,7 @@ interface Message {
   timestamp: string;
   sender: 'customer' | 'agent';
   tipo_remetente?: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  type: 'text' | 'image' | 'audio' | 'video' | 'file';
   fileUrl?: string;
   fileName?: string;
   read: boolean;
@@ -27,26 +22,26 @@ interface Conversation {
   contactNumber: string;
 }
 
-interface ChatMainAreaProps {
-  selectedConv: any;
-  conversationForHeader: Conversation | null;
-  // displayMessages: Message[]; // Removido, OptimizedMessageList gerencia
-  // messagesLoading: boolean; // Removido, OptimizedMessageList gerencia
+export interface ChatMainAreaProps {
+  selectedConv?: ChannelConversation;
+  conversationForHeader?: Conversation | null;
+  messages: Message[];
+  messagesLoading: boolean;
   isSidebarOpen: boolean;
   isDarkMode: boolean;
-  channelId?: string;
+  channelId: string;
   onSidebarToggle: (open: boolean) => void;
   onMarkAsResolved: () => void;
-  onSendMessage: (message: string) => void;
-  onSendFile: (file: File, caption?: string) => void;
-  onSendAudio: (audioBlob: Blob, duration: number) => void;
+  onSendMessage: (message: string) => Promise<void>;
+  onSendFile: (file: File, caption?: string) => Promise<void>;
+  onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
 }
 
 export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   selectedConv,
   conversationForHeader,
-  // displayMessages, // Removido
-  // messagesLoading, // Removido
+  messages,
+  messagesLoading,
   isSidebarOpen,
   isDarkMode,
   channelId,
@@ -56,107 +51,125 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   onSendFile,
   onSendAudio
 }) => {
-  // Referência para o contêiner de mensagens (ainda pode ser útil para o ChatInput)
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  // const scrollAreaRef = useRef<HTMLDivElement>(null); // Removido, ScrollArea está dentro de OptimizedMessageList
-  
-  // Função para rolar para o final das mensagens (ainda pode ser útil para o ChatInput)
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-  
-  // useEffect para rolar para o final removido, pois OptimizedMessageList gerencia
-
-  if (!selectedConv || !conversationForHeader) {
+  if (!selectedConv) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className={cn("text-gray-500", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-          Selecione uma conversa para começar
-        </p>
+      <div className={cn(
+        "flex-1 flex items-center justify-center",
+        isDarkMode ? "bg-[#09090b] text-white" : "bg-gray-50 text-gray-900"
+      )}>
+        <p className="text-lg">Selecione uma conversa para começar</p>
       </div>
     );
   }
 
-  const handleMenuClick = () => {
-    console.log('⋮ Menu button clicked');
-    alert('Menu de opções em desenvolvimento');
-  };
-
-  // renderMessage function removida, OptimizedMessageList renderiza as mensagens
-
   return (
-    <>
+    <div className={cn(
+      "flex-1 flex flex-col",
+      isDarkMode ? "bg-[#09090b]" : "bg-white"
+    )}>
       {/* Header */}
       <div className={cn(
-        "flex items-center border-b",
+        "p-4 border-b flex items-center justify-between",
         isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
       )}>
-        {!isSidebarOpen && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => onSidebarToggle(true)}
-            className="ml-2"
-          >
-            <Menu size={20} />
-          </Button>
-        )}
-        <div className="flex-1">
-          <ConversationHeader
-            conversation={conversationForHeader}
-            isDarkMode={isDarkMode}
-            onMarkAsResolved={onMarkAsResolved}
-          />
+        <div className="flex items-center space-x-3">
+          <h2 className={cn(
+            "font-semibold",
+            isDarkMode ? "text-white" : "text-gray-900"
+          )}>
+            {conversationForHeader?.contactName || selectedConv.contact_name}
+          </h2>
+          <span className={cn(
+            "text-sm",
+            isDarkMode ? "text-gray-400" : "text-gray-500"
+          )}>
+            {conversationForHeader?.contactNumber || selectedConv.contact_phone}
+          </span>
         </div>
-        <div className="flex items-center gap-2 pr-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onMarkAsResolved}
+        <button
+          onClick={onMarkAsResolved}
+          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Marcar como Resolvido
+        </button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-auto p-4">
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex",
+                  message.sender === 'agent' ? "justify-end" : "justify-start"
+                )}
+              >
+                <div
+                  className={cn(
+                    "max-w-xs lg:max-w-md px-4 py-2 rounded-lg",
+                    message.sender === 'agent'
+                      ? "bg-[#b5103c] text-white"
+                      : isDarkMode
+                      ? "bg-[#3f3f46] text-white"
+                      : "bg-gray-200 text-gray-900"
+                  )}
+                >
+                  <p className="text-sm">{message.content}</p>
+                  <p className="text-xs opacity-70 mt-1">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Message Input */}
+      <div className={cn(
+        "p-4 border-t",
+        isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
+      )}>
+        <div className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="Digite sua mensagem..."
             className={cn(
-              "flex items-center gap-2",
-              isDarkMode ? "border-[#3f3f46] hover:bg-[#27272a]" : "border-gray-200 hover:bg-gray-50"
+              "flex-1 px-3 py-2 rounded-lg border",
+              isDarkMode 
+                ? "bg-[#333333] border-[#444444] text-white placeholder:text-gray-400"
+                : "bg-white border-gray-300 text-gray-900"
             )}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                const target = e.target as HTMLInputElement;
+                if (target.value.trim()) {
+                  onSendMessage(target.value);
+                  target.value = '';
+                }
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+              if (input?.value.trim()) {
+                onSendMessage(input.value);
+                input.value = '';
+              }
+            }}
+            className="px-4 py-2 bg-[#b5103c] text-white rounded-lg hover:bg-[#9d0e34]"
           >
-            Resolver
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleMenuClick}
-            className={cn(
-              isDarkMode ? "hover:bg-[#27272a]" : "hover:bg-gray-50"
-            )}
-          >
-            <MoreVertical size={18} />
-          </Button>
+            Enviar
+          </button>
         </div>
       </div>
-      
-      {/* Messages - Usando OptimizedMessageList */}
-      {channelId && selectedConv.id && (
-        <OptimizedMessageList
-          channel={channelId}
-          sessionId={selectedConv.id}
-        />
-      )}
-      
-      {/* Input */}
-      <ChatInput 
-        isDarkMode={isDarkMode} 
-        onSendMessage={(message) => {
-          onSendMessage(message);
-          // Rolar para o final após enviar uma mensagem
-          setTimeout(scrollToBottom, 300);
-        }}
-        onSendFile={onSendFile}
-        onSendAudio={onSendAudio}
-      />
-    </>
+    </div>
   );
 };
-
-

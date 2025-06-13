@@ -1,172 +1,88 @@
 
-import { supabase } from "../lib/supabase"
+import { supabase } from '@/integrations/supabase/client';
+import { AIProvider, AIProviderFormData, ProviderType } from '@/types/ai-providers';
 
 export class AIProviderService {
-  private static readonly FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+  static async getProviders(): Promise<AIProvider[]> {
+    const { data, error } = await supabase
+      .from('ai_providers')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  static async getProviders() {
-    try {
-      const response = await fetch(`${this.FUNCTION_URL}/ai-providers`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        }
+    if (error) {
+      console.error('Error fetching AI providers:', error);
+      throw error;
+    }
+
+    return data || [];
+  }
+
+  static async createProvider(formData: AIProviderFormData): Promise<AIProvider> {
+    const { data, error } = await supabase
+      .from('ai_providers')
+      .insert({
+        name: formData.name,
+        provider_type: formData.provider_type,
+        api_key: formData.api_key,
+        base_url: formData.base_url,
+        default_model: formData.default_model,
+        is_active: formData.is_active,
+        advanced_settings: formData.advanced_settings || {}
       })
+      .select()
+      .single();
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+    if (error) {
+      console.error('Error creating AI provider:', error);
+      throw error;
+    }
 
-      const data = await response.json()
-      return data.providers
-    } catch (error) {
-      console.error("Erro ao buscar provedores:", error)
-      throw error
+    return data;
+  }
+
+  static async updateProvider(id: string, formData: AIProviderFormData): Promise<AIProvider> {
+    const { data, error } = await supabase
+      .from('ai_providers')
+      .update({
+        name: formData.name,
+        provider_type: formData.provider_type,
+        api_key: formData.api_key,
+        base_url: formData.base_url,
+        default_model: formData.default_model,
+        is_active: formData.is_active,
+        advanced_settings: formData.advanced_settings || {}
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating AI provider:', error);
+      throw error;
+    }
+
+    return data;
+  }
+
+  static async deleteProvider(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ai_providers')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting AI provider:', error);
+      throw error;
     }
   }
 
-  static async createProvider(providerData: any) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        throw new Error("Usuário não autenticado")
-      }
-
-      const response = await fetch(`${this.FUNCTION_URL}/ai-providers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify(providerData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao criar provedor")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Erro ao criar provedor:", error)
-      throw error
-    }
-  }
-
-  static async updateProvider(id: number, updates: any) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        throw new Error("Usuário não autenticado")
-      }
-
-      const response = await fetch(`${this.FUNCTION_URL}/ai-providers/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify(updates)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao atualizar provedor")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Erro ao atualizar provedor:", error)
-      throw error
-    }
-  }
-
-  static async deleteProvider(id: number) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        throw new Error("Usuário não autenticado")
-      }
-
-      const response = await fetch(`${this.FUNCTION_URL}/ai-providers/${id}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`
-        }
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao deletar provedor")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Erro ao deletar provedor:", error)
-      throw error
-    }
-  }
-
-  static async testProvider(providerData: any) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      const response = await fetch(`${this.FUNCTION_URL}/test-provider`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": session ? `Bearer ${session.access_token}` : `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify(providerData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Erro ao testar provedor")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Erro ao testar provedor:", error)
-      throw error
-    }
-  }
-
-  static async getActiveProviders() {
-    return this.getProviders();
-  }
-
-  static getProviderTypeLabel(type: string): string {
-    const labels: Record<string, string> = {
+  static getProviderTypeLabel(type: ProviderType): string {
+    const labels = {
       openai: 'OpenAI',
-      anthropic: 'Anthropic', 
+      anthropic: 'Anthropic',
       google: 'Google',
-      custom: 'Custom'
+      custom: 'Personalizado'
     };
     return labels[type] || type;
-  }
-
-  static getDefaultBaseUrl(type: string): string {
-    const baseUrls: Record<string, string> = {
-      openai: 'https://api.openai.com/v1',
-      anthropic: 'https://api.anthropic.com',
-      google: 'https://generativelanguage.googleapis.com',
-      custom: ''
-    };
-    return baseUrls[type] || '';
-  }
-
-  static getDefaultModels(type: string): string[] {
-    const models: Record<string, string[]> = {
-      openai: ['gpt-4', 'gpt-3.5-turbo'],
-      anthropic: ['claude-3-sonnet', 'claude-3-haiku'],
-      google: ['gemini-pro', 'gemini-pro-vision'],
-      custom: []
-    };
-    return models[type] || [];
   }
 }

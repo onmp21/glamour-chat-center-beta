@@ -10,11 +10,9 @@ export class IntelligentReportsService {
     custom_prompt?: string;
   }) {
     try {
-      // Mock implementation for now
       const reportId = crypto.randomUUID();
       const reportContent = `Generated report for ${params.report_type} using provider ${params.provider_id}`;
       
-      // Save to report_history table
       const { data, error } = await supabase
         .from('report_history')
         .insert({
@@ -75,7 +73,7 @@ export class IntelligentReportsService {
         model_used: report.model_used || 'unknown',
         tokens_used: report.tokens_used || 0,
         generation_time: report.generation_time || 0,
-        metadata: report.report_metadata || {},
+        metadata: typeof report.report_metadata === 'object' ? report.report_metadata as Record<string, any> : {},
         query: report.prompt,
         result: {
           id: report.id,

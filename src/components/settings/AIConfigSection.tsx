@@ -57,6 +57,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     try {
       await AIProviderService.createProvider({
         ...formData,
+        is_active: true,
         advanced_settings: JSON.parse(formData.advanced_settings || '{}')
       });
       
@@ -84,6 +85,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
     try {
       await AIProviderService.updateProvider(editingProvider.id, {
         ...formData,
+        is_active: true,
         advanced_settings: JSON.parse(formData.advanced_settings || '{}')
       });
       
