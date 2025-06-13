@@ -34,24 +34,29 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     return 'customer';
   }
 
-  async findAll(limit?: number): Promise<RawMessage[]> {
-    const query = supabase
-      .from(this.tableName as any)
-      .select('*')
-      .order('id', { ascending: false });
+  async findAll(limit = 50): Promise<RawMessage[]> {
+    console.log(`📋 [MESSAGE_REPOSITORY] Fetching ${limit} messages from ${this.tableName}`);
+    
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .order('id', { ascending: false })
+        .limit(Math.min(limit, 100)) // Máximo 100 para evitar sobrecarga
+        .abortSignal(AbortSignal.timeout(10000)); // 10 segundos timeout
 
-    if (limit) {
-      query.limit(limit);
-    }
+      if (error) {
+        console.error(`❌ [MESSAGE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
+        throw error;
+      }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error(`❌ [MESSAGE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
+      const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+      console.log(`✅ [MESSAGE_REPOSITORY] Successfully fetched ${messages.length} messages from ${this.tableName}`);
+      return messages;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error in findAll for ${this.tableName}:`, error);
       throw error;
     }
-
-    return (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
   }
 
   async insertMessage(sessionId: string, message: string, contactName?: string): Promise<RawMessage> {
@@ -66,55 +71,87 @@ export class MessageRepository extends BaseRepository<RawMessage> {
 
     console.log(`💾 [MESSAGE_REPOSITORY] Inserting message into ${this.tableName}`);
     
-    const created = await this.create(insertData);
-    return this.mapDatabaseRowToRawMessage(created);
+    try {
+      const created = await this.create(insertData);
+      return this.mapDatabaseRowToRawMessage(created);
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error inserting message:`, error);
+      throw error;
+    }
   }
 
   async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
-    const { data, error } = await supabase
-      .from(this.tableName as any)
-      .select('*')
-      .ilike("session_id", `%${phoneNumber}%`)
-      .order("id", { ascending: true })
-      .limit(1000);
+    console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages by phone ${phoneNumber} in ${this.tableName}`);
+    
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .ilike("session_id", `%${phoneNumber}%`)
+        .order("id", { ascending: true })
+        .limit(100) // Limite para evitar sobrecarga
+        .abortSignal(AbortSignal.timeout(8000)); // 8 segundos timeout
 
-    if (error) {
-      console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
+      if (error) {
+        console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
+        throw error;
+      }
+
+      const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+      console.log(`✅ [MESSAGE_REPOSITORY] Found ${messages.length} messages for phone ${phoneNumber}`);
+      return messages;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error in findByPhoneNumber:`, error);
       throw error;
     }
-
-    return (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
   }
 
   async findMessagesAfterTimestamp(timestamp: string): Promise<{ data: RawMessage[] | null; error: any }> {
     console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages after ${timestamp} in ${this.tableName}`);
     
-    const { data, error } = await supabase
-      .from(this.tableName as any)
-      .select('*')
-      .gt('read_at', timestamp)
-      .order("id", { ascending: true })
-      .limit(1000);
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .gt('read_at', timestamp)
+        .order("id", { ascending: true })
+        .limit(50) // Limite menor para new messages
+        .abortSignal(AbortSignal.timeout(5000)); // 5 segundos timeout
 
-    if (error) {
-      console.error(`❌ [MESSAGE_REPOSITORY] Error fetching messages after timestamp from ${this.tableName}:`, error);
+      if (error) {
+        console.error(`❌ [MESSAGE_REPOSITORY] Error fetching messages after timestamp from ${this.tableName}:`, error);
+        return { data: null, error };
+      }
+
+      const mappedData = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+      console.log(`✅ [MESSAGE_REPOSITORY] Found ${mappedData.length} new messages after ${timestamp}`);
+      return { data: mappedData, error: null };
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error in findMessagesAfterTimestamp:`, error);
       return { data: null, error };
     }
-
-    const mappedData = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
-    return { data: mappedData, error: null };
   }
 
   async markAsRead(sessionId: string): Promise<void> {
-    const { error } = await supabase
-      .from(this.tableName as any)
-      .update({ 
-        read_at: new Date().toISOString() 
-      })
-      .eq('session_id', sessionId);
+    console.log(`✅ [MESSAGE_REPOSITORY] Marking messages as read for session ${sessionId}`);
+    
+    try {
+      const { error } = await supabase
+        .from(this.tableName as any)
+        .update({ 
+          is_read: true,
+          read_at: new Date().toISOString() 
+        })
+        .eq('session_id', sessionId);
 
-    if (error) {
-      console.error(`❌ [MESSAGE_REPOSITORY] Error marking messages as read:`, error);
+      if (error) {
+        console.error(`❌ [MESSAGE_REPOSITORY] Error marking messages as read:`, error);
+        throw error;
+      }
+
+      console.log(`✅ [MESSAGE_REPOSITORY] Successfully marked messages as read for session ${sessionId}`);
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error in markAsRead:`, error);
       throw error;
     }
   }

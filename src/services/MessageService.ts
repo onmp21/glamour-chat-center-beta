@@ -8,6 +8,8 @@ export class MessageService {
   private repositories: Map<string, MessageRepository> = new Map();
   private channelId: string;
   private static activeSubscriptions: Map<string, any> = new Map();
+  private static queryCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private static readonly CACHE_DURATION = 30000; // 30 segundos
 
   constructor(channelId?: string) {
     this.channelId = channelId || '';
@@ -22,12 +24,38 @@ export class MessageService {
     return this.repositories.get(targetChannelId)!;
   }
 
-  async getMessagesForChannel(limit?: number): Promise<RawMessage[]> {
+  private getCacheKey(method: string, params: any = {}): string {
+    return `${this.channelId}-${method}-${JSON.stringify(params)}`;
+  }
+
+  private getFromCache<T>(cacheKey: string): T | null {
+    const cached = MessageService.queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < MessageService.CACHE_DURATION) {
+      console.log(`📊 [MESSAGE_SERVICE] Cache hit for ${cacheKey}`);
+      return cached.data;
+    }
+    return null;
+  }
+
+  private setCache(cacheKey: string, data: any): void {
+    MessageService.queryCache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  async getMessagesForChannel(limit = 50): Promise<RawMessage[]> {
+    const cacheKey = this.getCacheKey('getMessages', { limit });
+    const cached = this.getFromCache<RawMessage[]>(cacheKey);
+    if (cached) return cached;
+
     const repository = this.getRepository();
     console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
-      return await repository.findAll(limit);
+      const messages = await repository.findAll(limit);
+      this.setCache(cacheKey, messages);
+      return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${this.channelId}:`, error);
       throw error;
@@ -39,7 +67,10 @@ export class MessageService {
     console.log(`💾 [MESSAGE_SERVICE] Saving message to channel ${this.channelId}`);
     
     try {
-      return await repository.create(messageData);
+      const result = await repository.create(messageData);
+      // Invalidar cache após salvar
+      MessageService.queryCache.clear();
+      return result;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error saving message to channel ${this.channelId}:`, error);
       throw error;
@@ -47,11 +78,17 @@ export class MessageService {
   }
 
   async getMessagesByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
+    const cacheKey = this.getCacheKey('getByPhone', { phoneNumber });
+    const cached = this.getFromCache<RawMessage[]>(cacheKey);
+    if (cached) return cached;
+
     const repository = this.getRepository();
     console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${this.channelId}`);
     
     try {
-      return await repository.findByPhoneNumber(phoneNumber);
+      const messages = await repository.findByPhoneNumber(phoneNumber);
+      this.setCache(cacheKey, messages);
+      return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${this.channelId}:`, error);
       throw error;
@@ -82,24 +119,37 @@ export class MessageService {
     
     try {
       await repository.markAsRead(sessionId);
+      // Invalidar cache após atualização
+      MessageService.queryCache.clear();
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error marking conversation as read:`, error);
       throw error;
     }
   }
 
-  async getConversations(limit?: number): Promise<ChannelConversation[]> {
+  async getConversations(limit = 20): Promise<ChannelConversation[]> {
+    const cacheKey = this.getCacheKey('getConversations', { limit });
+    const cached = this.getFromCache<ChannelConversation[]>(cacheKey);
+    if (cached) return cached;
+
     const repository = this.getRepository();
     const tableName = repository.getTableName();
     
     try {
+      console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
+      
+      // Query otimizada com timeout personalizado
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
         .order('read_at', { ascending: false })
-        .limit(limit || 50);
+        .limit(limit)
+        .abortSignal(AbortSignal.timeout(15000)); // 15 segundos timeout
 
-      if (error) throw error;
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Database error:`, error);
+        throw error;
+      }
 
       const conversationsMap = new Map<string, ChannelConversation>();
       
@@ -119,14 +169,23 @@ export class MessageService {
         }
       });
 
-      return Array.from(conversationsMap.values());
+      const conversations = Array.from(conversationsMap.values());
+      console.log(`✅ [MESSAGE_SERVICE] Loaded ${conversations.length} conversations from ${tableName}`);
+      
+      this.setCache(cacheKey, conversations);
+      return conversations;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting conversations:`, error);
-      throw error;
+      // Retornar array vazio em caso de erro para não quebrar a UI
+      return [];
     }
   }
 
-  async getMessagesByConversation(sessionId: string, limit?: number): Promise<{ data: RawMessage[] }> {
+  async getMessagesByConversation(sessionId: string, limit = 50): Promise<{ data: RawMessage[] }> {
+    const cacheKey = this.getCacheKey('getByConversation', { sessionId, limit });
+    const cached = this.getFromCache<{ data: RawMessage[] }>(cacheKey);
+    if (cached) return cached;
+
     const repository = this.getRepository();
     const tableName = repository.getTableName();
     
@@ -136,19 +195,23 @@ export class MessageService {
         .select('*')
         .eq('session_id', sessionId)
         .order('read_at', { ascending: true })
-        .limit(limit || 100);
+        .limit(limit)
+        .abortSignal(AbortSignal.timeout(10000)); // 10 segundos timeout
 
       if (error) throw error;
 
       const mappedData = (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
-      return { data: mappedData };
+      const result = { data: mappedData };
+      
+      this.setCache(cacheKey, result);
+      return result;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
-      throw error;
+      return { data: [] };
     }
   }
 
-  async getAllMessages(limit?: number): Promise<RawMessage[]> {
+  async getAllMessages(limit = 50): Promise<RawMessage[]> {
     return this.getMessagesForChannel(limit);
   }
 
@@ -172,7 +235,12 @@ export class MessageService {
       .channel(`${tableName}-changes${channelSuffix}`)
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: tableName as any },
-        callback
+        (payload) => {
+          console.log(`🔔 [MESSAGE_SERVICE] Realtime update for ${tableName}:`, payload);
+          // Invalidar cache quando há mudanças
+          MessageService.queryCache.clear();
+          callback(payload);
+        }
       );
 
     // Store the subscription
@@ -192,27 +260,41 @@ export class MessageService {
     }
   }
 
+  static clearCache() {
+    MessageService.queryCache.clear();
+    console.log(`🧹 [MESSAGE_SERVICE] Cache cleared`);
+  }
+
   async getChannelStats(): Promise<{
     totalMessages: number;
     totalConversations: number;
     unreadMessages: number;
   }> {
+    const cacheKey = this.getCacheKey('getStats');
+    const cached = this.getFromCache<any>(cacheKey);
+    if (cached) return cached;
+
     const repository = this.getRepository();
     console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
-      const messages = await repository.findAll();
-      const conversations = new Set(messages.map(m => m.session_id));
-      const unread = messages.filter(m => !m.is_read);
-      
-      return {
-        totalMessages: messages.length,
-        totalConversations: conversations.size,
-        unreadMessages: unread.length
+      // Stats simplificados para evitar queries pesadas
+      const conversations = await this.getConversations(10);
+      const stats = {
+        totalMessages: 0,
+        totalConversations: conversations.length,
+        unreadMessages: conversations.filter(c => c.status === 'unread').length
       };
+      
+      this.setCache(cacheKey, stats);
+      return stats;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error getting channel stats:`, error);
-      throw error;
+      return {
+        totalMessages: 0,
+        totalConversations: 0,
+        unreadMessages: 0
+      };
     }
   }
 
@@ -220,7 +302,7 @@ export class MessageService {
     return this.getNewMessages(timestamp);
   }
 
-  async fetchMessages(limit?: number): Promise<RawMessage[]> {
+  async fetchMessages(limit = 50): Promise<RawMessage[]> {
     return this.getMessagesForChannel(limit);
   }
 }
