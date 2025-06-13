@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
 import { AIProvider, ReportResult, ReportHistory } from '@/types/ai-providers';
 import { ConversationService } from '@/services/ConversationService';
+import { IntelligentReportsService } from '@/services/IntelligentReportsService';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
@@ -57,6 +58,12 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   const [error, setError] = useState<string>('');
   const [channels, setChannels] = useState<{ id: string; name: string; type: string }[]>([]);
   const [recentReports, setRecentReports] = useState<ReportHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalReports: '',
+    reportsThisMonth: '',
+    averageGenerationTime: ''
+  });
 
   // Carregar provedores, canais e histórico de relatórios ao montar
   useEffect(() => {
@@ -122,6 +129,37 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       ]);
     } catch (error) {
       console.error('Erro ao carregar relatórios recentes:', error);
+    }
+  };
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const reports = await IntelligentReportsService.getReports();
+      setReports(reports);
+      
+      // Calculate stats
+      const total = reports.length;
+      const thisMonth = reports.filter(report => {
+        const reportDate = new Date(report.created_at);
+        const now = new Date();
+        return reportDate.getMonth() === now.getMonth() && 
+               reportDate.getFullYear() === now.getFullYear();
+      }).length;
+      
+      const avgTime = reports.length > 0 
+        ? reports.reduce((sum, r) => sum + (r.generation_time || 0), 0) / reports.length 
+        : 0;
+      
+      setStats({
+        totalReports: total.toString(), // Convert to string
+        reportsThisMonth: thisMonth.toString(), // Convert to string
+        averageGenerationTime: `${avgTime.toFixed(1)}s`
+      });
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    } finally {
+      setLoading(false);
     }
   };
 

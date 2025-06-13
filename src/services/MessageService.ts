@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 export class MessageService {
   private repositories: Map<string, MessageRepository> = new Map();
   private channelId: string;
+  private static activeSubscriptions: Map<string, any> = new Map();
 
   constructor(channelId?: string) {
     this.channelId = channelId || '';
@@ -87,7 +88,7 @@ export class MessageService {
     }
   }
 
-  async getConversations(): Promise<ChannelConversation[]> {
+  async getConversations(limit?: number): Promise<ChannelConversation[]> {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
     
@@ -95,7 +96,8 @@ export class MessageService {
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
-        .order('read_at', { ascending: false });
+        .order('read_at', { ascending: false })
+        .limit(limit || 50);
 
       if (error) throw error;
 
@@ -124,7 +126,7 @@ export class MessageService {
     }
   }
 
-  async getMessagesByConversation(sessionId: string): Promise<{ data: RawMessage[] }> {
+  async getMessagesByConversation(sessionId: string, limit?: number): Promise<{ data: RawMessage[] }> {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
     
@@ -133,7 +135,8 @@ export class MessageService {
         .from(tableName as any)
         .select('*')
         .eq('session_id', sessionId)
-        .order('read_at', { ascending: true });
+        .order('read_at', { ascending: true })
+        .limit(limit || 100);
 
       if (error) throw error;
 
@@ -145,8 +148,8 @@ export class MessageService {
     }
   }
 
-  async getAllMessages(): Promise<RawMessage[]> {
-    return this.getMessagesForChannel();
+  async getAllMessages(limit?: number): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(limit);
   }
 
   extractPhoneFromSessionId(sessionId: string): string {
@@ -157,14 +160,36 @@ export class MessageService {
   createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
     
-    return supabase
+    // Check if subscription already exists
+    if (MessageService.activeSubscriptions.has(subscriptionKey)) {
+      console.log(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing`);
+      return MessageService.activeSubscriptions.get(subscriptionKey);
+    }
+    
+    const channel = supabase
       .channel(`${tableName}-changes${channelSuffix}`)
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: tableName as any },
         callback
-      )
-      .subscribe();
+      );
+
+    // Store the subscription
+    MessageService.activeSubscriptions.set(subscriptionKey, channel);
+    
+    return channel;
+  }
+
+  static unsubscribeChannel(channelSuffix: string, tableName: string) {
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
+    const channel = MessageService.activeSubscriptions.get(subscriptionKey);
+    
+    if (channel) {
+      console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from ${subscriptionKey}`);
+      supabase.removeChannel(channel);
+      MessageService.activeSubscriptions.delete(subscriptionKey);
+    }
   }
 
   async getChannelStats(): Promise<{
@@ -189,6 +214,14 @@ export class MessageService {
       console.error(`❌ [MESSAGE_SERVICE] Error getting channel stats:`, error);
       throw error;
     }
+  }
+
+  async getNewMessagesAfterTimestamp(timestamp: string): Promise<RawMessage[]> {
+    return this.getNewMessages(timestamp);
+  }
+
+  async fetchMessages(limit?: number): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(limit);
   }
 }
 

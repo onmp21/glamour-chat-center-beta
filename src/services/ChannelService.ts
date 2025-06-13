@@ -31,6 +31,19 @@ export class ChannelService {
     }
   }
 
+  async fetchMessages(limit?: number) {
+    return this.getMessages(limit);
+  }
+
+  async getNewMessagesAfterTimestamp(timestamp: string) {
+    try {
+      return await this.messageService.getNewMessagesAfterTimestamp(timestamp);
+    } catch (error) {
+      console.error(`❌ [CHANNEL_SERVICE] Error getting new messages for channel ${this.channelId}:`, error);
+      throw error;
+    }
+  }
+
   async getChannelStats() {
     try {
       return await this.messageService.getChannelStats();

@@ -14,7 +14,16 @@ export class AIProviderService {
       throw error;
     }
 
-    return data || [];
+    return (data || []).map(row => ({
+      ...row,
+      provider_type: row.provider_type as ProviderType,
+      advanced_settings: row.advanced_settings as Record<string, any>
+    }));
+  }
+
+  static async getActiveProviders(): Promise<AIProvider[]> {
+    const providers = await this.getProviders();
+    return providers.filter(provider => provider.is_active);
   }
 
   static async createProvider(formData: AIProviderFormData): Promise<AIProvider> {
@@ -37,7 +46,11 @@ export class AIProviderService {
       throw error;
     }
 
-    return data;
+    return {
+      ...data,
+      provider_type: data.provider_type as ProviderType,
+      advanced_settings: data.advanced_settings as Record<string, any>
+    };
   }
 
   static async updateProvider(id: string, formData: AIProviderFormData): Promise<AIProvider> {
@@ -61,7 +74,11 @@ export class AIProviderService {
       throw error;
     }
 
-    return data;
+    return {
+      ...data,
+      provider_type: data.provider_type as ProviderType,
+      advanced_settings: data.advanced_settings as Record<string, any>
+    };
   }
 
   static async deleteProvider(id: string): Promise<void> {
@@ -73,6 +90,16 @@ export class AIProviderService {
     if (error) {
       console.error('Error deleting AI provider:', error);
       throw error;
+    }
+  }
+
+  static async testProvider(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Mock test implementation
+      console.log(`Testing provider ${id}`);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
     }
   }
 

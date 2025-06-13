@@ -70,9 +70,12 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     return () => {
-      if (channel) {
+      if (channel && channelId) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
-        channel.unsubscribe();
+        const messageService = new MessageService(channelId);
+        const repository = messageService['getRepository']();
+        const tableName = repository.getTableName();
+        MessageService.unsubscribeChannel(`-conversations-${Date.now()}`, tableName);
       }
     };
   }, [channelId, loadConversations]);
