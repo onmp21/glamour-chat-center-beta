@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatMainArea } from './ChatMainArea';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
-import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
+import { useLazyConversationsList } from '@/hooks/useLazyConversationsList';
+import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
@@ -35,16 +36,6 @@ interface Conversation {
   contactNumber: string;
 }
 
-// Helper function to convert File/Blob to Base64
-const fileToBase64 = (file: File | Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-  });
-};
-
 export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({ 
   channelId, 
   isDarkMode, 
@@ -54,70 +45,22 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [previousMessageCount, setPreviousMessageCount] = useState(0);
   
-  const { conversations, loading: conversationsLoading, refreshConversations } = useChannelConversationsRefactored(channelId);
-  const { messages, loading: messagesLoading } = useChannelMessagesRefactored(channelId, selectedConversation || undefined);
+  // Usar hooks otimizados
+  const { 
+    conversations, 
+    loading: conversationsLoading, 
+    refreshConversations 
+  } = useLazyConversationsList(channelId);
+  
+  const { 
+    messages, 
+    loading: messagesLoading,
+    addMessage 
+  } = useLazyChannelMessages(channelId, selectedConversation || undefined);
+  
   const { getConversationStatus, updateConversationStatus, markConversationAsViewed } = useConversationStatusEnhanced();
   const { playNotificationSound } = useNotificationSound();
   const { sendMessage: sendAppMessage } = useMessageSenderExtended();
-
-  const handleSendFile = async (file: File, caption?: string) => {
-    if (!selectedConversation) return;
-
-    try {
-      const base64Content = await fileToBase64(file);
-      const messageType = file.type.startsWith("image/") ? "image" : file.type.startsWith("video/") ? "video" : file.type.startsWith("audio/") ? "audio" : "file";
-
-      const success = await sendAppMessage({
-        conversationId: selectedConversation,
-        channelId: channelId,
-        content: caption || "",
-        sender: "agent",
-        messageType: messageType,
-        fileData: {
-          base64: base64Content,
-          mimeType: file.type,
-          fileName: file.name,
-        },
-      });
-
-      if (success) {
-        console.log("✅ [CHAT_OVERLAY] Arquivo enviado com sucesso:", file.name);
-      } else {
-        console.error("❌ [CHAT_OVERLAY] Falha ao enviar arquivo:", file.name);
-      }
-    } catch (error) {
-      console.error("❌ [CHAT_OVERLAY] Erro ao converter arquivo para base64 ou enviar:", error);
-    }
-  };
-
-  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
-    if (!selectedConversation) return;
-
-    try {
-      const base64Content = await fileToBase64(audioBlob);
-      const success = await sendAppMessage({
-        conversationId: selectedConversation,
-        channelId: channelId,
-        content: "",
-        sender: "agent",
-        messageType: "audio",
-        fileData: {
-          base64: base64Content,
-          mimeType: audioBlob.type,
-          fileName: `audio_message_${Date.now()}.webm`,
-          duration: duration,
-        },
-      });
-
-      if (success) {
-        console.log("✅ [CHAT_OVERLAY] Áudio enviado com sucesso:", `audio_message_${Date.now()}.webm`);
-      } else {
-        console.error("❌ [CHAT_OVERLAY] Falha ao enviar áudio:", `audio_message_${Date.now()}.webm`);
-      }
-    } catch (error) {
-      console.error("❌ [CHAT_OVERLAY] Erro ao converter áudio para base64 ou enviar:", error);
-    }
-  };
 
   // Auto-select first conversation and mark as viewed
   useEffect(() => {
@@ -141,7 +84,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   useEffect(() => {
     if (messages.length > 0 && previousMessageCount > 0 && messages.length > previousMessageCount) {
       const lastMessage = messages[messages.length - 1];
-      // Only play sound for customer messages (not our own)
       if (lastMessage.sender === 'customer') {
         console.log('🔊 [CHAT_OVERLAY] Playing notification sound for new customer message');
         playNotificationSound();
@@ -150,14 +92,14 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     setPreviousMessageCount(messages.length);
   }, [messages, previousMessageCount, playNotificationSound]);
 
-  // CORREÇÃO: Reduzir auto-refresh para 2 minutos e só se não houver conversa selecionada
+  // Auto-refresh conversations (reduced frequency)
   useEffect(() => {
     const interval = setInterval(() => {
       if (!selectedConversation) {
         console.log('🔄 [CHAT_OVERLAY] Auto-refreshing conversations (no active chat)');
         refreshConversations();
       }
-    }, 120000); // 2 minutos em vez de 30 segundos
+    }, 120000); // 2 minutos
 
     return () => clearInterval(interval);
   }, [refreshConversations, selectedConversation]);
@@ -191,21 +133,83 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       conversationId: selectedConversation,
       channelId: channelId,
       content: message,
-      sender: "agent", // Assumindo que a mensagem é enviada pelo agente
+      sender: "agent",
       messageType: "text",
-    });
+    }, addMessage);
 
-    if (success) {
-      // Opcional: Limpar o input da mensagem após o envio bem-sucedido
-      // setMessage(""); 
-    } else {
-      console.error("❌ [CHAT_OVERLAY] Falha ao enviar mensagem pelo aplicativo.");
+    if (!success) {
+      console.error("❌ [CHAT_OVERLAY] Failed to send message");
     }
   };
 
-  const handleRefreshConversations = () => {
-    console.log('🔄 [CHAT_OVERLAY] Manual refresh conversations triggered');
-    refreshConversations();
+  const handleSendFile = async (file: File, caption?: string) => {
+    if (!selectedConversation) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Content = reader.result as string;
+        const messageType = file.type.startsWith("image/") ? "image" : 
+                          file.type.startsWith("video/") ? "video" : 
+                          file.type.startsWith("audio/") ? "audio" : "file";
+
+        const success = await sendAppMessage({
+          conversationId: selectedConversation,
+          channelId: channelId,
+          content: caption || "",
+          sender: "agent",
+          messageType: messageType,
+          fileData: {
+            base64: base64Content.split(',')[1],
+            mimeType: file.type,
+            fileName: file.name,
+          },
+        }, addMessage);
+
+        if (success) {
+          console.log("✅ [CHAT_OVERLAY] File sent successfully:", file.name);
+        } else {
+          console.error("❌ [CHAT_OVERLAY] Failed to send file:", file.name);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("❌ [CHAT_OVERLAY] Error sending file:", error);
+    }
+  };
+
+  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+    if (!selectedConversation) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Content = reader.result as string;
+        
+        const success = await sendAppMessage({
+          conversationId: selectedConversation,
+          channelId: channelId,
+          content: "",
+          sender: "agent",
+          messageType: "audio",
+          fileData: {
+            base64: base64Content.split(',')[1],
+            mimeType: audioBlob.type,
+            fileName: `audio_message_${Date.now()}.webm`,
+            duration: duration,
+          },
+        }, addMessage);
+
+        if (success) {
+          console.log("✅ [CHAT_OVERLAY] Audio sent successfully");
+        } else {
+          console.error("❌ [CHAT_OVERLAY] Failed to send audio");
+        }
+      };
+      reader.readAsDataURL(audioBlob);
+    } catch (error) {
+      console.error("❌ [CHAT_OVERLAY] Error sending audio:", error);
+    }
   };
 
   const selectedConv = conversations.find(c => c.id === selectedConversation);
@@ -215,30 +219,12 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     let sender: 'customer' | 'agent';
     
     if (channelId === 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7' || channelId === 'gerente-externo') {
-      if (msg.tipo_remetente === 'USUARIO_INTERNO') {
-        sender = 'agent';
-      } else {
-        sender = 'customer';
-      }
+      sender = msg.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'customer';
     } else if (channelId === 'chat' || channelId === 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6') {
-      if (msg.tipo_remetente === 'Yelena-ai' || msg.tipo_remetente === 'USUARIO_INTERNO') {
-        sender = 'agent';
-      } else {
-        sender = 'customer';
-      }
+      sender = (msg.tipo_remetente === 'Yelena-ai' || msg.tipo_remetente === 'USUARIO_INTERNO') ? 'agent' : 'customer';
     } else {
-      if (msg.tipo_remetente) {
-        if (msg.tipo_remetente === 'USUARIO_INTERNO') {
-          sender = 'agent';
-        } else {
-          sender = 'customer';
-        }
-      } else {
-        sender = msg.sender === 'agent' ? 'agent' : 'customer';
-      }
+      sender = msg.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'customer';
     }
-    
-    console.log(`💬 [MESSAGE_PROCESSING] Channel: ${channelId}, Message ${msg.id}: tipo_remetente="${msg.tipo_remetente}", mensagemtype="${msg.mensagemtype}", determined sender="${sender}"`);
     
     return {
       id: msg.id,
@@ -253,7 +239,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     };
   });
 
-  // Create conversation object with correct property names for header
+  // Create conversation object for header
   const conversationForHeader: Conversation | null = selectedConv ? {
     contactName: selectedConv.contact_name,
     contactNumber: selectedConv.contact_phone

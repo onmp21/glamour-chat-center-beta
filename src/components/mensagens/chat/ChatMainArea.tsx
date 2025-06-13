@@ -2,6 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
+import { ChatInput } from '@/components/mensagens/ChatInput';
 
 interface Message {
   id: string;
@@ -131,45 +132,13 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         )}
       </div>
 
-      {/* Message Input */}
-      <div className={cn(
-        "p-4 border-t",
-        isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
-      )}>
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="Digite sua mensagem..."
-            className={cn(
-              "flex-1 px-3 py-2 rounded-lg border",
-              isDarkMode 
-                ? "bg-[#333333] border-[#444444] text-white placeholder:text-gray-400"
-                : "bg-white border-gray-300 text-gray-900"
-            )}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                const target = e.target as HTMLInputElement;
-                if (target.value.trim()) {
-                  onSendMessage(target.value);
-                  target.value = '';
-                }
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-              if (input?.value.trim()) {
-                onSendMessage(input.value);
-                input.value = '';
-              }
-            }}
-            className="px-4 py-2 bg-[#b5103c] text-white rounded-lg hover:bg-[#9d0e34]"
-          >
-            Enviar
-          </button>
-        </div>
-      </div>
+      {/* Chat Input - usando o componente completo */}
+      <ChatInput
+        isDarkMode={isDarkMode}
+        onSendMessage={onSendMessage}
+        onSendFile={onSendFile}
+        onSendAudio={onSendAudio}
+      />
     </div>
   );
 };

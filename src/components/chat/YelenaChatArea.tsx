@@ -1,6 +1,7 @@
+
 import React, { useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored';
+import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -17,7 +18,7 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
   isDarkMode,
   className
 }) => {
-  const { messages, loading } = useChannelMessagesRefactored(channelId, conversationId);
+  const { messages, loading } = useLazyChannelMessages(channelId, conversationId);
   const leftMessagesEndRef = useRef<HTMLDivElement>(null);
   const rightMessagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -66,12 +67,11 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
 
   return (
     <div className={cn("grid grid-cols-2 h-full gap-1", className)}>
-      {/* Coluna Esquerda - Cliente (Pedro Vila Nova) */}
+      {/* Coluna Esquerda - Cliente */}
       <div className={cn(
         "flex flex-col border-r",
         isDarkMode ? "border-zinc-800 bg-zinc-950" : "border-gray-200 bg-gray-50"
       )}>
-        {/* Header Cliente */}
         <div className={cn(
           "p-3 border-b text-center font-medium",
           isDarkMode ? "border-zinc-800 text-[#fafafa] bg-zinc-900" : "border-gray-200 text-gray-900 bg-white"
@@ -79,7 +79,6 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
           Cliente
         </div>
         
-        {/* Mensagens do Cliente */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {customerMessages.length === 0 ? (
             <div className={cn(
@@ -90,8 +89,7 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
             </div>
           ) : (
             customerMessages.map((message, index) => {
-              // Get contact name from Nome_do_contato, nome_do_contato or fallback to "Cliente"
-              const contactName = message.Nome_do_contato || message.nome_do_contato || message.contactName || "Cliente";
+              const contactName = message.Nome_do_contato || message.nome_do_contato || "Cliente";
               
               return (
                 <div key={`customer-${message.id}-${index}`} className="flex justify-start">
@@ -125,7 +123,6 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
         "flex flex-col",
         isDarkMode ? "bg-zinc-950" : "bg-gray-50"
       )}>
-        {/* Header Agente */}
         <div className={cn(
           "p-3 border-b text-center font-medium",
           isDarkMode ? "border-zinc-800 text-[#fafafa] bg-zinc-900" : "border-gray-200 text-gray-900 bg-white"
@@ -133,7 +130,6 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
           Yelena
         </div>
         
-        {/* Mensagens do Agente */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {agentMessages.length === 0 ? (
             <div className={cn(
@@ -153,7 +149,10 @@ export const YelenaChatArea: React.FC<YelenaChatAreaProps> = ({
                     <span>{formatMessageTime(message.timestamp)}</span>
                     <span className="font-medium">Yelena</span>
                   </div>
-                  <div className="px-4 py-3 rounded-2xl rounded-br-md text-sm whitespace-pre-wrap bg-[#b5103c] text-white">
+                  <div className={cn(
+                    "px-4 py-3 rounded-2xl rounded-br-md text-sm whitespace-pre-wrap",
+                    "bg-[#b5103c] text-white"
+                  )}>
                     {message.content}
                   </div>
                 </div>
