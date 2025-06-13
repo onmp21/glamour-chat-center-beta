@@ -71,11 +71,11 @@ export class OptimizedMessageService {
 
       // Processar mensagens e otimizar base64
       const processedMessages = await Promise.all(
-        (data || []).map(async (row) => {
+        (data || []).map(async (row: any) => {
           const mappedMessage = repository.mapDatabaseRowToRawMessage(row);
           
           // Verificar se há base64 para otimizar
-          if (row.media_base64 && row.media_base64.startsWith('data:')) {
+          if (row.media_base64 && typeof row.media_base64 === 'string' && row.media_base64.startsWith('data:')) {
             console.log(`🔄 [OPTIMIZED_MESSAGE_SERVICE] Found base64 in message ${row.id}, scheduling optimization`);
             
             // Processar em background (não bloquear a UI)
