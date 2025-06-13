@@ -34,3 +34,18 @@ export interface TestProviderResult {
   success: boolean;
   message: string;
 }
+
+export interface ReportResult {
+  id: string;
+  content: string;
+  created_at: string;
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface ReportHistory {
+  id: string;
+  title: string;
+  generated_at: string;
+  provider_used: string;
+  status: 'success' | 'failed';
+}

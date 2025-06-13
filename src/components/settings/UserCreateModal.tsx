@@ -91,7 +91,14 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     setLoading(true);
 
     try {
-      await createUser(formData);
+      await createUser({
+        username: formData.username,
+        password: formData.password,
+        name: formData.name,
+        role: formData.role,
+        assignedTabs: formData.assignedTabs,
+        assignedCities: formData.assignedCities
+      });
       toast.success('Usuário criado com sucesso!');
       onUserCreated();
       onClose();

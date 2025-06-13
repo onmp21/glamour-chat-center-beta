@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react'
 import { AIProviderService } from '../services/AIProviderService'
 import { useAuth } from '../contexts/AuthContext'
@@ -5,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 export function useAIProviders() {
   const [providers, setProviders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
 
@@ -18,6 +20,19 @@ export function useAIProviders() {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshProviders = async () => {
+    try {
+      setRefreshing(true)
+      setError(null)
+      const data = await AIProviderService.getProviders()
+      setProviders(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar')
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -65,12 +80,13 @@ export function useAIProviders() {
   return {
     providers,
     loading,
+    refreshing,
     error,
     refetch: fetchProviders,
+    refreshProviders,
     createProvider,
     updateProvider,
     deleteProvider,
     testProvider
   }
 }
-

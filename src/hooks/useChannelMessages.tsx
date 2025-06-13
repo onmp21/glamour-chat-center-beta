@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { MessageService } from '@/services/MessageService';
-import { ChannelMessage } from '@/types/messages';
+import { ChannelMessage, CursorPaginationResult } from '@/types/messages';
 
 export interface UseChannelMessagesResult {
   messages: ChannelMessage[];
@@ -22,10 +22,16 @@ export const useChannelMessages = (channelId: string, conversationId?: string): 
       const messageService = new MessageService(channelId);
       if (conversationId) {
         const result = await messageService.getMessagesByConversation(conversationId);
-        return Array.isArray(result) ? result : result?.data || [];
+        if (Array.isArray(result)) {
+          return result;
+        }
+        return (result as CursorPaginationResult<ChannelMessage>)?.data || [];
       }
       const result = await messageService.getAllMessages();
-      return Array.isArray(result) ? result : result?.data || [];
+      if (Array.isArray(result)) {
+        return result;
+      }
+      return (result as CursorPaginationResult<ChannelMessage>)?.data || [];
     },
     refetchInterval: 5000,
   });
