@@ -6,8 +6,6 @@ import { MessageHistory } from './MessageHistory';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
-import { RawMessage } from '@/types/messages';
 
 interface ChatAreaProps {
   isDarkMode: boolean;
@@ -16,11 +14,11 @@ interface ChatAreaProps {
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, channelId }) => {
-  const { addMessage } = useLazyChannelMessages(channelId, conversation.id);
+  console.log('🎯 [CHAT_AREA] Rendering with:', { conversation: conversation.id, channelId });
 
-  // Função adaptadora para converter tipos
-  const handleAddMessage = (message: RawMessage) => {
-    addMessage(message);
+  const handleAddMessage = (message: any) => {
+    console.log('➕ [CHAT_AREA] Message added:', message.id);
+    // A funcionalidade será implementada posteriormente
   };
 
   return (
