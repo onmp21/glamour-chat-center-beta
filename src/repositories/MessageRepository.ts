@@ -38,19 +38,6 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`📋 [MESSAGE_REPOSITORY] Fetching ${limit} messages from ${this.tableName}`);
     
     try {
-      // Verificar se a tabela existe primeiro
-      const { data: tableExists } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', this.tableName)
-        .maybeSingle();
-
-      if (!tableExists) {
-        console.log(`⚠️ [MESSAGE_REPOSITORY] Table ${this.tableName} does not exist`);
-        return [];
-      }
-
       const { data, error } = await supabase
         .from(this.tableName as any)
         .select('*')

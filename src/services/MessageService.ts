@@ -138,20 +138,7 @@ export class MessageService {
     try {
       console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
       
-      // Verificar se a tabela existe
-      const { data: tableExists } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', tableName)
-        .maybeSingle();
-
-      if (!tableExists) {
-        console.log(`⚠️ [MESSAGE_SERVICE] Table ${tableName} does not exist`);
-        return [];
-      }
-
-      // Query otimizada sem timeout
+      // Query otimizada
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
@@ -201,19 +188,6 @@ export class MessageService {
     const tableName = repository.getTableName();
     
     try {
-      // Verificar se a tabela existe
-      const { data: tableExists } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .eq('table_name', tableName)
-        .maybeSingle();
-
-      if (!tableExists) {
-        console.log(`⚠️ [MESSAGE_SERVICE] Table ${tableName} does not exist`);
-        return { data: [] };
-      }
-
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
