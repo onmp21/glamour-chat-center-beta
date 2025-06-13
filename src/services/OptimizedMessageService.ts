@@ -29,56 +29,29 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting messages for conversation ${sessionId} from ${tableName}`);
       
-      // Query mais robusta com tratamento de diferentes estruturas de tabela
+      // Query ultra-simples - SELECT * para garantir que funciona em todas as tabelas
       const { data, error } = await supabase
         .from(tableName as any)
-        .select(`
-          id,
-          session_id,
-          message,
-          read_at,
-          tipo_remetente,
-          mensagemtype,
-          media_base64,
-          is_read,
-          Nome_do_contato,
-          nome_do_contato
-        `)
+        .select('*')
         .eq('session_id', sessionId)
-        .order('read_at', { ascending: true })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (error) {
         console.error(`❌ [OPTIMIZED_MESSAGE_SERVICE] Error getting messages:`, error);
-        
-        // Fallback: tentar query mais simples
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from(tableName as any)
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('id', { ascending: true })
-          .limit(limit);
-
-        if (fallbackError) {
-          console.error(`❌ [OPTIMIZED_MESSAGE_SERVICE] Fallback query also failed:`, fallbackError);
-          return { data: [] };
-        }
-
-        const mappedFallbackData = (fallbackData || []).map(row => repository.mapDatabaseRowToRawMessage(row));
-        console.log(`✅ [OPTIMIZED_MESSAGE_SERVICE] Fallback query successful: ${mappedFallbackData.length} messages`);
-        return { data: mappedFallbackData };
+        return { data: [] };
       }
 
-      // Processar mensagens e otimizar base64
-      const processedMessages = await Promise.all(
-        (data || []).map(async (row: any) => {
-          const mappedMessage = repository.mapDatabaseRowToRawMessage(row);
+      // Processar mensagens com mapeamento flexível
+      const processedMessages = (data || []).map((row: any) => {
+        const mappedMessage = this.mapRowToRawMessage(row);
+        
+        // Verificar se há base64 para otimizar (em background, sem bloquear)
+        if (row.media_base64 && typeof row.media_base64 === 'string' && row.media_base64.startsWith('data:')) {
+          console.log(`🔄 [OPTIMIZED_MESSAGE_SERVICE] Found base64 in message ${row.id}, scheduling optimization`);
           
-          // Verificar se há base64 para otimizar
-          if (row.media_base64 && typeof row.media_base64 === 'string' && row.media_base64.startsWith('data:')) {
-            console.log(`🔄 [OPTIMIZED_MESSAGE_SERVICE] Found base64 in message ${row.id}, scheduling optimization`);
-            
-            // Processar em background (não bloquear a UI)
+          // Processar em background (não bloquear a UI)
+          setTimeout(() => {
             MediaStorageService.processAndReplaceBase64(
               tableName,
               row.id,
@@ -86,11 +59,11 @@ export class OptimizedMessageService {
             ).catch(error => {
               console.error(`❌ [OPTIMIZED_MESSAGE_SERVICE] Background base64 processing failed:`, error);
             });
-          }
-          
-          return mappedMessage;
-        })
-      );
+          }, 100);
+        }
+        
+        return mappedMessage;
+      });
 
       console.log(`✅ [OPTIMIZED_MESSAGE_SERVICE] Successfully loaded ${processedMessages.length} messages for conversation ${sessionId}`);
       return { data: processedMessages };
@@ -101,6 +74,33 @@ export class OptimizedMessageService {
     }
   }
 
+  // Mapeamento flexível que funciona com qualquer estrutura de tabela
+  private mapRowToRawMessage(row: any): RawMessage {
+    return {
+      id: row.id?.toString() || '',
+      session_id: row.session_id || '',
+      message: row.message || '',
+      sender: this.determineSender(row),
+      timestamp: row.read_at || new Date().toISOString(),
+      content: row.message || '',
+      tipo_remetente: row.tipo_remetente,
+      mensagemtype: row.mensagemtype,
+      // Tratar ambos os formatos de nome de contato
+      Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
+      nome_do_contato: row.nome_do_contato || row.Nome_do_contato,
+      media_base64: row.media_base64,
+      read_at: row.read_at,
+      is_read: row.is_read // Pode ser undefined, não tem problema
+    };
+  }
+
+  private determineSender(row: any): 'customer' | 'agent' {
+    if (row.tipo_remetente === 'USUARIO_INTERNO' || row.tipo_remetente === 'Yelena-ai') {
+      return 'agent';
+    }
+    return 'customer';
+  }
+
   async getConversations(limit = 20): Promise<ChannelConversation[]> {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
@@ -108,19 +108,11 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting conversations from ${tableName}`);
       
-      // Query otimizada para buscar últimas mensagens por session_id
+      // Query simples para buscar conversas
       const { data, error } = await supabase
         .from(tableName as any)
-        .select(`
-          session_id,
-          message,
-          read_at,
-          is_read,
-          Nome_do_contato,
-          nome_do_contato,
-          mensagemtype
-        `)
-        .order('read_at', { ascending: false })
+        .select('*')
+        .order('id', { ascending: false })
         .limit(limit * 10); // Buscar mais para garantir que temos conversas suficientes
 
       if (error) {

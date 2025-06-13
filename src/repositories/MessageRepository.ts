@@ -19,8 +19,9 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       content: row.message || '',
       tipo_remetente: row.tipo_remetente,
       mensagemtype: row.mensagemtype,
+      // Flexível para ambos os formatos
       Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
-      nome_do_contato: row.nome_do_contato,
+      nome_do_contato: row.nome_do_contato || row.Nome_do_contato,
       media_base64: row.media_base64,
       read_at: row.read_at,
       is_read: row.is_read
@@ -38,6 +39,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`📋 [MESSAGE_REPOSITORY] Fetching ${limit} messages from ${this.tableName}`);
     
     try {
+      // Query ultra-simples
       const { data, error } = await supabase
         .from(this.tableName as any)
         .select('*')
@@ -62,7 +64,11 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     const insertData = {
       session_id: sessionId,
       message: message,
-      Nome_do_contato: contactName || 'Contato Anônimo',
+      // Usar o formato de nome correto para cada tabela
+      ...(this.tableName === 'yelena_ai_conversas' || this.tableName === 'gerente_externo_conversas' 
+        ? { Nome_do_contato: contactName || 'Contato Anônimo' }
+        : { nome_do_contato: contactName || 'Contato Anônimo' }
+      ),
       read_at: new Date().toISOString(),
       mensagemtype: 'conversation',
       tipo_remetente: 'sistema'
@@ -133,12 +139,19 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`✅ [MESSAGE_REPOSITORY] Marking messages as read for session ${sessionId}`);
     
     try {
+      // Tentar atualizar is_read se o campo existir, caso contrário, ignorar
+      const updateData: any = {
+        read_at: new Date().toISOString()
+      };
+
+      // Verificar se a tabela tem o campo is_read antes de tentar atualizar
+      if (this.tableName !== 'yelena_ai_conversas') {
+        updateData.is_read = true;
+      }
+
       const { error } = await supabase
         .from(this.tableName as any)
-        .update({ 
-          is_read: true,
-          read_at: new Date().toISOString() 
-        })
+        .update(updateData)
         .eq('session_id', sessionId);
 
       if (error) {

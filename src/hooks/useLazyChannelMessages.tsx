@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { MessageServiceV2 } from '@/services/MessageServiceV2';
+import { OptimizedMessageService } from '@/services/OptimizedMessageService';
 import { RawMessage } from '@/types/messages';
 
 export const useLazyChannelMessages = (channelId: string | null, conversationId: string | null) => {
@@ -20,15 +20,12 @@ export const useLazyChannelMessages = (channelId: string | null, conversationId:
       setError(null);
       console.log(`📋 [LAZY_MESSAGES] Loading messages for channel: ${channelId}, conversation: ${conversationId}`);
       
-      const messageService = new MessageServiceV2(channelId);
+      const messageService = new OptimizedMessageService(channelId);
       const result = await messageService.getMessagesByConversation(conversationId, 50);
       
-      setMessages(result.data);
+      setMessages(result.data || []);
       
-      console.log(`✅ [LAZY_MESSAGES] Successfully loaded ${result.data.length} messages`);
-      
-      // Iniciar otimização em background
-      messageService.processBackgroundOptimization();
+      console.log(`✅ [LAZY_MESSAGES] Successfully loaded ${result.data?.length || 0} messages`);
       
     } catch (err) {
       console.error(`❌ [LAZY_MESSAGES] Error loading messages:`, err);
