@@ -1,4 +1,3 @@
-
 export interface RawMessage {
   id: string;
   session_id: string;
@@ -26,6 +25,8 @@ export interface ChannelMessage {
   nome_do_contato?: string;
   mensagemtype?: string;
   contactName?: string;
+  isOwn?: boolean;
+  agentName?: string;
   fileData?: {
     fileName?: string;
     mimeType?: string;

@@ -1,7 +1,8 @@
+
 import { supabase } from '../lib/supabase';
 
 export interface ReportGenerationRequest {
-  provider_id: number
+  provider_id: string
   report_type: 'conversations' | 'channels' | 'custom'
   data: any
   custom_prompt?: string
@@ -15,7 +16,7 @@ export interface ReportHistoryOptions {
 }
 
 export class IntelligentReportsService {
-  private static readonly FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+  private static readonly FUNCTION_URL = `https://uxccfhptochnfomurulr.supabase.co/functions/v1`
 
   static async generateReport(request: ReportGenerationRequest) {
     try {
@@ -25,7 +26,7 @@ export class IntelligentReportsService {
         throw new Error('Usuário não autenticado')
       }
 
-      const response = await fetch(`${this.FUNCTION_URL}/intelligent-reports/generate`, {
+      const response = await fetch(`${this.FUNCTION_URL}/generate-report`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +60,7 @@ export class IntelligentReportsService {
       if (options.per_page) params.append('per_page', options.per_page.toString())
       if (options.report_type) params.append('report_type', options.report_type)
 
-      const response = await fetch(`${this.FUNCTION_URL}/intelligent-reports/history?${params}`, {
+      const response = await fetch(`${this.FUNCTION_URL}/generate-report/history?${params}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -78,7 +79,7 @@ export class IntelligentReportsService {
     }
   }
 
-  static async deleteReport(reportId: number) {
+  static async deleteReport(reportId: string) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
@@ -86,7 +87,7 @@ export class IntelligentReportsService {
         throw new Error('Usuário não autenticado')
       }
 
-      const response = await fetch(`${this.FUNCTION_URL}/intelligent-reports/${reportId}`, {
+      const response = await fetch(`${this.FUNCTION_URL}/generate-report/${reportId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -105,4 +106,3 @@ export class IntelligentReportsService {
     }
   }
 }
-

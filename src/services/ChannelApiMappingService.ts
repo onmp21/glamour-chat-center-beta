@@ -161,7 +161,8 @@ export class ChannelApiMappingService {
       media_base64: message.media_base64
     };
 
-    const { error } = await supabase
+    // Use dynamic query with type assertion
+    const { error } = await (supabase as any)
       .from(tableName)
       .insert(dbMessage);
 
