@@ -1,404 +1,251 @@
+
+import { supabase } from '@/integrations/supabase/client';
+import { RawMessage, CursorPaginationResult } from '@/types/messages';
+import { TableName } from '@/utils/channelMapping';
+
 export interface PaginationOptions {
-  page: number;
-  limit: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  filters?: Record<string, any>;
-}
-
-export interface PaginationResult<T> {
-  data: T[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  };
-}
-
-export interface CursorPaginationOptions {
-  limit: number;
+  limit?: number;
   cursor?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  filters?: Record<string, any>;
-}
-
-export interface CursorPaginationResult<T> {
-  data: T[];
-  nextCursor?: string;
-  hasMore: boolean;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
 }
 
 export class PaginationService {
-  /**
-   * Implementa paginação offset-based para grandes volumes de dados
-   */
-  static async paginateQuery<T>(
-    tableName: string,
-    options: PaginationOptions
-  ): Promise<PaginationResult<T>> {
+  async getPaginatedMessages(
+    tableName: TableName,
+    options: PaginationOptions = {}
+  ): Promise<CursorPaginationResult<RawMessage>> {
+    const {
+      limit = 50,
+      cursor,
+      sortField = 'id',
+      sortDirection = 'desc'
+    } = options;
+
     try {
-      console.log('📄 [PAGINATION] Iniciando paginação offset-based:', {
-        tableName,
-        page: options.page,
-        limit: options.limit,
-        sortBy: options.sortBy,
-        filters: options.filters
-      });
-
-      const { page, limit, sortBy = 'id', sortOrder = 'desc', filters } = options;
-      const offset = (page - 1) * limit;
-
-      // Construir query base
       let query = supabase
         .from(tableName)
-        .select('*', { count: 'exact' });
+        .select('*')
+        .order(sortField, { ascending: sortDirection === 'asc' })
+        .limit(limit + 1); // +1 to check if there are more records
 
-      // Aplicar filtros
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            if (typeof value === 'string' && value.includes('%')) {
-              query = query.ilike(key, value);
-            } else {
-              query = query.eq(key, value);
-            }
-          }
-        });
-      }
-
-      // Aplicar ordenação e paginação
-      query = query
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
-
-      if (error) {
-        console.error('❌ [PAGINATION] Erro na query:', error);
-        throw error;
-      }
-
-      const totalItems = count || 0;
-      const totalPages = Math.ceil(totalItems / limit);
-
-      const result: PaginationResult<T> = {
-        data: (data || []) as T[],
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalItems,
-          itemsPerPage: limit,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1
-        }
-      };
-
-      console.log('✅ [PAGINATION] Paginação concluída:', {
-        itemsReturned: result.data.length,
-        totalItems,
-        totalPages,
-        currentPage: page
-      });
-
-      return result;
-
-    } catch (error) {
-      console.error('❌ [PAGINATION] Erro na paginação:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Implementa paginação cursor-based para melhor performance em grandes datasets
-   */
-  static async paginateWithCursor<T>(
-    tableName: string,
-    options: CursorPaginationOptions
-  ): Promise<CursorPaginationResult<T>> {
-    try {
-      console.log('🔄 [CURSOR_PAGINATION] Iniciando paginação cursor-based:', {
-        tableName,
-        limit: options.limit,
-        cursor: options.cursor,
-        sortBy: options.sortBy
-      });
-
-      const { limit, cursor, sortBy = 'id', sortOrder = 'desc', filters } = options;
-
-      // Construir query base
-      let query = supabase
-        .from(tableName)
-        .select('*');
-
-      // Aplicar filtros
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            if (typeof value === 'string' && value.includes('%')) {
-              query = query.ilike(key, value);
-            } else {
-              query = query.eq(key, value);
-            }
-          }
-        });
-      }
-
-      // Aplicar cursor se fornecido
+      // Apply cursor-based pagination
       if (cursor) {
-        if (sortOrder === 'asc') {
-          query = query.gt(sortBy, cursor);
-        } else {
-          query = query.lt(sortBy, cursor);
-        }
+        const operator = sortDirection === 'asc' ? 'gt' : 'lt';
+        query = query[operator](sortField, cursor);
       }
-
-      // Buscar um item a mais para verificar se há próxima página
-      query = query
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .limit(limit + 1);
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ [CURSOR_PAGINATION] Erro na query:', error);
+        console.error(`❌ [PAGINATION_SERVICE] Error fetching paginated data from ${tableName}:`, error);
         throw error;
       }
 
-      const items = (data || []) as T[];
-      const hasMore = items.length > limit;
+      const messages = (data || []).map(this.mapDatabaseRowToRawMessage);
+      const hasMore = messages.length > limit;
       
-      // Remover o item extra se existir
       if (hasMore) {
-        items.pop();
+        messages.pop(); // Remove the extra record used for hasMore check
       }
 
-      // Determinar próximo cursor
-      let nextCursor: string | undefined;
-      if (hasMore && items.length > 0) {
-        const lastItem = items[items.length - 1] as any;
-        nextCursor = lastItem[sortBy];
-      }
+      const nextCursor = hasMore && messages.length > 0
+        ? messages[messages.length - 1][sortField as keyof RawMessage]?.toString()
+        : undefined;
 
-      const result: CursorPaginationResult<T> = {
-        data: items,
+      return {
+        data: messages,
         nextCursor,
         hasMore
       };
-
-      console.log('✅ [CURSOR_PAGINATION] Paginação concluída:', {
-        itemsReturned: result.data.length,
-        hasMore,
-        nextCursor
-      });
-
-      return result;
-
     } catch (error) {
-      console.error('❌ [CURSOR_PAGINATION] Erro na paginação:', error);
+      console.error(`❌ [PAGINATION_SERVICE] Pagination error:`, error);
       throw error;
     }
   }
 
-  /**
-   * Paginação otimizada para mensagens (mais recentes primeiro)
-   */
-  static async paginateMessages<T>(
-    tableName: string,
-    sessionId?: string,
-    options: Partial<CursorPaginationOptions> = {}
-  ): Promise<CursorPaginationResult<T>> {
-    const defaultOptions: CursorPaginationOptions = {
-      limit: 50,
-      sortBy: 'timestamp',
-      sortOrder: 'desc',
-      ...options
-    };
+  async getPaginatedConversations(
+    tableName: TableName,
+    options: PaginationOptions = {}
+  ): Promise<CursorPaginationResult<any>> {
+    const {
+      limit = 20,
+      cursor,
+      sortField = 'last_message_time',
+      sortDirection = 'desc'
+    } = options;
 
-    // Adicionar filtro de sessão se fornecido
-    if (sessionId) {
-      defaultOptions.filters = {
-        ...defaultOptions.filters,
-        session_id: sessionId
-      };
-    }
-
-    return this.paginateWithCursor<T>(tableName, defaultOptions);
-  }
-
-  /**
-   * Busca com paginação e pesquisa de texto
-   */
-  static async searchWithPagination<T>(
-    tableName: string,
-    searchTerm: string,
-    searchFields: string[],
-    options: Partial<PaginationOptions> = {}
-  ): Promise<PaginationResult<T>> {
     try {
-      console.log('🔍 [SEARCH_PAGINATION] Iniciando busca paginada:', {
-        tableName,
-        searchTerm,
-        searchFields,
-        options
-      });
-
-      const defaultOptions: PaginationOptions = {
-        page: 1,
-        limit: 20,
-        sortBy: 'id',
-        sortOrder: 'desc',
-        ...options
-      };
-
-      const { page, limit, sortBy, sortOrder } = defaultOptions;
-      const offset = (page - 1) * limit;
-
-      // Construir query de busca
-      let query = supabase
-        .from(tableName)
-        .select('*', { count: 'exact' });
-
-      // Aplicar busca em múltiplos campos
-      if (searchTerm && searchFields.length > 0) {
-        const searchConditions = searchFields.map(field => 
-          `${field}.ilike.%${searchTerm}%`
-        ).join(',');
-        
-        query = query.or(searchConditions);
-      }
-
-      // Aplicar ordenação e paginação
-      query = query
-        .order(sortBy, { ascending: sortOrder === 'asc' })
-        .range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
+      // Get unique conversations with latest message info
+      const { data: conversations, error } = await supabase
+        .rpc('get_paginated_conversations', {
+          table_name: tableName,
+          page_limit: limit + 1,
+          cursor_value: cursor,
+          sort_field: sortField,
+          sort_direction: sortDirection
+        });
 
       if (error) {
-        console.error('❌ [SEARCH_PAGINATION] Erro na busca:', error);
+        console.error(`❌ [PAGINATION_SERVICE] Error fetching paginated conversations:`, error);
         throw error;
       }
 
-      const totalItems = count || 0;
-      const totalPages = Math.ceil(totalItems / limit);
+      const hasMore = conversations && conversations.length > limit;
+      
+      if (hasMore && conversations) {
+        conversations.pop(); // Remove the extra record
+      }
 
-      const result: PaginationResult<T> = {
-        data: (data || []) as T[],
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalItems,
-          itemsPerPage: limit,
-          hasNextPage: page < totalPages,
-          hasPreviousPage: page > 1
-        }
+      const nextCursor = hasMore && conversations && conversations.length > 0
+        ? conversations[conversations.length - 1][sortField]
+        : undefined;
+
+      return {
+        data: conversations || [],
+        nextCursor,
+        hasMore
       };
-
-      console.log('✅ [SEARCH_PAGINATION] Busca concluída:', {
-        searchTerm,
-        itemsFound: result.data.length,
-        totalItems
-      });
-
-      return result;
-
     } catch (error) {
-      console.error('❌ [SEARCH_PAGINATION] Erro na busca:', error);
+      console.error(`❌ [PAGINATION_SERVICE] Conversation pagination error:`, error);
       throw error;
     }
   }
 
-  /**
-   * Paginação com agregações (contadores, somas, etc.)
-   */
-  static async paginateWithAggregations<T>(
-    tableName: string,
-    options: PaginationOptions,
-    aggregations?: {
-      count?: string[];
-      sum?: string[];
-      avg?: string[];
+  private mapDatabaseRowToRawMessage(row: any): RawMessage {
+    return {
+      id: row.id?.toString() || '',
+      session_id: row.session_id || '',
+      message: row.message || '',
+      sender: this.determineSender(row),
+      timestamp: row.read_at || new Date().toISOString(),
+      content: row.message || '',
+      tipo_remetente: row.tipo_remetente,
+      mensagemtype: row.mensagemtype,
+      Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
+      nome_do_contato: row.nome_do_contato,
+      media_base64: row.media_base64,
+      read_at: row.read_at,
+      is_read: row.is_read
+    };
+  }
+
+  private determineSender(row: any): 'customer' | 'agent' {
+    if (row.tipo_remetente === 'USUARIO_INTERNO' || row.tipo_remetente === 'Yelena-ai') {
+      return 'agent';
     }
-  ): Promise<PaginationResult<T> & { aggregations?: Record<string, any> }> {
+    return 'customer';
+  }
+
+  async searchMessages(
+    tableName: TableName,
+    searchTerm: string,
+    options: PaginationOptions = {}
+  ): Promise<CursorPaginationResult<RawMessage>> {
+    const {
+      limit = 50,
+      cursor,
+      sortField = 'id',
+      sortDirection = 'desc'
+    } = options;
+
     try {
-      console.log('📊 [AGGREGATION_PAGINATION] Iniciando paginação com agregações:', {
-        tableName,
-        options,
-        aggregations
-      });
+      let query = supabase
+        .from(tableName)
+        .select('*')
+        .or(`message.ilike.%${searchTerm}%,Nome_do_contato.ilike.%${searchTerm}%,session_id.ilike.%${searchTerm}%`)
+        .order(sortField, { ascending: sortDirection === 'asc' })
+        .limit(limit + 1);
 
-      // Buscar dados paginados
-      const paginatedResult = await this.paginateQuery<T>(tableName, options);
-
-      // Buscar agregações se solicitadas
-      let aggregationResults: Record<string, any> = {};
-      
-      if (aggregations) {
-        // Construir query para agregações
-        let aggQuery = supabase.from(tableName);
-
-        // Aplicar mesmos filtros da paginação
-        if (options.filters) {
-          Object.entries(options.filters).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-              if (typeof value === 'string' && value.includes('%')) {
-                aggQuery = aggQuery.ilike(key, value);
-              } else {
-                aggQuery = aggQuery.eq(key, value);
-              }
-            }
-          });
-        }
-
-        // Executar agregações (simplificado - em produção usaria funções SQL)
-        const { data: allData } = await aggQuery.select('*');
-        
-        if (allData) {
-          // Calcular agregações manualmente
-          if (aggregations.count) {
-            aggregations.count.forEach(field => {
-              aggregationResults[`${field}_count`] = allData.filter(item => 
-                (item as any)[field] !== null && (item as any)[field] !== undefined
-              ).length;
-            });
-          }
-
-          if (aggregations.sum) {
-            aggregations.sum.forEach(field => {
-              aggregationResults[`${field}_sum`] = allData.reduce((sum, item) => 
-                sum + (Number((item as any)[field]) || 0), 0
-              );
-            });
-          }
-
-          if (aggregations.avg) {
-            aggregations.avg.forEach(field => {
-              const values = allData.map(item => Number((item as any)[field]) || 0);
-              const sum = values.reduce((a, b) => a + b, 0);
-              aggregationResults[`${field}_avg`] = values.length > 0 ? sum / values.length : 0;
-            });
-          }
-        }
+      if (cursor) {
+        const operator = sortDirection === 'asc' ? 'gt' : 'lt';
+        query = query[operator](sortField, cursor);
       }
 
-      console.log('✅ [AGGREGATION_PAGINATION] Paginação com agregações concluída:', {
-        itemsReturned: paginatedResult.data.length,
-        aggregations: aggregationResults
-      });
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`❌ [PAGINATION_SERVICE] Error searching messages:`, error);
+        throw error;
+      }
+
+      const messages = (data || []).map(this.mapDatabaseRowToRawMessage);
+      const hasMore = messages.length > limit;
+      
+      if (hasMore) {
+        messages.pop();
+      }
+
+      const nextCursor = hasMore && messages.length > 0
+        ? messages[messages.length - 1][sortField as keyof RawMessage]?.toString()
+        : undefined;
 
       return {
-        ...paginatedResult,
-        aggregations: aggregationResults
+        data: messages,
+        nextCursor,
+        hasMore
       };
-
     } catch (error) {
-      console.error('❌ [AGGREGATION_PAGINATION] Erro na paginação com agregações:', error);
+      console.error(`❌ [PAGINATION_SERVICE] Search error:`, error);
+      throw error;
+    }
+  }
+
+  async getMessagesByDateRange(
+    tableName: TableName,
+    startDate: string,
+    endDate: string,
+    options: PaginationOptions = {}
+  ): Promise<CursorPaginationResult<RawMessage>> {
+    const {
+      limit = 50,
+      cursor,
+      sortField = 'read_at',
+      sortDirection = 'desc'
+    } = options;
+
+    try {
+      let query = supabase
+        .from(tableName)
+        .select('*')
+        .gte('read_at', startDate)
+        .lte('read_at', endDate)
+        .order(sortField, { ascending: sortDirection === 'asc' })
+        .limit(limit + 1);
+
+      if (cursor) {
+        const operator = sortDirection === 'asc' ? 'gt' : 'lt';
+        query = query[operator](sortField, cursor);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error(`❌ [PAGINATION_SERVICE] Error fetching messages by date range:`, error);
+        throw error;
+      }
+
+      const messages = (data || []).map(this.mapDatabaseRowToRawMessage);
+      const hasMore = messages.length > limit;
+      
+      if (hasMore) {
+        messages.pop();
+      }
+
+      const nextCursor = hasMore && messages.length > 0
+        ? messages[messages.length - 1][sortField as keyof RawMessage]?.toString()
+        : undefined;
+
+      return {
+        data: messages,
+        nextCursor,
+        hasMore
+      };
+    } catch (error) {
+      console.error(`❌ [PAGINATION_SERVICE] Date range error:`, error);
       throw error;
     }
   }
 }
 
+export const paginationService = new PaginationService();

@@ -69,7 +69,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({
     assigned_cities: user.assignedCities || [],
     is_active: true, // Default to active since the User type doesn't have this field
     created_at: user.createdAt || new Date().toISOString(),
-    updated_at: user.updatedAt || new Date().toISOString()
+    updated_at: user.createdAt || new Date().toISOString() // Use createdAt as fallback
   }));
 
   const filteredUsers = databaseUsers.filter(user =>

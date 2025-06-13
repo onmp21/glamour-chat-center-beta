@@ -9,6 +9,31 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     super(tableName);
   }
 
+  private mapDatabaseRowToRawMessage(row: any): RawMessage {
+    return {
+      id: row.id?.toString() || '',
+      session_id: row.session_id || '',
+      message: row.message || '',
+      sender: this.determineSender(row),
+      timestamp: row.read_at || new Date().toISOString(),
+      content: row.message || '',
+      tipo_remetente: row.tipo_remetente,
+      mensagemtype: row.mensagemtype,
+      Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
+      nome_do_contato: row.nome_do_contato,
+      media_base64: row.media_base64,
+      read_at: row.read_at,
+      is_read: row.is_read
+    };
+  }
+
+  private determineSender(row: any): 'customer' | 'agent' {
+    if (row.tipo_remetente === 'USUARIO_INTERNO' || row.tipo_remetente === 'Yelena-ai') {
+      return 'agent';
+    }
+    return 'customer';
+  }
+
   async insertMessage(sessionId: string, message: string, contactName?: string): Promise<RawMessage> {
     const insertData = {
       session_id: sessionId,
@@ -21,7 +46,8 @@ export class MessageRepository extends BaseRepository<RawMessage> {
 
     console.log(`💾 [MESSAGE_REPOSITORY] Inserting message into ${this.tableName}`);
     
-    return await this.create(insertData);
+    const created = await this.create(insertData);
+    return this.mapDatabaseRowToRawMessage(created);
   }
 
   async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
@@ -37,7 +63,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       throw error;
     }
 
-    return data || [];
+    return (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
   }
 
   async findMessagesAfterTimestamp(timestamp: string): Promise<{ data: RawMessage[] | null; error: any }> {
@@ -46,14 +72,17 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     const { data, error } = await supabase
       .from(this.tableName)
       .select('*')
-      .gt('read_at', timestamp)      .order("id", { ascending: true })
+      .gt('read_at', timestamp)
+      .order("id", { ascending: true })
       .limit(1000);
+
     if (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error fetching messages after timestamp from ${this.tableName}:`, error);
       return { data: null, error };
     }
 
-    return { data, error: null };
+    const mappedData = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+    return { data: mappedData, error: null };
   }
 
   async markAsRead(sessionId: string): Promise<void> {
