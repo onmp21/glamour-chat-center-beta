@@ -149,7 +149,7 @@ serve(async (req) => {
         );
       }
 
-      // Preparar dados para inserção
+      // Preparar dados para inserção - começar com campos obrigatórios
       const insertData: any = {
         session_id: sessionId,
         message: messageContent,
@@ -166,63 +166,85 @@ serve(async (req) => {
         insertData.media_base64 = mediaBase64;
       }
 
-      // Adicionar is_read se a tabela suportar
+      // Adicionar is_read apenas se a tabela suportar
       if (tableConfig.hasIsRead) {
         insertData.is_read = false;
       }
 
-      console.log(`💾 [WEBHOOK_UNIVERSAL] Saving to ${tableName}:`, {
+      console.log(`💾 [WEBHOOK_UNIVERSAL] Preparing to save to ${tableName}:`, {
         session_id: insertData.session_id,
         contactNameField: tableConfig.contactNameField,
         contactName: insertData[tableConfig.contactNameField],
         messageType: insertData.mensagemtype,
         hasMedia: !!insertData.media_base64,
-        tipoRemetente: insertData.tipo_remetente
+        tipoRemetente: insertData.tipo_remetente,
+        hasIsRead: tableConfig.hasIsRead,
+        insertDataKeys: Object.keys(insertData)
       });
 
-      // Inserir no Supabase
-      const { data: insertResult, error } = await supabase
-        .from(tableName)
-        .insert([insertData])
-        .select();
+      // Inserir no Supabase com tratamento de erro melhorado
+      try {
+        const { data: insertResult, error } = await supabase
+          .from(tableName)
+          .insert([insertData])
+          .select();
 
-      if (error) {
-        console.error(`❌ [WEBHOOK_UNIVERSAL] Error saving message:`, {
-          error: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+        if (error) {
+          console.error(`❌ [WEBHOOK_UNIVERSAL] Database error details:`, {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            tableName,
+            insertData: JSON.stringify(insertData, null, 2)
+          });
+          
+          return new Response(
+            JSON.stringify({ 
+              error: 'Database error', 
+              details: error.message,
+              code: error.code,
+              tableName,
+              contactNameField: tableConfig.contactNameField 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log(`✅ [WEBHOOK_UNIVERSAL] Message saved successfully:`, {
           tableName,
-          insertData
+          messageId: insertResult?.[0]?.id,
+          sessionId: insertData.session_id,
+          contactName: insertData[tableConfig.contactNameField]
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            tableName,
+            messageId: insertResult?.[0]?.id,
+            instance 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+
+      } catch (dbError) {
+        console.error(`❌ [WEBHOOK_UNIVERSAL] Database operation failed:`, {
+          error: dbError.message || 'Unknown database error',
+          stack: dbError.stack,
+          tableName,
+          insertData: JSON.stringify(insertData, null, 2)
         });
         
         return new Response(
           JSON.stringify({ 
-            error: 'Database error', 
-            details: error.message,
-            tableName,
-            contactNameField: tableConfig.contactNameField 
+            error: 'Database operation failed',
+            details: dbError.message || 'Unknown error',
+            tableName 
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      console.log(`✅ [WEBHOOK_UNIVERSAL] Message saved successfully:`, {
-        tableName,
-        messageId: insertResult?.[0]?.id,
-        sessionId: insertData.session_id,
-        contactName: insertData[tableConfig.contactNameField]
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          tableName,
-          messageId: insertResult?.[0]?.id,
-          instance 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Para outros tipos de eventos, apenas log
@@ -234,12 +256,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ [WEBHOOK_UNIVERSAL] Unexpected error:', error);
+    console.error('❌ [WEBHOOK_UNIVERSAL] Unexpected error:', {
+      message: error.message || 'Unknown error',
+      stack: error.stack || 'No stack trace',
+      name: error.name || 'Unknown error type'
+    });
     
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        details: error.message 
+        details: error.message || 'Unknown error'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
