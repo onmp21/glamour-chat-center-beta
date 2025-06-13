@@ -1,4 +1,3 @@
-
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
 import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
@@ -29,7 +28,7 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting messages for conversation ${sessionId} from ${tableName}`);
       
-      // Query ultra-simples - SELECT * para garantir que funciona em todas as tabelas
+      // Query ultra-simples - SELECT * sem dependência de autenticação
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
@@ -42,7 +41,7 @@ export class OptimizedMessageService {
         return { data: [] };
       }
 
-      // Processar mensagens com mapeamento flexível
+      // Processar mensagens com mapeamento dinâmico
       const processedMessages = (data || []).map((row: any) => {
         const mappedMessage = this.mapRowToRawMessage(row);
         
@@ -74,8 +73,11 @@ export class OptimizedMessageService {
     }
   }
 
-  // Mapeamento flexível que funciona com qualquer estrutura de tabela
+  // Mapeamento dinâmico que funciona com qualquer estrutura de tabela
   private mapRowToRawMessage(row: any): RawMessage {
+    // Mapear nome do contato dinamicamente (diferentes formatos entre tabelas)
+    const contactName = row.Nome_do_contato || row.nome_do_contato || 'Contato Anônimo';
+    
     return {
       id: row.id?.toString() || '',
       session_id: row.session_id || '',
@@ -86,11 +88,11 @@ export class OptimizedMessageService {
       tipo_remetente: row.tipo_remetente,
       mensagemtype: row.mensagemtype,
       // Tratar ambos os formatos de nome de contato
-      Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
-      nome_do_contato: row.nome_do_contato || row.Nome_do_contato,
+      Nome_do_contato: contactName,
+      nome_do_contato: contactName,
       media_base64: row.media_base64,
       read_at: row.read_at,
-      is_read: row.is_read // Pode ser undefined, não tem problema
+      is_read: row.is_read // Pode ser undefined para tabelas que não têm este campo
     };
   }
 
@@ -108,12 +110,12 @@ export class OptimizedMessageService {
     try {
       console.log(`📋 [OPTIMIZED_MESSAGE_SERVICE] Getting conversations from ${tableName}`);
       
-      // Query simples para buscar conversas
+      // Query simples sem dependência de autenticação
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
         .order('id', { ascending: false })
-        .limit(limit * 10); // Buscar mais para garantir que temos conversas suficientes
+        .limit(limit * 10);
 
       if (error) {
         console.error(`❌ [OPTIMIZED_MESSAGE_SERVICE] Error getting conversations:`, error);
@@ -137,15 +139,21 @@ export class OptimizedMessageService {
             contactName = this.extractPhoneFromSessionId(sessionId);
           }
 
+          // Determinar status baseado no is_read (se existir)
+          let status: 'unread' | 'in_progress' | 'resolved' = 'unread';
+          if (message.is_read !== undefined) {
+            status = message.is_read ? 'resolved' : 'unread';
+          }
+
           conversationsMap.set(sessionId, {
             id: sessionId,
             contact_name: contactName,
             contact_phone: this.extractPhoneFromSessionId(sessionId),
             last_message: this.formatLastMessage(message.message, message.mensagemtype),
             last_message_time: message.read_at || new Date().toISOString(),
-            status: message.is_read ? 'resolved' : 'unread',
+            status: status,
             updated_at: message.read_at || new Date().toISOString(),
-            unread_count: message.is_read ? 0 : 1
+            unread_count: status === 'unread' ? 1 : 0
           });
         }
       });

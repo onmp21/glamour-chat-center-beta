@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { BaseRepository } from './BaseRepository';
 import { RawMessage } from '@/types/messages';
@@ -10,6 +9,9 @@ export class MessageRepository extends BaseRepository<RawMessage> {
   }
 
   mapDatabaseRowToRawMessage(row: any): RawMessage {
+    // Mapear nome do contato dinamicamente
+    const contactName = row.Nome_do_contato || row.nome_do_contato || 'Contato Anônimo';
+    
     return {
       id: row.id?.toString() || '',
       session_id: row.session_id || '',
@@ -19,12 +21,12 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       content: row.message || '',
       tipo_remetente: row.tipo_remetente,
       mensagemtype: row.mensagemtype,
-      // Flexível para ambos os formatos
-      Nome_do_contato: row.Nome_do_contato || row.nome_do_contato,
-      nome_do_contato: row.nome_do_contato || row.Nome_do_contato,
+      // Mapear ambos os formatos
+      Nome_do_contato: contactName,
+      nome_do_contato: contactName,
       media_base64: row.media_base64,
       read_at: row.read_at,
-      is_read: row.is_read
+      is_read: row.is_read // Opcional - pode ser undefined
     };
   }
 
@@ -39,7 +41,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`📋 [MESSAGE_REPOSITORY] Fetching ${limit} messages from ${this.tableName}`);
     
     try {
-      // Query ultra-simples
+      // Query simples sem dependência de autenticação
       const { data, error } = await supabase
         .from(this.tableName as any)
         .select('*')
@@ -56,6 +58,32 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       return messages;
     } catch (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error in findAll for ${this.tableName}:`, error);
+      return [];
+    }
+  }
+
+  async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
+    console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages by phone ${phoneNumber} in ${this.tableName}`);
+    
+    try {
+      // Query simples sem dependência de autenticação
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .ilike("session_id", `%${phoneNumber}%`)
+        .order("id", { ascending: true })
+        .limit(100);
+
+      if (error) {
+        console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
+        return [];
+      }
+
+      const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
+      console.log(`✅ [MESSAGE_REPOSITORY] Found ${messages.length} messages for phone ${phoneNumber}`);
+      return messages;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_REPOSITORY] Error in findByPhoneNumber:`, error);
       return [];
     }
   }
@@ -82,31 +110,6 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     } catch (error) {
       console.error(`❌ [MESSAGE_REPOSITORY] Error inserting message:`, error);
       throw error;
-    }
-  }
-
-  async findByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
-    console.log(`🔍 [MESSAGE_REPOSITORY] Finding messages by phone ${phoneNumber} in ${this.tableName}`);
-    
-    try {
-      const { data, error } = await supabase
-        .from(this.tableName as any)
-        .select('*')
-        .ilike("session_id", `%${phoneNumber}%`)
-        .order("id", { ascending: true })
-        .limit(100);
-
-      if (error) {
-        console.error(`❌ [MESSAGE_REPOSITORY] Error fetching by phone from ${this.tableName}:`, error);
-        return [];
-      }
-
-      const messages = (data || []).map(row => this.mapDatabaseRowToRawMessage(row));
-      console.log(`✅ [MESSAGE_REPOSITORY] Found ${messages.length} messages for phone ${phoneNumber}`);
-      return messages;
-    } catch (error) {
-      console.error(`❌ [MESSAGE_REPOSITORY] Error in findByPhoneNumber:`, error);
-      return [];
     }
   }
 
@@ -139,7 +142,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     console.log(`✅ [MESSAGE_REPOSITORY] Marking messages as read for session ${sessionId}`);
     
     try {
-      // Tentar atualizar is_read se o campo existir, caso contrário, ignorar
+      // Tentar atualizar is_read se o campo existir
       const updateData: any = {
         read_at: new Date().toISOString()
       };

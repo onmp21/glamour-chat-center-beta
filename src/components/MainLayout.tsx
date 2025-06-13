@@ -7,6 +7,7 @@ import { LayoutProvider } from './layout/LayoutProvider';
 import { SEOProvider } from './layout/SEOProvider';
 import { MainLayoutContainer } from './layout/MainLayoutContainer';
 import { useLayout } from './layout/LayoutProvider';
+import { AuthDebug } from './debug/AuthDebug';
 
 import { ChannelProvider } from '@/contexts/ChannelContext';
 
@@ -22,6 +23,7 @@ const MainLayoutContent: React.FC = () => {
         keywords="login, acesso, glamour chat center, atendimento"
       >
         <LoginForm />
+        <AuthDebug />
       </SEOHead>
     );
   }
@@ -29,6 +31,7 @@ const MainLayoutContent: React.FC = () => {
   return (
     <SEOProvider activeSection={activeSection}>
       <MainLayoutContainer />
+      <AuthDebug />
     </SEOProvider>
   );
 };
