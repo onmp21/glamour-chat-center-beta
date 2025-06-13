@@ -15,13 +15,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const savedUser = localStorage.getItem('villa_glamour_user');
     if (savedUser) {
       const user = JSON.parse(savedUser);
+      console.log('🔐 [AUTH] Usuário restaurado do localStorage:', user.name);
       setAuthState({ user, isAuthenticated: true });
+    } else {
+      console.log('🔐 [AUTH] Nenhum usuário no localStorage');
     }
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     try {
-      console.log('Tentando fazer login com:', credentials.username);
+      console.log('🔐 [AUTH] Tentando fazer login com:', credentials.username);
       
       // BYPASS TEMPORÁRIO APENAS PARA DEMONSTRAÇÃO - CONFIGURAR SUPABASE EM PRODUÇÃO
       if (credentials.username === 'demo' && credentials.password === 'demo') {
@@ -37,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setAuthState({ user, isAuthenticated: true });
         localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('Login demo realizado com sucesso');
+        console.log('🔐 [AUTH] Login demo realizado com sucesso');
         return true;
       }
       
@@ -49,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         input_password: credentials.password
       });
 
-      console.log('Resultado verificação usuário:', { userData, userError });
+      console.log('🔐 [AUTH] Resultado verificação usuário:', { userData, userError });
 
       if (!userError && userData && userData.length > 0) {
         const userInfo = userData[0];
@@ -65,24 +68,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setAuthState({ user, isAuthenticated: true });
         localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('Login realizado com sucesso para usuário:', user.role);
+        console.log('🔐 [AUTH] Login realizado com sucesso para usuário:', user.role);
         return true;
       }
 
       // Se chegou aqui, as credenciais são inválidas
-      console.log('Credenciais inválidas ou usuário não encontrado');
+      console.log('🔐 [AUTH] Credenciais inválidas ou usuário não encontrado');
       return false;
       
     } catch (error) {
-      console.error('Erro durante login:', error);
+      console.error('🔐 [AUTH] Erro durante login:', error);
       return false;
     }
   };
 
   const logout = () => {
+    console.log('🔐 [AUTH] Fazendo logout');
     setAuthState({ user: null, isAuthenticated: false });
     localStorage.removeItem('villa_glamour_user');
   };
+
+  // Debug do estado de autenticação
+  useEffect(() => {
+    console.log('🔐 [AUTH] Estado atual:', {
+      isAuthenticated: authState.isAuthenticated,
+      user: authState.user?.name || 'nenhum'
+    });
+  }, [authState]);
 
   return (
     <AuthContext.Provider value={{

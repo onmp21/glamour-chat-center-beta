@@ -49,21 +49,35 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_MESSAGES] Loading from table: ${tableName}, session: ${sessionId}`);
 
-      // Query ultra-simples - SELECT * direto
-      const { data, error } = await supabase
+      // Query corrigida - especificar campos explicitamente para evitar erros
+      const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select('*')
+        .select('id, session_id, message, read_at, tipo_remetente, Nome_do_contato, nome_do_contato, mensagemtype, media_base64')
         .eq('session_id', sessionId)
-        .order('id', { ascending: true });
+        .order('read_at', { ascending: true });
 
-      if (error) {
-        console.error('❌ [SIMPLE_MESSAGES] Query error:', error);
-        setError(error.message);
+      if (queryError) {
+        console.error('❌ [SIMPLE_MESSAGES] Query error:', queryError);
+        setError(queryError.message);
         return;
       }
 
-      console.log(`✅ [SIMPLE_MESSAGES] Loaded ${data?.length || 0} messages`);
-      setMessages(data || []);
+      console.log(`✅ [SIMPLE_MESSAGES] Loaded ${rawData?.length || 0} messages`);
+      
+      // Converter dados para o formato esperado
+      const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
+        id: row.id?.toString() || '',
+        session_id: row.session_id || '',
+        message: row.message || '',
+        read_at: row.read_at || new Date().toISOString(),
+        tipo_remetente: row.tipo_remetente,
+        Nome_do_contato: row.Nome_do_contato,
+        nome_do_contato: row.nome_do_contato,
+        mensagemtype: row.mensagemtype,
+        media_base64: row.media_base64
+      }));
+
+      setMessages(processedMessages);
 
     } catch (err) {
       console.error('❌ [SIMPLE_MESSAGES] Unexpected error:', err);

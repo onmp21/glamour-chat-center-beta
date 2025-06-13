@@ -34,6 +34,18 @@ interface Conversation {
   contactNumber: string;
 }
 
+// Tipo unificado para compatibilidade
+interface UnifiedConversation {
+  id: string;
+  contact_name: string;
+  contact_phone: string;
+  last_message: string;
+  last_message_time: string;
+  status: 'unread' | 'in_progress' | 'resolved';
+  unread_count: number;
+  updated_at: string;
+}
+
 export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({ 
   channelId, 
   isDarkMode, 
@@ -45,7 +57,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   
   // Usar hooks simplificados
   const { 
-    conversations, 
+    conversations: simpleConversations, 
     loading: conversationsLoading, 
     refreshConversations 
   } = useSimpleConversations(channelId);
@@ -58,13 +70,25 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
     channelId,
     selectedConversation,
-    conversationsCount: conversations.length,
+    conversationsCount: simpleConversations.length,
     messagesCount: messages.length,
     conversationsLoading,
     messagesLoading,
     isAuthenticated,
     user: user?.name
   });
+
+  // Converter SimpleConversation para UnifiedConversation (compatibilidade)
+  const conversations: UnifiedConversation[] = simpleConversations.map(conv => ({
+    id: conv.id,
+    contact_name: conv.contact_name,
+    contact_phone: conv.contact_phone,
+    last_message: conv.last_message,
+    last_message_time: conv.last_message_time,
+    status: conv.status,
+    unread_count: conv.unread_count,
+    updated_at: conv.updated_at
+  }));
 
   // Auto-select primeira conversa
   useEffect(() => {

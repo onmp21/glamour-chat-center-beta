@@ -11,6 +11,7 @@ interface SimpleConversation {
   last_message_time: string;
   status: 'unread' | 'in_progress' | 'resolved';
   unread_count: number;
+  updated_at: string; // Adicionado campo obrigatório
 }
 
 export const useSimpleConversations = (channelId: string | null) => {
@@ -52,23 +53,25 @@ export const useSimpleConversations = (channelId: string | null) => {
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_CONVERSATIONS] Loading from table: ${tableName}`);
 
-      // Query simples para pegar mensagens recentes
-      const { data, error } = await supabase
+      // Query corrigida - especificar campos explicitamente
+      const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(200); // Pegar últimas 200 mensagens
+        .select('session_id, Nome_do_contato, nome_do_contato, message, read_at, tipo_remetente')
+        .order('read_at', { ascending: false })
+        .limit(100);
 
-      if (error) {
-        console.error('❌ [SIMPLE_CONVERSATIONS] Query error:', error);
-        setError(error.message);
+      if (queryError) {
+        console.error('❌ [SIMPLE_CONVERSATIONS] Query error:', queryError);
+        setError(queryError.message);
         return;
       }
 
-      // Agrupar por session_id
+      console.log(`📋 [SIMPLE_CONVERSATIONS] Raw data received:`, rawData?.length || 0);
+
+      // Processar dados e agrupar por session_id
       const conversationsMap = new Map<string, SimpleConversation>();
       
-      (data || []).forEach((message: any) => {
+      (rawData || []).forEach((message: any) => {
         const sessionId = message.session_id;
         
         if (!conversationsMap.has(sessionId)) {
@@ -89,7 +92,8 @@ export const useSimpleConversations = (channelId: string | null) => {
             last_message: message.message || '',
             last_message_time: message.read_at || new Date().toISOString(),
             status: 'unread',
-            unread_count: 0
+            unread_count: 0,
+            updated_at: message.read_at || new Date().toISOString() // Campo obrigatório
           });
         }
       });
