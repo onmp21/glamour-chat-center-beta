@@ -158,11 +158,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
         )}>
           <MessageInput
-            onSendMessage={onSendMessage}
-            onSendFile={onSendFile}
-            onSendAudio={onSendAudio}
+            channelId={channelId}
+            conversationId={selectedConv.id}
             isDarkMode={isDarkMode}
-            placeholder="Digite sua mensagem..."
             className="w-full"
           />
         </div>

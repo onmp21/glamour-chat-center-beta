@@ -46,7 +46,7 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
              message.tipo_remetente === 'Andressa-ai' ? 'Andressa' :
              'Agente';
     } else {
-      return message.nome_do_contato || message.Nome_do_contato || 'Cliente';
+      return message.nome_do_contato || 'Cliente';
     }
   };
 
@@ -144,7 +144,6 @@ export const MessageHistory: React.FC<MessageHistoryProps> = ({
                       tipo_remetente: message.tipo_remetente,
                       isOwn: isAgent,
                       agentName: senderName,
-                      Nome_do_contato: message.Nome_do_contato,
                       nome_do_contato: message.nome_do_contato,
                       mensagemtype: message.mensagemtype
                     }}
