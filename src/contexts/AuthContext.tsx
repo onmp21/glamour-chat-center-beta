@@ -12,11 +12,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
+    console.log('🔐 [AUTH] AuthProvider inicializando...');
+    
     const savedUser = localStorage.getItem('villa_glamour_user');
     if (savedUser) {
-      const user = JSON.parse(savedUser);
-      console.log('🔐 [AUTH] Usuário restaurado do localStorage:', user.name);
-      setAuthState({ user, isAuthenticated: true });
+      try {
+        const user = JSON.parse(savedUser);
+        console.log('🔐 [AUTH] Usuário restaurado do localStorage:', user.name);
+        setAuthState({ user, isAuthenticated: true });
+      } catch (error) {
+        console.error('🔐 [AUTH] Erro ao parsear usuário salvo:', error);
+        localStorage.removeItem('villa_glamour_user');
+      }
     } else {
       console.log('🔐 [AUTH] Nenhum usuário no localStorage');
     }
@@ -26,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🔐 [AUTH] Tentando fazer login com:', credentials.username);
       
-      // BYPASS TEMPORÁRIO APENAS PARA DEMONSTRAÇÃO - CONFIGURAR SUPABASE EM PRODUÇÃO
+      // BYPASS TEMPORÁRIO APENAS PARA DEMONSTRAÇÃO
       if (credentials.username === 'demo' && credentials.password === 'demo') {
         const user: User = {
           id: 'demo-user',
@@ -44,9 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
       
-      // Login via Supabase - Sistema de autenticação completo
-      
-      // Usar apenas a função verify_user_credentials para todos os usuários
+      // Login via Supabase
       const { data: userData, error: userError } = await supabase.rpc('verify_user_credentials', {
         input_username: credentials.username,
         input_password: credentials.password
@@ -72,7 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
 
-      // Se chegou aqui, as credenciais são inválidas
       console.log('🔐 [AUTH] Credenciais inválidas ou usuário não encontrado');
       return false;
       

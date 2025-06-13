@@ -9,13 +9,14 @@ import { MainLayoutContainer } from './layout/MainLayoutContainer';
 import { useLayout } from './layout/LayoutProvider';
 import { AuthDebug } from './debug/AuthDebug';
 
-import { ChannelProvider } from '@/contexts/ChannelContext';
-
 const MainLayoutContent: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { activeSection } = useLayout();
 
+  console.log('🔍 [MAIN_LAYOUT] Estado de autenticação:', { isAuthenticated });
+
   if (!isAuthenticated) {
+    console.log('🔍 [MAIN_LAYOUT] Usuário não autenticado, mostrando LoginForm');
     return (
       <SEOHead 
         title="Login"
@@ -28,6 +29,7 @@ const MainLayoutContent: React.FC = () => {
     );
   }
 
+  console.log('🔍 [MAIN_LAYOUT] Usuário autenticado, mostrando layout principal');
   return (
     <SEOProvider activeSection={activeSection}>
       <MainLayoutContainer />
@@ -37,6 +39,8 @@ const MainLayoutContent: React.FC = () => {
 };
 
 export const MainLayout: React.FC = () => {
+  console.log('🔍 [MAIN_LAYOUT] Renderizando MainLayout');
+  
   return (
     <LayoutProvider>
       <MainLayoutContent />

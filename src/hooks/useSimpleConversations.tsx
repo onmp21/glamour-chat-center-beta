@@ -11,14 +11,14 @@ interface SimpleConversation {
   last_message_time: string;
   status: 'unread' | 'in_progress' | 'resolved';
   unread_count: number;
-  updated_at: string; // Adicionado campo obrigatório
+  updated_at: string;
 }
 
 export const useSimpleConversations = (channelId: string | null) => {
   const [conversations, setConversations] = useState<SimpleConversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const getTableName = (channelId: string): string => {
     const mapping: Record<string, string> = {
@@ -42,7 +42,7 @@ export const useSimpleConversations = (channelId: string | null) => {
 
   const loadConversations = async () => {
     if (!channelId || !isAuthenticated) {
-      console.log('🔍 [SIMPLE_CONVERSATIONS] Missing params:', { channelId, isAuthenticated });
+      console.log('🔍 [SIMPLE_CONVERSATIONS] Parâmetros insuficientes:', { channelId, isAuthenticated });
       return;
     }
 
@@ -51,9 +51,8 @@ export const useSimpleConversations = (channelId: string | null) => {
       setError(null);
       
       const tableName = getTableName(channelId);
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Loading from table: ${tableName}`);
+      console.log(`📋 [SIMPLE_CONVERSATIONS] Carregando da tabela: ${tableName}`);
 
-      // Query corrigida - especificar campos explicitamente
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
         .select('session_id, Nome_do_contato, nome_do_contato, message, read_at, tipo_remetente')
@@ -61,21 +60,19 @@ export const useSimpleConversations = (channelId: string | null) => {
         .limit(100);
 
       if (queryError) {
-        console.error('❌ [SIMPLE_CONVERSATIONS] Query error:', queryError);
+        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryError);
         setError(queryError.message);
         return;
       }
 
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Raw data received:`, rawData?.length || 0);
+      console.log(`📋 [SIMPLE_CONVERSATIONS] Dados recebidos:`, rawData?.length || 0);
 
-      // Processar dados e agrupar por session_id
       const conversationsMap = new Map<string, SimpleConversation>();
       
       (rawData || []).forEach((message: any) => {
         const sessionId = message.session_id;
         
         if (!conversationsMap.has(sessionId)) {
-          // Determinar nome do contato
           let contactName = 'Cliente';
           if (message.Nome_do_contato) {
             contactName = message.Nome_do_contato;
@@ -93,7 +90,7 @@ export const useSimpleConversations = (channelId: string | null) => {
             last_message_time: message.read_at || new Date().toISOString(),
             status: 'unread',
             unread_count: 0,
-            updated_at: message.read_at || new Date().toISOString() // Campo obrigatório
+            updated_at: message.read_at || new Date().toISOString()
           });
         }
       });
@@ -101,11 +98,11 @@ export const useSimpleConversations = (channelId: string | null) => {
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
-      console.log(`✅ [SIMPLE_CONVERSATIONS] Loaded ${conversations.length} conversations`);
+      console.log(`✅ [SIMPLE_CONVERSATIONS] Carregadas ${conversations.length} conversas`);
       setConversations(conversations);
 
     } catch (err) {
-      console.error('❌ [SIMPLE_CONVERSATIONS] Unexpected error:', err);
+      console.error('❌ [SIMPLE_CONVERSATIONS] Erro inesperado:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -113,14 +110,14 @@ export const useSimpleConversations = (channelId: string | null) => {
   };
 
   useEffect(() => {
+    console.log(`🚀 [SIMPLE_CONVERSATIONS] Effect acionado para usuário: ${user?.name}`);
     if (isAuthenticated && channelId) {
-      console.log(`🚀 [SIMPLE_CONVERSATIONS] Effect triggered`);
       loadConversations();
     } else {
-      console.log('⏳ [SIMPLE_CONVERSATIONS] Waiting for params...');
+      console.log('⏳ [SIMPLE_CONVERSATIONS] Aguardando parâmetros...');
       setConversations([]);
     }
-  }, [channelId, isAuthenticated]);
+  }, [channelId, isAuthenticated, user?.name]);
 
   return {
     conversations,

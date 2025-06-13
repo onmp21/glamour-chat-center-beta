@@ -38,7 +38,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
 
   const loadMessages = async () => {
     if (!channelId || !sessionId || !isAuthenticated) {
-      console.log('🔍 [SIMPLE_MESSAGES] Missing params:', { channelId, sessionId, isAuthenticated });
+      console.log('🔍 [SIMPLE_MESSAGES] Parâmetros insuficientes:', { channelId, sessionId, isAuthenticated });
       return;
     }
 
@@ -47,9 +47,8 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       setError(null);
       
       const tableName = getTableName(channelId);
-      console.log(`📋 [SIMPLE_MESSAGES] Loading from table: ${tableName}, session: ${sessionId}`);
+      console.log(`📋 [SIMPLE_MESSAGES] Carregando da tabela: ${tableName}, sessão: ${sessionId}`);
 
-      // Query corrigida - especificar campos explicitamente para evitar erros
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
         .select('id, session_id, message, read_at, tipo_remetente, Nome_do_contato, nome_do_contato, mensagemtype, media_base64')
@@ -57,14 +56,13 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         .order('read_at', { ascending: true });
 
       if (queryError) {
-        console.error('❌ [SIMPLE_MESSAGES] Query error:', queryError);
+        console.error('❌ [SIMPLE_MESSAGES] Erro na query:', queryError);
         setError(queryError.message);
         return;
       }
 
-      console.log(`✅ [SIMPLE_MESSAGES] Loaded ${rawData?.length || 0} messages`);
+      console.log(`✅ [SIMPLE_MESSAGES] Carregadas ${rawData?.length || 0} mensagens`);
       
-      // Converter dados para o formato esperado
       const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
         id: row.id?.toString() || '',
         session_id: row.session_id || '',
@@ -80,7 +78,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       setMessages(processedMessages);
 
     } catch (err) {
-      console.error('❌ [SIMPLE_MESSAGES] Unexpected error:', err);
+      console.error('❌ [SIMPLE_MESSAGES] Erro inesperado:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -88,14 +86,14 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   };
 
   useEffect(() => {
+    console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado para usuário: ${user?.name}`);
     if (isAuthenticated && channelId && sessionId) {
-      console.log(`🚀 [SIMPLE_MESSAGES] Effect triggered for user: ${user?.name}`);
       loadMessages();
     } else {
-      console.log('⏳ [SIMPLE_MESSAGES] Waiting for params...');
+      console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros...');
       setMessages([]);
     }
-  }, [channelId, sessionId, isAuthenticated]);
+  }, [channelId, sessionId, isAuthenticated, user?.name]);
 
   return {
     messages,
