@@ -1,8 +1,15 @@
 
-import { Database } from "@/types/supabase";
 import { supabase } from "../lib/supabase";
+import { RawMessage } from '@/types/messageTypes';
 
-type ChannelApiMapping = Database['public']['Tables']['channel_api_mappings']['Row'];
+type ChannelApiMapping = {
+  id: string;
+  channel_id: string;
+  api_instance_id: string;
+  created_at?: string;
+  updated_at?: string;
+  api_instance_uuid?: string;
+};
 
 export class ChannelApiMappingService {
   private static mappings: ChannelApiMapping[] | null = null;
@@ -122,6 +129,45 @@ export class ChannelApiMappingService {
     } catch (error) {
       console.error("Error sending message via Evolution API:", error);
       return false;
+    }
+  }
+
+  static async saveMessageToChannel(channelId: string, message: RawMessage): Promise<void> {
+    // Get table name for channel
+    const tableMapping: Record<string, string> = {
+      'yelena': 'yelena_ai_conversas',
+      'canarana': 'canarana_conversas',
+      'souto-soares': 'souto_soares_conversas',
+      'joao-dourado': 'joao_dourado_conversas',
+      'america-dourada': 'america_dourada_conversas',
+      'gerente-lojas': 'gerente_lojas_conversas',
+      'gerente-externo': 'gerente_externo_conversas'
+    };
+
+    const tableName = tableMapping[channelId];
+    if (!tableName) {
+      console.error(`No table mapping found for channel: ${channelId}`);
+      return;
+    }
+
+    // Convert RawMessage to database format
+    const dbMessage = {
+      session_id: message.session_id,
+      message: message.message,
+      read_at: message.read_at,
+      Nome_do_contato: message.Nome_do_contato,
+      mensagemtype: message.mensagemtype || 'text',
+      tipo_remetente: message.tipo_remetente,
+      media_base64: message.media_base64
+    };
+
+    const { error } = await supabase
+      .from(tableName)
+      .insert(dbMessage);
+
+    if (error) {
+      console.error(`Error saving message to ${tableName}:`, error);
+      throw error;
     }
   }
 

@@ -68,7 +68,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({
     
     try {
       if (editingProvider) {
-        await updateProvider(editingProvider.id, formData);
+        await updateProvider(editingProvider.id!, formData);
         toast({
           title: "Sucesso",
           description: "Provedor atualizado com sucesso",
@@ -123,7 +123,8 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({
   };
 
   const handleTest = async (provider: AIProvider) => {
-    setTestingProviders(prev => new Set(prev).add(provider.id));
+    const providerId = provider.id!;
+    setTestingProviders(prev => new Set(prev).add(providerId));
     
     try {
       const result = await testProvider({
@@ -157,7 +158,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({
     } finally {
       setTestingProviders(prev => {
         const newSet = new Set(prev);
-        newSet.delete(provider.id);
+        newSet.delete(providerId);
         return newSet;
       });
     }
@@ -376,9 +377,9 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={() => handleTest(provider)}
-                      disabled={testingProviders.has(provider.id)}
+                      disabled={testingProviders.has(provider.id!)}
                     >
-                      {testingProviders.has(provider.id) ? (
+                      {testingProviders.has(provider.id!) ? (
                         <Loader2 size={16} className="animate-spin" />
                       ) : (
                         <TestTube size={16} />
@@ -394,7 +395,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(provider.id)}
+                      onClick={() => handleDelete(provider.id!)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 size={16} />
