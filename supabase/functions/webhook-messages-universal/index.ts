@@ -10,6 +10,7 @@ const corsHeaders = {
 // Mapeamento de instâncias para canais e tabelas
 const INSTANCE_MAPPING = {
   'yelena': 'yelena_ai_conversas',
+  'yelena-ai': 'yelena_ai_conversas',
   'andressa': 'gerente_externo_conversas',
   'glamour': 'gerente_lojas_conversas',
   'gustavo': 'america_dourada_conversas',
@@ -21,7 +22,7 @@ const INSTANCE_MAPPING = {
 // Configuração das colunas por tabela
 const TABLE_COLUMNS = {
   'yelena_ai_conversas': {
-    contactNameField: 'Nome_do_contato',
+    contactNameField: 'nome_do_contato',
     hasIsRead: false
   },
   'gerente_externo_conversas': {
@@ -76,10 +77,13 @@ serve(async (req) => {
       );
     }
 
+    // Normalizar nome da instância
+    const normalizedInstance = instance.toLowerCase().trim();
+    
     // Mapear instância para tabela
-    const tableName = INSTANCE_MAPPING[instance];
+    const tableName = INSTANCE_MAPPING[normalizedInstance];
     if (!tableName) {
-      console.error(`❌ [WEBHOOK_UNIVERSAL] Unknown instance: ${instance}`);
+      console.error(`❌ [WEBHOOK_UNIVERSAL] Unknown instance: ${instance} (normalized: ${normalizedInstance})`);
       return new Response(
         JSON.stringify({ error: `Unknown instance: ${instance}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -106,7 +110,7 @@ serve(async (req) => {
       // Determinar tipo de remetente
       let tipoRemetente = 'CONTATO_EXTERNO';
       if (messageData.key?.fromMe) {
-        tipoRemetente = instance === 'yelena' ? 'Yelena-ai' : 'USUARIO_INTERNO';
+        tipoRemetente = normalizedInstance === 'yelena' || normalizedInstance === 'yelena-ai' ? 'Yelena-ai' : 'USUARIO_INTERNO';
       }
 
       // Determinar tipo de mensagem
