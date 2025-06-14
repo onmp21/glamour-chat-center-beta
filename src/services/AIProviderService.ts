@@ -1,5 +1,4 @@
-
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { AIProvider, AIProviderFormData, ProviderType } from '@/types/ai-providers';
 
 export class AIProviderService {
