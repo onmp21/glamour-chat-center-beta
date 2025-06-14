@@ -1,18 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
-import { Camera, Upload, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUserProfiles } from '@/hooks/useUserProfiles';
-import { useAuth } from '@/contexts/AuthContext';
-import { AvatarAdjustDialog } from './AvatarAdjustDialog';
+
+import React, { useRef, useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Camera, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AvatarAdjustDialog } from "./AvatarAdjustDialog";
 
 interface ProfilePictureProps {
   isDarkMode: boolean;
   userName: string;
-  onAvatarChange?: (avatarFile: File | null, previewURL: string | null) => void;
-  externalPreview?: string | null; // Para controlar preview externo
+  onAvatarChange?: (avatarFile: File | null, previewUrl: string | null) => void;
+  externalPreview?: string | null;
 }
 
 export const ProfilePicture: React.FC<ProfilePictureProps> = ({
@@ -21,25 +20,13 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   onAvatarChange,
   externalPreview,
 }) => {
-  const { user } = useAuth();
-  const { loadProfile, loading } = useUserProfiles();
-  const [savedImage, setSavedImage] = useState<string | null>(null); // No Supabase
-  const [previewImage, setPreviewImage] = useState<string | null>(null); // Novo upload, antes do save
-  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null); // base64 local/crop
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      loadProfile(user.id).then(profile => {
-        if (profile?.avatar_url) setSavedImage(profile.avatar_url);
-        else setSavedImage(null);
-      });
-    }
-  }, [user?.id, loadProfile]);
-
-  // Mostra preview externo se veio da tela de perfil (preview do App)
-  useEffect(() => {
+    // Mostra preview externo se veio da tela de perfil (preview do App)
     if (externalPreview !== undefined) setPreviewImage(externalPreview);
   }, [externalPreview]);
 
@@ -52,8 +39,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
       .slice(0, 2);
   };
 
-  // Abre crop ao selecionar
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -64,20 +50,16 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
       alert('Por favor, selecione apenas arquivos de imagem');
       return;
     }
-    // Mostra preview p/ crop/ajuste (não sobe ainda!)
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreviewImage(e.target?.result as string);
       setPendingFile(file);
-      setAdjustDialogOpen(true); // <-- aqui garante que vai abrir a overlay!
-      onAvatarChange?.(file, e.target?.result as string);
+      setAdjustDialogOpen(true);
     };
     reader.readAsDataURL(file);
-    // Limpa input
-    event.target.value = '';
+    event.target.value = ''; // Limpar input para novo upload.
   };
 
-  // Remove preview pendente (antes do upload)
   const handleRemovePreview = () => {
     setPreviewImage(null);
     setPendingFile(null);
@@ -85,21 +67,20 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
     onAvatarChange?.(null, null);
   };
 
-  // Após crop/confirmar
   const handleConfirmPreview = (confirmedUrl: string) => {
     setPreviewImage(confirmedUrl);
     setAdjustDialogOpen(false);
-    // O arquivo em pendingFile já foi passado p/ app pela prop onAvatarChange
+    if (pendingFile && confirmedUrl) {
+      // Passa para o pai o arquivo temporário + o preview ajustado (base64)
+      onAvatarChange?.(pendingFile, confirmedUrl);
+    }
   };
-
-  // Remove foto salva (do profile)
-  // Exportado apenas para referência (a confirmação e save ocorre na tela de perfil, não aqui)
 
   return (
     <div className="flex flex-col items-center space-y-4">
       <div className="relative">
         <Avatar className="w-24 h-24">
-          <AvatarImage src={previewImage || savedImage || undefined} alt={userName} />
+          <AvatarImage src={previewImage || undefined} alt={userName} />
           <AvatarFallback className={cn(
             "text-2xl font-semibold",
             isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
@@ -107,8 +88,6 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
             {getInitials(userName)}
           </AvatarFallback>
         </Avatar>
-
-        {/* Overlay de ajuste */}
         <AvatarAdjustDialog
           open={adjustDialogOpen}
           imageUrl={previewImage}
@@ -122,7 +101,6 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
               className="h-8 w-8 p-0 rounded-full"
               style={{ backgroundColor: '#b5103c' }}
               asChild
-              disabled={loading}
             >
               <div className="cursor-pointer">
                 <Camera size={16} />
@@ -134,14 +112,11 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
               accept="image/*"
               onChange={handleImageUpload}
               className="hidden"
-              disabled={loading}
             />
           </label>
         </div>
       </div>
-
-      {/* Mostrar botão para remover imagem atual */}
-      {(previewImage || savedImage) && (
+      {(previewImage) && (
         <Button
           variant="outline"
           size="sm"
@@ -152,7 +127,6 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
             borderColor: '#dc2626',
             color: '#dc2626'
           }}
-          disabled={loading}
         >
           <Trash2 size={16} />
         </Button>
