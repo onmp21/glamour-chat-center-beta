@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Manual UserProfile type for runtime checks
 type UserProfile = {
   id: string;
   avatar_url: string | null;
@@ -19,13 +20,15 @@ export function useSupabaseAvatar() {
   const getAvatarUrl = useCallback(async (): Promise<string | null> => {
     if (!user) return null;
     const { data, error } = await supabase
-      .from<UserProfile>("user_profiles")
+      .from("user_profiles")
       .select("avatar_url")
       .eq("id", user.id)
       .maybeSingle();
 
+    // Accepts dynamic types since not present in Supabase's generated types
     if (error || !data) return null;
-    return data.avatar_url || null;
+    // Type assertion for custom table
+    return (data as UserProfile).avatar_url || null;
   }, [user]);
 
   // Atualiza o avatar_url (quando faz upload)
@@ -33,7 +36,7 @@ export function useSupabaseAvatar() {
     if (!user) return;
     // upsert (se não existe, cria, se existe, atualiza)
     await supabase
-      .from<UserProfile>("user_profiles")
+      .from("user_profiles")
       .upsert(
         { id: user.id, avatar_url: avatarUrl || null, updated_at: new Date().toISOString() },
         { onConflict: "id" }
@@ -87,3 +90,4 @@ export function useSupabaseAvatar() {
     loading,
   };
 }
+
