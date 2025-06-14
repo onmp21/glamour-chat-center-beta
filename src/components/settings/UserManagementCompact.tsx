@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +36,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
     name: '',
     role: 'salesperson' as UserRole,
     assignedTabs: [] as string[],
-    assignedChannels: [] as string[]
+    assignedChannels: [] as string[],
+    assignedSettingsSections: [] as string[]
   });
 
   // Debug: Log dos usuários recebidos
@@ -55,7 +55,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
         name: editingUser.name,
         role: editingUser.role,
         assignedTabs: editingUser.assignedTabs || [],
-        assignedChannels: editingUser.assignedChannels || []
+        assignedChannels: editingUser.assignedChannels || [],
+        assignedSettingsSections: editingUser.assignedSettingsSections || []
       });
     } else {
       setFormData({
@@ -64,7 +65,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
         name: '',
         role: 'salesperson',
         assignedTabs: TAB_PERMISSIONS['salesperson'] || [],
-        assignedChannels: []
+        assignedChannels: [],
+        assignedSettingsSections: []
       });
     }
   }, [editingUser]);
@@ -74,7 +76,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
       ...prev,
       role: newRole,
       assignedTabs: TAB_PERMISSIONS[newRole] || [],
-      assignedChannels: [] // Limpa canais ao trocar
+      assignedChannels: [],
+      assignedSettingsSections: []
     }));
   };
 
@@ -97,7 +100,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
           name: formData.name,
           role: formData.role,
           assignedTabs: formData.assignedTabs,
-          assignedChannels: formData.assignedChannels
+          assignedChannels: formData.assignedChannels,
+          assignedSettingsSections: formData.assignedSettingsSections
         };
         if (formData.password.trim()) {
           updateData.password = formData.password;
@@ -123,7 +127,8 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
         name: '',
         role: 'salesperson',
         assignedTabs: TAB_PERMISSIONS['salesperson'] || [],
-        assignedChannels: []
+        assignedChannels: [],
+        assignedSettingsSections: []
       });
     } catch (error) {
       toast({

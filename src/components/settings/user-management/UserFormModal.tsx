@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,6 +20,7 @@ interface UserFormModalProps {
     role: UserRole;
     assignedTabs: string[];
     assignedChannels: string[];
+    assignedSettingsSections: string[];
   };
   showPassword: boolean;
   onClose: () => void;
@@ -59,6 +59,18 @@ const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   manager: 'Gerência geral'
 };
 
+const SETTINGS_SECTIONS = [
+  { key: 'credentials', label: 'Alterar Credenciais' },
+  { key: 'notifications', label: 'Configurações de Notificação' },
+  { key: 'users', label: 'Gerenciamento de Usuários' },
+  { key: 'channels', label: 'Gerenciar Canais' },
+  { key: 'audit', label: 'Histórico de Auditoria' },
+  { key: 'ai', label: 'Configurações de IA' },
+  { key: 'evolution', label: 'API Evolution' },
+  { key: 'system', label: 'Sistema' },
+  { key: 'backup', label: 'Backup e Dados' },
+];
+
 export const UserFormModal: React.FC<UserFormModalProps> = ({
   open,
   editingUser,
@@ -73,7 +85,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   const handleTabChange = (tab: string, checked: boolean) => {
     onFormDataChange({
       ...formData,
-      assignedTabs: checked 
+      assignedTabs: checked
         ? [...formData.assignedTabs, tab]
         : formData.assignedTabs.filter(t => t !== tab)
     });
@@ -82,9 +94,18 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
   const handleChannelChange = (channel: string, checked: boolean) => {
     onFormDataChange({
       ...formData,
-      assignedChannels: checked 
+      assignedChannels: checked
         ? [...formData.assignedChannels, channel]
         : formData.assignedChannels.filter(c => c !== channel)
+    });
+  };
+
+  const handleSettingsSectionChange = (section: string, checked: boolean) => {
+    onFormDataChange({
+      ...formData,
+      assignedSettingsSections: checked
+        ? [...(formData.assignedSettingsSections || []), section]
+        : (formData.assignedSettingsSections || []).filter(s => s !== section)
     });
   };
 
@@ -165,7 +186,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               </SelectContent>
             </Select>
           </div>
-          {/* Abas */}
+          {/* Abas Permitidas */}
           <div>
             <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Abas Permitidas</Label>
             <div className="grid grid-cols-2 gap-2 mt-2">
@@ -204,6 +225,28 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
                     className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-700")}
                   >
                     {chan.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Seções de Configurações Permitidas */}
+          <div>
+            <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Seções de Configurações Permitidas</Label>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {SETTINGS_SECTIONS.map(sec => (
+                <div key={sec.key} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`settings-section-${sec.key}`}
+                    checked={!!(formData.assignedSettingsSections || []).includes(sec.key)}
+                    onCheckedChange={(checked) => handleSettingsSectionChange(sec.key, !!checked)}
+                    className={cn(isDarkMode ? "border-[#9a0e35]" : "border-gray-300")}
+                  />
+                  <Label 
+                    htmlFor={`settings-section-${sec.key}`} 
+                    className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-700")}
+                  >
+                    {sec.label}
                   </Label>
                 </div>
               ))}

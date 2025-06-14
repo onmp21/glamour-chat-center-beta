@@ -27,7 +27,7 @@ export const useUsers = () => {
       console.log('🔍 [useUsers] Dados brutos recebidos:', data);
       console.log('🔍 [useUsers] Quantidade de usuários encontrados:', data?.length || 0);
 
-      // Adaptado para nova estrutura: assigned_channels e assigned_tabs SEM assigned_cities legado
+      // Adaptado para nova estrutura: assigned_channels, assigned_tabs, assigned_settings_sections
       const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => {
         console.log('🔍 [useUsers] Formatando usuário:', user);
         return {
@@ -37,6 +37,7 @@ export const useUsers = () => {
           role: user.role as UserRole,
           assignedTabs: user.assigned_tabs || [],
           assignedChannels: user.assigned_channels || [],
+          assignedSettingsSections: user.assigned_settings_sections || [],
           createdAt: user.created_at
         };
       });
@@ -62,6 +63,7 @@ export const useUsers = () => {
     role: UserRole;
     assignedTabs: string[];
     assignedChannels: string[];
+    assignedSettingsSections?: string[]; // <-- Novo campo opcional
   }) => {
     try {
       console.log('Criando usuário:', userData);
@@ -71,7 +73,8 @@ export const useUsers = () => {
         p_name: userData.name,
         p_role: userData.role as any,
         p_assigned_tabs: userData.assignedTabs,
-        p_assigned_channels: userData.assignedChannels
+        p_assigned_channels: userData.assignedChannels,
+        p_assigned_settings_sections: userData.assignedSettingsSections || []
       });
 
       if (error) {
@@ -99,7 +102,8 @@ export const useUsers = () => {
           p_name: userData.name || null,
           p_role: userData.role as any || null,
           p_assigned_tabs: userData.assignedTabs || null,
-          p_assigned_channels: userData.assignedChannels || null
+          p_assigned_channels: userData.assignedChannels || null,
+          p_assigned_settings_sections: userData.assignedSettingsSections || null
         });
 
         if (error) {
@@ -114,6 +118,7 @@ export const useUsers = () => {
         if (userData.role) updateData.role = userData.role;
         if (userData.assignedTabs) updateData.assigned_tabs = userData.assignedTabs;
         if (userData.assignedChannels) updateData.assigned_channels = userData.assignedChannels;
+        if (userData.assignedSettingsSections) updateData.assigned_settings_sections = userData.assignedSettingsSections;
 
         const { error } = await supabase
           .from('users')

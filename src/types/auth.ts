@@ -9,7 +9,8 @@ export interface User {
   name: string;
   role: UserRole;
   assignedTabs: string[];
-  assignedChannels: string[]; // Agora obrigatoriamente presente
+  assignedChannels: string[];
+  assignedSettingsSections?: string[]; // <-- Novo campo
   createdAt: string;
 }
 
@@ -20,6 +21,7 @@ export interface DatabaseUser {
   role: UserRole;
   assigned_tabs: string[];
   assigned_channels: string[];
+  assigned_settings_sections?: string[]; // <-- Novo campo
   is_active: boolean;
   created_at: string;
   updated_at: string;
