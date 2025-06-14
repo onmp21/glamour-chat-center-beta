@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client.ts';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { User, UserRole, DatabaseUser } from '@/types/auth';
 
 export const useUsers = () => {
@@ -10,36 +10,43 @@ export const useUsers = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      console.log('Carregando usuários...');
+      console.log('🔍 [useUsers] Carregando usuários da tabela users...');
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
+      console.log('🔍 [useUsers] Resposta do Supabase:', { data, error });
+
       if (error) {
-        console.error('Erro ao carregar usuários:', error);
+        console.error('❌ [useUsers] Erro ao carregar usuários:', error);
         return;
       }
 
-      console.log('Dados recebidos do Supabase:', data);
+      console.log('🔍 [useUsers] Dados brutos recebidos:', data);
+      console.log('🔍 [useUsers] Quantidade de usuários encontrados:', data?.length || 0);
 
       // Adaptar para consumir tanto assigned_channels (moderno) quanto assigned_cities (legado)
-      const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => ({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role as UserRole,
-        assignedTabs: user.assigned_tabs || [],
-        assignedChannels: (user as any).assigned_channels || user.assigned_cities || [], // novo > legado
-        assignedCities: user.assigned_cities || [], // mantém para transição
-        createdAt: user.created_at
-      }));
+      const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => {
+        console.log('🔍 [useUsers] Formatando usuário:', user);
+        return {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role as UserRole,
+          assignedTabs: user.assigned_tabs || [],
+          assignedChannels: (user as any).assigned_channels || user.assigned_cities || [], // novo > legado
+          assignedCities: user.assigned_cities || [], // mantém para transição
+          createdAt: user.created_at
+        };
+      });
 
-      console.log('Usuários formatados:', formattedUsers);
+      console.log('🔍 [useUsers] Usuários formatados:', formattedUsers);
       setUsers(formattedUsers);
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
+      console.error('❌ [useUsers] Erro inesperado ao carregar usuários:', error);
     } finally {
       setLoading(false);
     }

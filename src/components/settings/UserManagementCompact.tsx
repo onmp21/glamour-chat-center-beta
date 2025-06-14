@@ -86,6 +86,13 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
     assignedChannels: [] as string[]
   });
 
+  // Debug: Log dos usuários recebidos
+  useEffect(() => {
+    console.log('🔍 [UserManagementCompact] Usuários recebidos:', users);
+    console.log('🔍 [UserManagementCompact] Loading:', loading);
+    console.log('🔍 [UserManagementCompact] Quantidade:', users.length);
+  }, [users, loading]);
+
   useEffect(() => {
     if (editingUser) {
       setFormData({
@@ -236,6 +243,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
+        <span className="ml-2">Carregando usuários...</span>
       </div>
     );
   }
@@ -281,12 +289,26 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
           </Button>
         </div>
       </div>
+
+      {/* Debug info */}
+      <div className={cn(
+        "p-4 rounded-lg border",
+        isDarkMode ? "bg-[#232327] border-[#27272a]" : "bg-gray-50 border-gray-200"
+      )}>
+        <p className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-600")}>
+          Debug: {users.length} usuários carregados | Loading: {loading.toString()}
+        </p>
+      </div>
+
       {/* Lista de Usuários */}
       {filteredUsers.length === 0 ? (
         <div className="text-center py-8">
           <Users className={cn("h-12 w-12 mx-auto mb-4", isDarkMode ? "text-gray-400" : "text-gray-400")} />
           <p className={cn("text-lg", isDarkMode ? "text-gray-300" : "text-gray-600")}>
             {searchTerm || selectedRole !== 'all' ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado.'}
+          </p>
+          <p className={cn("text-sm mt-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+            Total de usuários na base: {users.length}
           </p>
         </div>
       ) : (
