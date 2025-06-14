@@ -1,7 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelMessage, RawMessage } from '@/types/messages';
 import { evolutionMessageService } from '@/services/EvolutionMessageService';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 export const useChannelMessagesRefactored = (channelId: string, conversationId?: string) => {
   console.log(`[useChannelMessagesRefactored] channelId recebido: ${channelId}`);
@@ -11,11 +13,11 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
 
   const convertRawToChannelMessage = (raw: RawMessage): ChannelMessage => {
     return {
-      id: raw.id.toString(),
+      id: raw.id.toString(), // Ensure id is a string
       content: raw.content,
       sender: raw.sender,
       timestamp: raw.timestamp,
-      type: 'text',
+      type: 'text', // This might need to be dynamic based on raw.mensagemtype
       isFromUser: raw.sender === 'customer',
       session_id: raw.session_id,
       tipo_remetente: raw.tipo_remetente,
@@ -27,6 +29,8 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
 
   const loadMessages = useCallback(async () => {
     if (!channelId) return;
+    // Adicionando log para verificar se conversationId está presente
+    console.log(`[useChannelMessagesRefactored] loadMessages called. channelId: ${channelId}, conversationId: ${conversationId}`);
 
     try {
       setLoading(true);
@@ -34,17 +38,21 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       
       let result: RawMessage[] | { data: RawMessage[] };
       if (conversationId) {
+        // Certifique-se de que conversationId não é undefined antes de chamar
+        console.log(`[useChannelMessagesRefactored] Fetching messages by conversation: ${conversationId}`);
         result = await messageService.getMessagesByConversation(conversationId) || [];
       } else {
+        console.log(`[useChannelMessagesRefactored] Fetching all messages for channel: ${channelId}`);
         result = await messageService.getAllMessages() || [];
       }
 
       const rawMessages = Array.isArray(result) ? result : (result?.data || []);
+      console.log(`[useChannelMessagesRefactored] Raw messages fetched:`, rawMessages.length);
       const convertedMessages = rawMessages.map(convertRawToChannelMessage);
       setMessages(convertedMessages);
       setError(null);
     } catch (err) {
-      console.error('Error loading messages:', err);
+      console.error('[useChannelMessagesRefactored] Error loading messages:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
@@ -54,9 +62,41 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
   useEffect(() => {
     loadMessages();
     
-    const interval = setInterval(loadMessages, 5000);
-    return () => clearInterval(interval);
-  }, [loadMessages]);
+    const interval = setInterval(loadMessages, 5000); // Consider making this configurable or event-driven
+    
+    // Realtime subscription
+    let realtimeChannel: any;
+    if (channelId && conversationId) {
+      const tableName = MessageService.getTableNameForChannel(channelId);
+      console.log(`[useChannelMessagesRefactored] Subscribing to realtime for table: ${tableName}, conversation: ${conversationId}`);
+      realtimeChannel = supabase
+        .channel(`public:${tableName}:${conversationId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: tableName, filter: `session_id=eq.${conversationId}` },
+          (payload) => {
+            console.log('[useChannelMessagesRefactored] Realtime event received:', payload);
+            loadMessages(); // Reload messages on new event
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`[useChannelMessagesRefactored] Successfully subscribed to ${tableName} for ${conversationId}`);
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error(`[useChannelMessagesRefactored] Realtime subscription error for ${tableName}, ${conversationId}:`, err || status);
+          }
+        });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+        console.log(`[useChannelMessagesRefactored] Unsubscribed from realtime for conversation: ${conversationId}`);
+      }
+    };
+  }, [loadMessages, channelId, conversationId]); // Added channelId and conversationId to dependencies
 
   const addMessage = useCallback((newMessage: RawMessage) => {
     const convertedMessage = convertRawToChannelMessage(newMessage);
@@ -83,15 +123,15 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
         console.log('✅ [SEND_MESSAGE] Mensagem enviada com sucesso:', result.messageId);
         
         const newMessage: RawMessage = {
-          id: Date.now(),
+          id: Date.now().toString(), // Changed to string
           content: message,
           sender: 'agent',
           timestamp: new Date().toISOString(),
           session_id: conversationId,
-          tipo_remetente: 'agent', // Ou 'USUARIO_INTERNO' / 'Yelena-ai' dependendo da lógica
+          tipo_remetente: 'agent', 
           mensagemtype: 'text',
-          Nome_do_contato: 'Atendente', // Pode ser o nome do usuário logado
-          nome_do_contato: 'Atendente'  // Pode ser o nome do usuário logado
+          Nome_do_contato: 'Atendente', 
+          nome_do_contato: 'Atendente'
         };
         
         addMessage(newMessage);
@@ -131,24 +171,24 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
         const result = await evolutionMessageService.sendMediaMessage({
           channelId: channelId,
           phoneNumber: conversationId,
-          message: caption || `[${file.name}]`,
+          message: caption || file.name, // Using file.name as caption if not provided
           messageType: 'media',
-          mediaUrl: fileData, // Este deve ser uma URL acessível ou base64 dependendo da API
+          mediaUrl: fileData, 
           mediaType: mediaType,
-          caption: caption
+          caption: caption || file.name // Ensure caption is passed if available
         });
 
         if (result.success) {
           console.log('✅ [SEND_FILE] Arquivo enviado com sucesso:', result.messageId);
           
           const newMessage: RawMessage = {
-            id: Date.now(),
+            id: Date.now().toString(), // Changed to string
             content: caption || `[Arquivo: ${file.name}]`,
             sender: 'agent',
             timestamp: new Date().toISOString(),
             session_id: conversationId,
             tipo_remetente: 'agent',
-            mensagemtype: mediaType,
+            mensagemtype: mediaType, // Use determined mediaType
             Nome_do_contato: 'Atendente',
             nome_do_contato: 'Atendente'
           };
@@ -164,7 +204,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
         }
       };
       
-      reader.readAsDataURL(file); // Convertendo para base64 para envio
+      reader.readAsDataURL(file); 
     } catch (error) {
       console.error('❌ [SEND_FILE] Erro inesperado:', error);
       throw error;
@@ -188,19 +228,19 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
         const result = await evolutionMessageService.sendMediaMessage({
           channelId: channelId,
           phoneNumber: conversationId,
-          message: `[Áudio - ${duration}s]`, // Mensagem de fallback ou caption
+          message: `Áudio gravado`, // Simplified message
           messageType: 'media',
-          mediaUrl: audioData, // Este deve ser uma URL acessível ou base64
+          mediaUrl: audioData, 
           mediaType: 'audio',
-          caption: `Áudio de ${duration} segundos`
+          caption: `Áudio (${Math.round(duration)}s)` // More descriptive caption
         });
 
         if (result.success) {
           console.log('✅ [SEND_AUDIO] Áudio enviado com sucesso:', result.messageId);
           
           const newMessage: RawMessage = {
-            id: Date.now(),
-            content: `[Áudio - ${duration}s]`,
+            id: Date.now().toString(), // Changed to string
+            content: `[Áudio: ${Math.round(duration)}s]`,
             sender: 'agent',
             timestamp: new Date().toISOString(),
             session_id: conversationId,
@@ -221,7 +261,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
         }
       };
       
-      reader.readAsDataURL(audioBlob); // Convertendo para base64 para envio
+      reader.readAsDataURL(audioBlob); 
     } catch (error) {
       console.error('❌ [SEND_AUDIO] Erro inesperado:', error);
       throw error;

@@ -5,27 +5,14 @@ import { ChatMainArea } from './ChatMainArea';
 import { useSimpleConversations } from '@/hooks/useSimpleConversations';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { useAuth } from '@/contexts/AuthContext';
+import { ChannelConversation } from '@/types/messages'; // Added for selectedConv in ChatMainArea
+
 interface ChatOverlayRefactoredProps {
   channelId: string;
   isDarkMode: boolean;
   onClose: () => void;
-}
-interface Message {
-  id: string;
-  content: string;
-  timestamp: string;
-  sender: 'customer' | 'agent';
-  tipo_remetente?: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'file';
-  fileUrl?: string;
-  fileName?: string;
-  read: boolean;
-  nome_do_contato?: string;
-  mensagemtype?: string;
-}
-interface Conversation {
-  contactName: string;
-  contactNumber: string;
+  onSendFile: (file: File, caption?: string) => Promise<void>; // Added
+  onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>; // Added
 }
 
 // Tipo unificado para compatibilidade
@@ -39,10 +26,32 @@ interface UnifiedConversation {
   unread_count: number;
   updated_at: string;
 }
+
+interface Message {
+  id: string;
+  content: string;
+  timestamp: string;
+  sender: 'customer' | 'agent';
+  tipo_remetente?: string;
+  type: 'text' | 'image' | 'audio' | 'video' | 'file';
+  fileUrl?: string;
+  fileName?: string;
+  read: boolean;
+  nome_do_contato?: string;
+  mensagemtype?: string;
+}
+
+interface Conversation {
+  contactName: string;
+  contactNumber: string;
+}
+
 export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   channelId,
   isDarkMode,
-  onClose
+  onClose,
+  onSendFile,
+  onSendAudio
 }) => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -59,8 +68,13 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   } = useSimpleConversations(channelId);
   const {
     messages,
-    loading: messagesLoading
+    loading: messagesLoading,
+    sendMessage: sendMessageHook,
+    sendFile: sendFileHook,
+    sendAudio: sendAudioHook,
+    refetch: refetchMessages
   } = useSimpleMessages(channelId, selectedConversation);
+
   console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
     channelId,
     selectedConversation,
@@ -92,44 +106,70 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       setSelectedConversation(firstConversation.id);
     }
   }, [conversations, selectedConversation]);
+
   const handleConversationSelect = (conversationId: string) => {
     console.log('📱 [CHAT_OVERLAY] Conversation selected:', conversationId);
     setSelectedConversation(conversationId);
   };
+
   const handleSendMessage = async (message: string) => {
     console.log('💬 [CHAT_OVERLAY] Send message:', message);
-    // TODO: Implementar envio de mensagem
+    if (selectedConversation) {
+      await sendMessageHook(message);
+      refetchMessages();
+    }
   };
+
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('📎 [CHAT_OVERLAY] Send file:', file.name);
-    // TODO: Implementar envio de arquivo
+     if (selectedConversation) {
+      await sendFileHook(file, caption);
+      refetchMessages();
+    }
   };
+
   const handleSendAudio = async (audioBlob: Blob, duration: number) => {
     console.log('🎵 [CHAT_OVERLAY] Send audio:', duration);
-    // TODO: Implementar envio de áudio
+    if (selectedConversation) {
+      await sendAudioHook(audioBlob, duration);
+      refetchMessages();
+    }
   };
-  const selectedConv = conversations.find(c => c.id === selectedConversation);
+
+  const selectedConvData = simpleConversations.find(c => c.id === selectedConversation);
+  const selectedConvForMainArea: ChannelConversation | undefined = selectedConvData ? {
+    ...selectedConvData,
+    unread_messages: selectedConvData.unread_count, // Mapeando para o tipo esperado
+    is_pinned: false, // Adicionando valor padrão
+    tags: [], // Adicionando valor padrão
+    notes: '', // Adicionando valor padrão
+  } : undefined;
 
   // Converter mensagens para o formato esperado
   const displayMessages: Message[] = messages.map(msg => {
-    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
+    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai' || msg.sender === 'agent';
     return {
       id: msg.id,
       content: msg.message,
-      timestamp: msg.read_at,
+      timestamp: msg.created_at, // Assuming created_at is the correct timestamp field
       sender: isAgent ? 'agent' : 'customer',
       tipo_remetente: msg.tipo_remetente,
-      type: 'text',
-      read: true,
+      type: msg.mensagemtype === 'image' ? 'image' :
+            msg.mensagemtype === 'audio' ? 'audio' :
+            msg.mensagemtype === 'video' ? 'video' :
+            msg.mensagemtype === 'document' ? 'file' : 'text',
+      fileUrl: msg.media_url,
+      fileName: msg.media_caption || msg.message, // Fallback for file name
+      read: msg.is_read !== undefined ? msg.is_read : true, // Default to true if undefined
       nome_do_contato: msg.nome_do_contato,
       mensagemtype: msg.mensagemtype
     };
   });
 
   // Criar objeto de conversa para o header
-  const conversationForHeader: Conversation | null = selectedConv ? {
-    contactName: selectedConv.contact_name,
-    contactNumber: selectedConv.contact_phone
+  const conversationForHeader: Conversation | null = selectedConvData ? {
+    contactName: selectedConvData.contact_name,
+    contactNumber: selectedConvData.contact_phone
   } : null;
 
   if (conversationsLoading && conversations.length === 0) {
@@ -140,10 +180,33 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       </div>;
   }
   return <div className={cn("fixed inset-0 z-50 flex", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
-      <ChatSidebar channelId={channelId} conversations={conversations} selectedConversation={selectedConversation} isSidebarOpen={isSidebarOpen} isDarkMode={isDarkMode} onClose={onClose} onConversationSelect={setSelectedConversation} onSidebarToggle={setIsSidebarOpen} onRefresh={refreshConversations} />
+      <ChatSidebar 
+        channelId={channelId} 
+        conversations={conversations} 
+        selectedConversation={selectedConversation} 
+        isSidebarOpen={isSidebarOpen} 
+        isDarkMode={isDarkMode} 
+        onClose={onClose} 
+        onConversationSelect={handleConversationSelect} // Passado handleConversationSelect
+        onSidebarToggle={setIsSidebarOpen} 
+        onRefresh={refreshConversations} 
+      />
 
       <div className="flex-1 flex flex-col">
-        <ChatMainArea selectedConv={selectedConv} conversationForHeader={conversationForHeader} messages={displayMessages} messagesLoading={messagesLoading} isSidebarOpen={isSidebarOpen} isDarkMode={isDarkMode} channelId={channelId} onSidebarToggle={setIsSidebarOpen} onMarkAsResolved={() => {}} onSendMessage={handleSendMessage} onSendFile={handleSendFile} onSendAudio={handleSendAudio} />
+        <ChatMainArea 
+          selectedConv={selectedConvForMainArea} // Passado selectedConvForMainArea
+          conversationForHeader={conversationForHeader} 
+          messages={displayMessages} 
+          messagesLoading={messagesLoading} 
+          isSidebarOpen={isSidebarOpen} 
+          isDarkMode={isDarkMode} 
+          channelId={channelId} 
+          onSidebarToggle={setIsSidebarOpen} 
+          onMarkAsResolved={() => { console.log('Mark as resolved clicked'); }} // Implementar lógica de resolução
+          onSendMessage={handleSendMessage} 
+          onSendFile={handleSendFile} // Passado handleSendFile
+          onSendAudio={handleSendAudio} // Passado handleSendAudio
+        />
       </div>
     </div>;
 };
