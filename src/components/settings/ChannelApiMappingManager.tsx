@@ -7,6 +7,7 @@ import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { EvolutionApiService } from '@/services/EvolutionApiService';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -163,7 +164,7 @@ export const ChannelApiMappingManager: React.FC = () => {
         {has ? 'Webhook Configurado' : 'Webhook NÃO configurado'}
         {!has && (
           <Button
-            size="xs"
+            size="sm"
             className="ml-1 px-2 py-0.5 h-5 text-xs"
             onClick={async () => {
               // Força nova configuração
