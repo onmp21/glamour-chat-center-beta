@@ -384,8 +384,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         is_active: true
       });
 
-      // Configurar webhook automaticamente usando APENAS o webhook universal
-      console.log('🔗 [WEBHOOK] Configurando webhook universal para instância:', selectedInstance.instanceName);
+      // Configurar webhook automaticamente usando o novo webhook universal
+      console.log('🔗 [WEBHOOK] Configurando novo webhook universal para instância:', selectedInstance.instanceName);
       
       const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
@@ -393,10 +393,10 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         instanceName: selectedInstance.instanceName
       });
 
-      // URL do webhook universal que funciona para todos os canais
-      const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/webhook-messages-universal`;
+      // URL do novo webhook universal que substitui o antigo
+      const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/webhook-evolution-universal`;
       
-      // Eventos que queremos receber
+      // Todos os eventos que o setWebhook suporta
       const webhookEvents = [
         'MESSAGES_UPSERT',
         'MESSAGES_SET', 
@@ -404,22 +404,30 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         'CONNECTION_UPDATE',
         'QRCODE_UPDATED',
         'CONTACTS_UPSERT',
-        'CHATS_UPSERT'
+        'CONTACTS_SET',
+        'CONTACTS_UPDATE',
+        'CHATS_UPSERT',
+        'CHATS_SET',
+        'CHATS_UPDATE',
+        'PRESENCE_UPDATE',
+        'GROUPS_UPSERT',
+        'GROUP_UPDATE',
+        'GROUP_PARTICIPANTS_UPDATE'
       ];
 
       const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
       
       if (webhookResult.success) {
-        console.log('✅ [WEBHOOK] Webhook universal configurado com sucesso para instância:', selectedInstance.instanceName);
+        console.log('✅ [WEBHOOK] Novo webhook universal configurado com sucesso para instância:', selectedInstance.instanceName);
       } else {
-        console.warn('⚠️ [WEBHOOK] Falha ao configurar webhook universal:', webhookResult.error);
+        console.warn('⚠️ [WEBHOOK] Falha ao configurar novo webhook universal:', webhookResult.error);
       }
 
-      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName} usando webhook universal`)
+      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName} usando novo webhook universal`)
 
       toast({
         title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook universal configurado!`,
+        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com novo webhook universal configurado!`,
       });
 
       // Recarregar mapeamentos
@@ -757,7 +765,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 Vincular Canal à Instância
               </CardTitle>
               <CardDescription>
-                Associe um canal de comunicação a uma instância da API Evolution usando webhook universal.
+                Associe um canal de comunicação a uma instância da API Evolution usando o novo webhook universal.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -822,7 +830,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 {linkingChannel ? (
                   <>
                     <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                    Vinculando...
+                    Configurando novo webhook...
                   </>
                 ) : (
                   <>
