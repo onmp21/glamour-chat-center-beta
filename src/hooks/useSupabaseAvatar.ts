@@ -19,15 +19,15 @@ export function useSupabaseAvatar() {
   // Pega o avatar_url do perfil
   const getAvatarUrl = useCallback(async (): Promise<string | null> => {
     if (!user) return null;
-    const { data, error } = await supabase
+
+    // Use 'any' to bypass TS typechecking, since user_profiles is not in generated types
+    const { data, error } = await (supabase as any)
       .from("user_profiles")
       .select("avatar_url")
       .eq("id", user.id)
       .maybeSingle();
 
-    // Accepts dynamic types since not present in Supabase's generated types
     if (error || !data) return null;
-    // Type assertion for custom table
     return (data as UserProfile).avatar_url || null;
   }, [user]);
 
@@ -35,7 +35,7 @@ export function useSupabaseAvatar() {
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     if (!user) return;
     // upsert (se não existe, cria, se existe, atualiza)
-    await supabase
+    await (supabase as any)
       .from("user_profiles")
       .upsert(
         { id: user.id, avatar_url: avatarUrl || null, updated_at: new Date().toISOString() },
@@ -90,4 +90,3 @@ export function useSupabaseAvatar() {
     loading,
   };
 }
-
