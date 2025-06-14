@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,26 +51,17 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const loadProviders = async () => {
     try {
-<<<<<<< HEAD
       console.log("📊 [ReportDashboardEnhanced] Carregando provedores de IA...");
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       const activeProviders = await AIProviderService.getProviders();
       setProviders(activeProviders);
       if (activeProviders.length > 0) {
         setSelectedProvider(String(activeProviders[0].id));
-<<<<<<< HEAD
         console.log("📊 [ReportDashboardEnhanced] Provedores carregados. Primeiro provedor selecionado:", activeProviders[0].id);
       } else {
         console.log("📊 [ReportDashboardEnhanced] Nenhum provedor de IA ativo encontrado.");
       }
     } catch (error) {
       console.error("Erro ao carregar provedores:", error);
-=======
-      }
-    } catch (error) {
-      console.error('Erro ao carregar provedores:', error);
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
     }
   };
 
