@@ -12,6 +12,7 @@ import { Lock } from 'lucide-react';
 import { ProfilePicture } from '@/components/ProfilePicture';
 import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 import { supabase } from "@/lib/supabase";
+import { useProfileAvatar } from "@/hooks/useProfileAvatar";
 
 interface CredentialsSectionProps {
   isDarkMode: boolean;
@@ -30,48 +31,29 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     confirmPassword: ''
   });
 
-  // Avatar states
-  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
-  const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
-  const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
-  const [avatarForceReload, setAvatarForceReload] = useState(0); // Para forçar re-render/useEffect
-  const [loading, setLoading] = useState(false);
-  const [avatarOldFilePath, setAvatarOldFilePath] = useState<string | null>(null);
-
+  // Avatar logic encapsulated
   const {
-    getAvatarUrl,
+    avatarUrl,
     uploadAvatar,
     removeAvatar,
-    updateAvatarUrl,
     loading: avatarLoading,
-  } = useSupabaseAvatar();
+    ready: avatarReady,
+    refetchAvatar
+  } = useProfileAvatar();
 
-  // Função utilitária para extrair o caminho do arquivo da publicUrl
-  function getFilePathFromUrl(url: string | null): string | null {
-    if (!url) return null;
-    const match = url.match(/\/storage\/v1\/object\/public\/avatars\/(.+)/);
-    return match ? match[1] : null;
-  }
+  // States for draft/crop
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Carrega avatar salvo + caminho do arquivo antigo ao montar ou quando alterado
+  // Sync with profile-avatar fetch
   useEffect(() => {
-    let isMounted = true;
-    async function fetchAvatar() {
-      if (!user?.id) return;
-      const url = await getAvatarUrl();
-      if (isMounted) {
-        setAvatarSaved(url || null);
-        setAvatarDraftFile(null);
-        setAvatarDraftUrl(null);
-        setAvatarOldFilePath(getFilePathFromUrl(url || null));
-      }
+    if (!avatarDraftFile && !avatarDraftUrl && avatarReady) {
+      // No draft, just show saved
+      // nothing to set here, kept for clarity
     }
-    fetchAvatar();
+  }, [avatarUrl, avatarReady, avatarDraftFile, avatarDraftUrl]);
 
-    return () => { isMounted = false };
-  }, [user?.id, getAvatarUrl, avatarForceReload]);
-
-  // Handle draft/crop do componente ProfilePicture (não salva nem faz upload ainda)
   const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
     setAvatarDraftFile(file);
     setAvatarDraftUrl(previewUrl);
@@ -95,7 +77,6 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       });
       return;
     }
-
     if (formData.newPassword && formData.newPassword.length < 6) {
       toast({
         title: "Erro",
@@ -110,25 +91,19 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       const updateData: any = {};
       const changes: string[] = [];
       let fezUploadOuRemocao = false;
-      let novoPublicUrl: string | null = null;
 
       // FOTO DE PERFIL: UPLOAD OU REMOÇÃO
       if (avatarDraftFile && avatarDraftUrl) {
-        // 1. Remove do Storage se houver uma anterior
-        if (avatarSaved && avatarOldFilePath) {
-          // Excluir antigo do storage diretamente via Supabase client
-          const { error } = await supabase.storage.from("avatars").remove([avatarOldFilePath]);
-          if (error) {
-            // Não bloqueia o processo mas loga
-            console.warn("Erro ao remover foto antiga do storage:", error);
-          }
-        }
-        // 2. Upload nova
-        novoPublicUrl = await uploadAvatar(avatarDraftFile);
-        if (novoPublicUrl) {
-          await updateAvatarUrl(novoPublicUrl);
-          setAvatarSaved(novoPublicUrl);
-          setAvatarOldFilePath(getFilePathFromUrl(novoPublicUrl));
+        // upload and update DB, remove old (handled by hook)
+        const publicUrl = await uploadAvatar(avatarDraftFile);
+        if (publicUrl) {
+          toast({
+            title: "Sucesso",
+            description: "Foto de perfil atualizada!",
+            variant: "default"
+          });
+          setAvatarDraftFile(null);
+          setAvatarDraftUrl(null);
           changes.push('profile_picture');
           fezUploadOuRemocao = true;
         } else {
@@ -140,19 +115,19 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
           setLoading(false);
           return;
         }
-      } else if (!avatarDraftUrl && avatarSaved) {
-        // Se tinha uma salva e apagou no draft, deleta do bucket
-        if (avatarOldFilePath) {
-          await supabase.storage.from("avatars").remove([avatarOldFilePath]);
-        }
+      } else if (!avatarDraftUrl && !avatarDraftFile && avatarUrl) {
+        // Se tinha salva e apagou
         await removeAvatar();
-        setAvatarSaved(null);
-        setAvatarOldFilePath(null);
+        toast({
+          title: "Sucesso",
+          description: "Foto de perfil removida",
+          variant: "default"
+        });
         changes.push('profile_picture');
         fezUploadOuRemocao = true;
       }
 
-      // USER/SENHA (mantém igual)
+      // USER/SENHA
       if (formData.username !== user.username) {
         updateData.username = formData.username;
         changes.push('username');
@@ -165,17 +140,20 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         await updateUser(user.id, updateData);
       }
 
+      // Audit log
       if (changes.length > 0) {
         await logCredentialsAction('update', {
           changes,
           timestamp: new Date().toISOString()
         });
       }
-      toast({
-        title: "Sucesso",
-        description: "Credenciais atualizadas com sucesso!",
-        variant: "default"
-      });
+      if (changes.length > 0) {
+        toast({
+          title: "Sucesso",
+          description: "Credenciais atualizadas com sucesso!",
+          variant: "default"
+        });
+      }
 
       setFormData(prev => ({
         ...prev,
@@ -183,19 +161,11 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         newPassword: '',
         confirmPassword: ''
       }));
-      setAvatarDraftFile(null);
-      setAvatarDraftUrl(null);
 
-      // Atualiza preview da nova foto imediatamente
-      if (novoPublicUrl) {
-        setAvatarSaved(novoPublicUrl);
-        setAvatarOldFilePath(getFilePathFromUrl(novoPublicUrl));
-      }
-
-      // Força reload apenas se mudou algo na foto
       if (fezUploadOuRemocao) {
-        setAvatarForceReload(c => c + 1);
+        refetchAvatar();
       }
+
     } catch (error) {
       toast({
         title: "Erro",
@@ -227,7 +197,11 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
             isDarkMode={isDarkMode}
             userName={user?.name || user?.username || ''}
             onAvatarChange={handleAvatarChange}
-            externalPreview={avatarDraftUrl !== null ? avatarDraftUrl : avatarSaved}
+            externalPreview={
+              avatarDraftUrl !== null
+                ? avatarDraftUrl
+                : (avatarUrl || null)
+            }
           />
         </CardContent>
       </Card>
@@ -314,10 +288,10 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
             <div className="pt-4">
               <Button 
                 type="submit"
-                disabled={loading}
+                disabled={loading || avatarLoading}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 h-11"
               >
-                {loading ? 'Salvando...' : 'Salvar Alterações'}
+                {loading || avatarLoading ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </div>
           </form>
