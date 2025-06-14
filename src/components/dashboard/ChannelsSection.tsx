@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -34,7 +33,6 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   };
 
   const getChannelDisplayName = (channel: any) => {
-    // Manter os nomes originais dos canais sem unificação
     const nameMappings: Record<string, string> = {
       'Andressa Gerente Externo': 'Andressa',
       'Gustavo Gerente das Lojas': 'Gustavo',
@@ -44,18 +42,32 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   };
 
   const accessibleChannels = getAccessibleChannels();
-  const availableChannels = channels
-    .filter(channel => 
-      channel.isActive && 
-      channel.name !== 'Pedro' && // Filtrar o canal Pedro que não existe mais
-      channel.name // Garantir que o canal tem um nome válido
-    )
-    .map(channel => ({
-      ...channel,
-      legacyId: getChannelLegacyId(channel),
-      displayName: getChannelDisplayName(channel)
-    }))
-    .filter(channel => accessibleChannels.includes(channel.legacyId));
+  
+  // NOVO: Exibir para admin todos os canais ativos exceto Pedro
+  const { user } = require('@/contexts/AuthContext').useAuth?.() || {};
+  let availableChannels = [];
+
+  if (user?.role === 'admin') {
+    availableChannels = channels
+      .filter(channel => channel.isActive && channel.name !== 'Pedro')
+      .map(channel => ({
+        ...channel,
+        legacyId: getChannelLegacyId(channel),
+        displayName: getChannelDisplayName(channel)
+      }));
+  } else {
+    availableChannels = channels
+      .filter(channel => 
+        channel.isActive && 
+        channel.name !== 'Pedro' &&
+        accessibleChannels.includes(getChannelLegacyId(channel))
+      )
+      .map(channel => ({
+        ...channel,
+        legacyId: getChannelLegacyId(channel),
+        displayName: getChannelDisplayName(channel)
+      }));
+  }
 
   const handleChannelClick = (channelId: string) => {
     console.log('🔥 Dashboard channel clicked:', channelId);
