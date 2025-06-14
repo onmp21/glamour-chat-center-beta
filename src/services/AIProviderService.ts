@@ -2,13 +2,20 @@ import { supabase } from '@/integrations/supabase/client.ts';
 import { AIProvider, AIProviderFormData, ProviderType } from '@/types/ai-providers';
 
 export class AIProviderService {
-  static async getProviders(): Promise<AIProvider[]> {
-    console.log('🔍 [AI_PROVIDER_SERVICE] Getting providers with direct query');
-    
-    const { data, error } = await supabase
+  static async getProviders(userId?: string): Promise<AIProvider[]> {
+    console.log('🔍 [AI_PROVIDER_SERVICE] Getting providers with direct query. userId:', userId);
+
+    let query = supabase
       .from('ai_providers')
       .select('*')
-      .eq('is_active', true)
+      .eq('is_active', true);
+
+    // Permitir busca global OU por usuário se fornecido
+    if (userId) {
+      query = query.or(`user_id.is.null,user_id.eq.${userId}`);
+    } // Se não houver userId, traz todos (global)
+
+    const { data, error } = await query
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -28,7 +35,7 @@ export class AIProviderService {
       api_key: provider.api_key || '',
       base_url: provider.base_url || '',
       default_model: provider.default_model || '',
-      user_id: provider.user_id || ''
+      user_id: provider.user_id || null
     }));
   }
 

@@ -27,32 +27,50 @@ export const openaiService = {
   async getOpenAIInstance(providerType: ProviderType | string = 'openai'): Promise<OpenAI | null> {
     DetailedLogger.info('OpenAIService', `Buscando provedor OpenAI ativo... Tipo: ${providerType}`);
     try {
-      // AIProviderService.getActiveProviders() should ideally return AIProvider[] | AIProvider | null
-      // where AIProvider is the type from @/types/ai-providers
-      const activeProvidersResult = await AIProviderService.getActiveProviders(); 
-      
+      // Tentar obter userId global + individual, se hook de contexto disponível
+      let userId: string | undefined = undefined;
+      // Tentativa de buscar userId do contexto está fora deste arquivo
+      // Por simplicidade, consulta ambos (global e usuário) como no serviço acima
+
+      const activeProvidersResult = await AIProviderService.getProviders(userId);
+
       let provider: AIProvider | null | undefined = null;
 
       if (Array.isArray(activeProvidersResult)) {
-        // Ensure 'p' is correctly typed as AIProvider (from import)
-        provider = activeProvidersResult.find(p => p.provider_type === providerType && p.is_active === true);
+        console.log('[OpenAIService] Lista de provedores disponíveis:', activeProvidersResult.map(p => `${p.name} (${p.provider_type}) ativo=${p.is_active}, user_id=${p.user_id}`));
+        provider = activeProvidersResult.find(
+          p => p.provider_type === providerType && p.is_active === true
+        );
+        if (!provider) {
+          DetailedLogger.warn(
+            'OpenAIService',
+            `Nenhum provedor OpenAI ativo encontrado para o tipo '${providerType}'.`
+          );
+        }
       } else if (activeProvidersResult && typeof activeProvidersResult === 'object') {
-        // Ensure activeProvidersResult is correctly typed as AIProvider (from import)
-        const singleProvider = activeProvidersResult as AIProvider; // Cast if necessary, or ensure service returns correctly typed
-        if (singleProvider.provider_type === providerType && singleProvider.is_active === true) {
-          provider = singleProvider;
+        provider = (activeProvidersResult as AIProvider);
+        if (
+          provider.provider_type === providerType &&
+          provider.is_active === true
+        ) {
+          // Ok
+        } else {
+          provider = null;
         }
       }
-      
+
       if (provider && provider.api_key) {
-        DetailedLogger.info('OpenAIService', `Provedor OpenAI '${provider.name}' encontrado. BaseURL: ${provider.base_url || 'Padrão OpenAI'}`);
+        DetailedLogger.info(
+          'OpenAIService',
+          `Provedor OpenAI '${provider.name}' encontrado. BaseURL: ${provider.base_url || 'Padrão OpenAI'}`
+        );
         return new OpenAI({
-          apiKey: provider.api_key, // api_key is optional on AIProvider, so this check is important
+          apiKey: provider.api_key,
           baseURL: provider.base_url || undefined,
           dangerouslyAllowBrowser: true,
         });
       }
-      DetailedLogger.warn('OpenAIService', `Nenhum provedor OpenAI ativo do tipo '${providerType}' ou chave de API não configurada.`);
+      DetailedLogger.warn('OpenAIService', `Provedor OpenAI não encontrado ou chave de API não configurada. Resultado da busca:`, provider);
       return null;
     } catch (error) {
       DetailedLogger.error('OpenAIService', 'Erro ao obter instância OpenAI:', error);
