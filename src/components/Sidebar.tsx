@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { SidebarUserProfileButton } from './sidebar/SidebarUserProfileButton';
 
 interface SidebarProps {
   activeSection: string;
@@ -188,68 +189,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* --- NOVO FOOTER --- */}
         <div className="p-4 border-t border-inherit">
-          {/* Avatar Colapsado */}
-          {isCollapsed && user && (
-            <div className="flex flex-col items-center space-y-3 mb-4">
-              <button onClick={handleProfileClick}>
-                <Avatar className="w-12 h-12 hover:ring-2 hover:ring-[#b5103c]/50 transition-all">
-                  <AvatarImage
-                    src={userProfile?.avatar_url || undefined}
-                    alt={user.name}
-                    onError={(e) => (e.currentTarget.src = undefined)}
-                  />
-                  <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            </div>
-          )}
-          {/* Avatar + dados igual ao mock */}
-          {!isCollapsed && user && (
-            <button 
-              onClick={handleProfileClick}
-              className={cn(
-                "flex items-center px-4 py-3 rounded-xl w-full mb-4 border transition-all duration-200",
-                isDarkMode
-                  ? "bg-[#b5103c]/10 border-[#b5103c]/40 hover:bg-[#b5103c]/20"
-                  : "bg-[#b5103c]/5 border-[#b5103c]/20 hover:bg-[#b5103c]/10"
-              )}
-              style={{
-                boxShadow: isDarkMode
-                  ? "0 0 0 1.5px #b5103c22"
-                  : "0 0 0 1.5px #b5103c22"
-              }}
-              aria-label="Alterar foto e credenciais"
-            >
-              <Avatar className="w-10 h-10 mr-3">
-                <AvatarImage
-                  src={userProfile?.avatar_url || undefined}
-                  alt={user.name}
-                  onError={(e) => (e.currentTarget.src = undefined)}
-                  style={{ objectFit: "cover", background: "transparent" }}
-                />
-                <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start min-w-0">
-                <span className={cn(
-                  "text-base font-medium truncate",
-                  isDarkMode ? "text-white" : "text-gray-900"
-                )}>
-                  {user.name}
-                </span>
-                <span className={cn(
-                  "text-sm truncate",
-                  isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
-                )}>
-                  {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                </span>
-              </div>
-            </button>
-          )}
-          
+          <SidebarUserProfileButton
+            user={user}
+            avatarUrl={userProfile?.avatar_url}
+            isDarkMode={isDarkMode}
+            isCollapsed={isCollapsed}
+            onProfileClick={() => onSectionChange('credentials')}
+          />
+
           {/* Controles de tema e logout */}
           <div className={cn(
             "space-y-2", 
@@ -288,7 +235,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Button>
           </div>
         </div>
-
         {/* --- FIM DO FOOTER --- */}
       </div>
 
