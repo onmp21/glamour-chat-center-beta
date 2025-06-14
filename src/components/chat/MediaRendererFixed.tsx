@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MediaProcessor } from '@/services/MediaProcessor';
+import React, { useState, useEffect } from 'react';
+import { MediaProcessor } from '@/services/MediaProcessor'; // agora assíncrono
 import { AudioPlayerFixed } from './AudioPlayerFixed';
 import { MediaOverlay } from './MediaOverlay';
 import { AlertCircle, Download, Play, Pause, Volume2 } from 'lucide-react';
@@ -32,50 +32,22 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   balloonColor = 'received'
 }) => {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
 
-  // Processar mídia usando o MediaProcessor melhorado
-  const processedResult = React.useMemo(() => {
-    console.log('🎯 [MEDIA_RENDERER_FIXED] Processing media:', { 
-      messageId, 
-      messageType, 
-      contentLength: content?.length || 0,
-      startsWithData: content?.startsWith('data:')
+  // Novo: processamento assíncrono da mídia
+  const [processedResult, setProcessedResult] = useState<MediaResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    MediaProcessor.processAsync(content, messageType).then(res => {
+      if (mounted) {
+        setProcessedResult(res);
+        setLoading(false);
+      }
     });
-    
-    let result: MediaResult;
-    
-    // Usar métodos específicos baseado no tipo
-    switch (messageType?.toLowerCase()) {
-      case 'audio':
-      case 'audiomessage':
-      case 'ptt':
-      case 'voice':
-        result = MediaProcessor.processAudio(content);
-        break;
-      case 'video':
-      case 'videomessage':
-        result = MediaProcessor.processVideo(content);
-        break;
-      case 'image':
-      case 'imagemessage':
-        result = MediaProcessor.processImage(content);
-        break;
-      default:
-        result = MediaProcessor.process(content, messageType);
-    }
-    
-    console.log('🎯 [MEDIA_RENDERER_FIXED] Media processing result:', {
-      messageId,
-      type: result.type,
-      isProcessed: result.isProcessed,
-      mimeType: result.mimeType,
-      size: result.size,
-      error: result.error
-    });
-    
-    return result;
-  }, [content, messageType, messageId]);
+    return () => { mounted = false };
+  }, [content, messageType]);
 
   // Estado de erro
   const renderError = () => (
@@ -94,18 +66,23 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
         "text-xs text-center mt-1",
         isDarkMode ? "text-destructive-foreground/80" : "text-red-500"
       )}>
-        {processedResult.error || 'Formato não suportado'}
+        {(processedResult && processedResult.error) || 'Formato não suportado'}
       </div>
-      {/* Debug info em desenvolvimento */}
-      {import.meta.env.MODE === 'development' && (
-        <div className="text-xs text-muted-foreground mt-2 max-w-full break-all">
-          Type: {messageType} | Length: {content?.length || 0}
-        </div>
-      )}
     </div>
   );
 
-  // Verificar se há erro
+  if (loading || !processedResult) {
+    return (
+      <div className={cn(
+        "flex flex-col items-center justify-center min-h-[80px] p-4 rounded-lg border max-w-[300px]",
+        isDarkMode ? "bg-muted border-border" : "bg-gray-100 border-gray-200"
+      )}>
+        <div className="animate-spin w-6 h-6 rounded-full border-4 border-primary border-t-transparent" />
+        <div className="mt-2 text-xs text-muted-foreground">Carregando mídia…</div>
+      </div>
+    );
+  }
+
   if (!processedResult.isProcessed || !processedResult.url) {
     return renderError();
   }

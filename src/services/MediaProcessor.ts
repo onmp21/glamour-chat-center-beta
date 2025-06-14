@@ -1,5 +1,6 @@
 
 import { MediaDetector } from './media/MediaDetector';
+import { MediaStorageService } from './MediaStorageService';
 
 interface ProcessResult {
   isProcessed: boolean;
@@ -11,14 +12,13 @@ interface ProcessResult {
 }
 
 export class MediaProcessor {
-  static process(content: string, messageType?: string): ProcessResult {
+  // Nova: faz upload de base64 no Supabase Storage e retorna o link público
+  static async processAsync(content: string, messageType?: string): Promise<ProcessResult> {
     try {
-      // Não processar conteúdo muito pequeno ou vazio
       if (!content || content.length < 20) {
         return { isProcessed: false, error: 'Conteúdo muito pequeno' };
       }
 
-      // Se já é URL do storage, retornar como está
       if (content.includes('supabase.co/storage/v1/object/public/media-files/')) {
         return {
           isProcessed: true,
@@ -28,17 +28,37 @@ export class MediaProcessor {
         };
       }
 
-      // Verificar se é data URL válido
       if (content.startsWith('data:')) {
-        return this.processDataUrl(content, messageType);
+        // Salva no storage e retorna URL
+        const uploadResult = await MediaStorageService.uploadBase64ToStorage(content);
+        if (uploadResult.success && uploadResult.url) {
+          return {
+            isProcessed: true,
+            url: uploadResult.url,
+            type: this.detectMediaType(content, messageType),
+            mimeType: this.getMimeTypeFromUrl(uploadResult.url)
+          }
+        } else {
+          return { isProcessed: false, error: uploadResult.error || 'Erro ao enviar mídia ao storage' };
+        }
       }
 
-      // Verificar se parece base64 puro
       if (MediaDetector.looksLikeBase64(content)) {
-        return this.processBase64(content, messageType);
+        // Converte base64 puro para dataurl, salva e retorna URL
+        const dataUrl = `data:${this.getMimeTypeFromType(messageType ?? 'image')};base64,${content}`;
+        const uploadResult = await MediaStorageService.uploadBase64ToStorage(dataUrl);
+        if (uploadResult.success && uploadResult.url) {
+          return {
+            isProcessed: true,
+            url: uploadResult.url,
+            type: messageType ?? 'image',
+            mimeType: this.getMimeTypeFromUrl(uploadResult.url)
+          }
+        } else {
+          return { isProcessed: false, error: uploadResult.error || 'Erro ao enviar base64 ao storage' };
+        }
       }
 
-      // Não é mídia válida
       return { isProcessed: false, error: 'Não é conteúdo de mídia válido' };
 
     } catch (error) {
@@ -47,93 +67,37 @@ export class MediaProcessor {
     }
   }
 
+  static process(content: string, messageType?: string): ProcessResult {
+    // Por compatibilidade, apenas retorna erro dizendo que só processa de forma assíncrona agora.
+    return {
+      isProcessed: false,
+      error: 'Use processAsync para processar mídia corretamente!'
+    };
+  }
+
   static processImage(content: string): ProcessResult {
     return this.process(content, 'image');
   }
-
   static processAudio(content: string): ProcessResult {
     return this.process(content, 'audio');
   }
-
   static processVideo(content: string): ProcessResult {
     return this.process(content, 'video');
-  }
-
-  private static processDataUrl(content: string, messageType?: string): ProcessResult {
-    try {
-      const [header, base64Data] = content.split(',');
-      
-      if (!header || !base64Data) {
-        return { isProcessed: false, error: 'Data URL inválido' };
-      }
-
-      const mimeMatch = header.match(/data:([^;]+)/);
-      const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-      
-      // Validar base64
-      if (!this.isValidBase64(base64Data)) {
-        return { isProcessed: false, error: 'Base64 inválido' };
-      }
-
-      const type = this.getTypeFromMimeType(mimeType);
-      const size = this.calculateSize(base64Data);
-
-      return {
-        isProcessed: true,
-        url: content,
-        type,
-        mimeType,
-        size
-      };
-
-    } catch (error) {
-      return { isProcessed: false, error: 'Erro ao processar data URL' };
-    }
-  }
-
-  private static processBase64(content: string, messageType?: string): ProcessResult {
-    try {
-      if (!this.isValidBase64(content)) {
-        return { isProcessed: false, error: 'Base64 inválido' };
-      }
-
-      const detectedType = MediaDetector.detectMediaTypeFromBase64(content);
-      const type = messageType || detectedType;
-      const mimeType = this.getMimeTypeFromType(type);
-      
-      // Converter para data URL
-      const dataUrl = `data:${mimeType};base64,${content}`;
-      const size = this.calculateSize(content);
-
-      return {
-        isProcessed: true,
-        url: dataUrl,
-        type,
-        mimeType,
-        size
-      };
-
-    } catch (error) {
-      return { isProcessed: false, error: 'Erro ao processar base64' };
-    }
   }
 
   static detectMediaType(content: string, messageType?: string): string {
     if (messageType && messageType !== 'text') {
       return messageType;
     }
-
     if (content.startsWith('data:')) {
       const mimeMatch = content.match(/data:([^;]+)/);
       if (mimeMatch) {
         return this.getTypeFromMimeType(mimeMatch[1]);
       }
     }
-
     if (MediaDetector.looksLikeBase64(content)) {
       return MediaDetector.detectMediaTypeFromBase64(content);
     }
-
     return 'unknown';
   }
 
@@ -169,22 +133,6 @@ export class MediaProcessor {
       case 'pdf': return 'application/pdf';
       default: return 'application/octet-stream';
     }
-  }
-
-  private static isValidBase64(base64: string): boolean {
-    try {
-      const cleaned = base64.replace(/[\s\n\r\t]/g, '');
-      return /^[A-Za-z0-9+/]*={0,2}$/.test(cleaned) && cleaned.length % 4 === 0;
-    } catch {
-      return false;
-    }
-  }
-
-  private static calculateSize(base64: string): string {
-    const bytes = (base64.length * 3) / 4;
-    if (bytes < 1024) return `${bytes.toFixed(0)} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   static getMediaIcon(type: string): string {
