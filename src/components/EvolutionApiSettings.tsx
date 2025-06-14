@@ -649,7 +649,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           {getStatusBadge(instance.status)}
-                          <span className="font-semibold">{instance.profileName || instance.instanceName}</span>
+                          <span className="font-semibold">{instance.instanceName}</span>
+                          {instance.profileName && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              ({instance.profileName})
+                            </span>
+                          )}
                           {instance.number && (
                             <span className="text-sm text-gray-500">({instance.number})</span>
                           )}
@@ -812,7 +817,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                     <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
                       {apiConnection.instances.map(instance => (
                         <SelectItem key={instance.instanceName} value={instance.instanceName}>
-                          {instance.profileName || instance.instanceName}
+                          {instance.instanceName}
+                          {instance.profileName && (
+                            <span className="text-xs text-gray-400 ml-1">
+                              ({instance.profileName})
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                     </SelectContent>
