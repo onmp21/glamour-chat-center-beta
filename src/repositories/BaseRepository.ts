@@ -1,5 +1,5 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 
 export abstract class BaseRepository<T> {
   protected tableName: string;
@@ -91,3 +91,4 @@ export abstract class BaseRepository<T> {
     }
   }
 }
+
