@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,28 +13,25 @@ interface ProfilePictureProps {
   userName: string;
 }
 
-// Type guard to check if object has avatar_url property
-const hasAvatarUrl = (obj: any): obj is { avatar_url?: string } => {
-  return obj && typeof obj === 'object';
-};
-
 export const ProfilePicture: React.FC<ProfilePictureProps> = ({ 
   isDarkMode, 
   userName
 }) => {
   const { user } = useAuth();
-  const { getProfileByUserId, loadProfile, uploadAvatar, updateProfile, loading } = useUserProfiles();
+  const { loadProfile, uploadAvatar, updateProfile, removeAvatar, loading, getProfileByUserId } = useUserProfiles();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadProfile(user.id).then(profile => {
-        if (hasAvatarUrl(profile) && profile.avatar_url) {
+        if (profile?.avatar_url) {
           setSelectedImage(profile.avatar_url);
+        } else {
+          setSelectedImage(null);
         }
       });
     }
-  }, [user, loadProfile]);
+  }, [user?.id, loadProfile]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -59,10 +57,8 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   };
 
   const handleRemoveImage = async () => {
-    if (user) {
-      setSelectedImage(null);
-      await updateProfile({ avatar_url: null });
-    }
+    setSelectedImage(null);
+    await removeAvatar();
   };
 
   const getInitials = (name: string) => {
