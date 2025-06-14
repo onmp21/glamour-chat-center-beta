@@ -1,4 +1,3 @@
-
 export interface RawMessage {
   id: string;
   session_id: string;
@@ -39,7 +38,7 @@ export interface ChannelConversation {
   last_message_time: string | null;
   status: 'unread' | 'in_progress' | 'resolved';
   updated_at: string;
-  unread_count: number;
+  unread_count?: number; // Made unread_count optional
   message_count?: number;
 }
 

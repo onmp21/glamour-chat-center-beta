@@ -16,7 +16,7 @@ import {
   QrCode,
   RefreshCw
 } from 'lucide-react';
-import { evolutionMessageService } from '@/services/EvolutionMessageService';
+import { EvolutionMessageService } from '@/services/EvolutionMessageService'; 
 import { useToast } from '@/hooks/use-toast';
 
 interface EvolutionMessageTestProps {
@@ -69,7 +69,8 @@ export const EvolutionMessageTest: React.FC<EvolutionMessageTestProps> = ({ isDa
     try {
       console.log('🧪 [EVOLUTION_TEST] Enviando mensagem de teste');
 
-      const result = await evolutionMessageService.sendTextMessage({
+      // Use the corrected service name
+      const result = await EvolutionMessageService.sendTextMessage({
         channelId: selectedChannel,
         phoneNumber: phoneNumber,
         message: message
@@ -134,7 +135,8 @@ export const EvolutionMessageTest: React.FC<EvolutionMessageTestProps> = ({ isDa
     try {
       console.log('🔍 [EVOLUTION_TEST] Verificando conexão');
 
-      const status = await evolutionMessageService.checkChannelConnectionStatus(selectedChannel);
+      // Use the corrected service name
+      const status = await EvolutionMessageService.checkChannelConnectionStatus(selectedChannel);
       
       setConnectionStatus({
         connected: status.connected,
@@ -386,4 +388,3 @@ export const EvolutionMessageTest: React.FC<EvolutionMessageTestProps> = ({ isDa
     </div>
   );
 };
-

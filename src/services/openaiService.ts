@@ -1,9 +1,9 @@
-
 import OpenAI from 'openai';
 import { supabase } from '@/integrations/supabase/client';
 import { AIProviderService } from './AIProviderService';
 import { DetailedLogger } from './DetailedLogger';
-import { getTableNameForChannel } from '@/utils/channelMapping'; // Corrected import
+import { getTableNameForChannel } from '@/utils/channelMapping';
+import { AIProvider, ProviderType } from '@/types/ai-providers';
 
 // Tipos básicos para mensagens e conversas
 interface ConversationMessage {
@@ -11,54 +11,43 @@ interface ConversationMessage {
   message: string;
   nome_do_contato?: string | null;
   session_id: string;
-  tipo_remetente: 'customer' | 'agent' | 'USUARIO_INTERNO' | 'Yelena-ai' | 'CONTATO_EXTERNO' | string; // string para flexibilidade
-  created_at: string; // ou Date
+  tipo_remetente: 'customer' | 'agent' | 'USUARIO_INTERNO' | 'Yelena-ai' | 'CONTATO_EXTERNO' | string;
+  created_at: string; 
   mensagemtype?: string | null;
   media_url?: string | null;
   media_caption?: string | null;
   is_read?: boolean | null;
 }
 
-// Define AIProvider type based on table structure
-interface AIProvider {
-  id: string;
-  name: string;
-  provider_type: string;
-  api_key: string;
-  base_url?: string | null;
-  default_model?: string | null;
-  is_active?: boolean | null; // is_active can be boolean or null
-  // Add other fields from your ai_providers table as needed
-  advanced_settings?: any; // Use 'any' or a more specific type for jsonb
-  user_id?: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
+// Removed local AIProvider interface, will use imported one
 
-
-const MAX_PROMPT_MESSAGES = 20; // Limite de mensagens para incluir no prompt
+const MAX_PROMPT_MESSAGES = 20;
 
 export const openaiService = {
-  async getOpenAIInstance(providerType: 'openai' | string = 'openai'): Promise<OpenAI | null> {
+  async getOpenAIInstance(providerType: ProviderType | string = 'openai'): Promise<OpenAI | null> {
     DetailedLogger.info('OpenAIService', `Buscando provedor OpenAI ativo... Tipo: ${providerType}`);
     try {
-      const activeProvidersResult = await AIProviderService.getActiveProviders(); // Should return AIProvider[] | AIProvider | null
+      // AIProviderService.getActiveProviders() should ideally return AIProvider[] | AIProvider | null
+      // where AIProvider is the type from @/types/ai-providers
+      const activeProvidersResult = await AIProviderService.getActiveProviders(); 
       
       let provider: AIProvider | null | undefined = null;
 
       if (Array.isArray(activeProvidersResult)) {
+        // Ensure 'p' is correctly typed as AIProvider (from import)
         provider = activeProvidersResult.find(p => p.provider_type === providerType && p.is_active === true);
       } else if (activeProvidersResult && typeof activeProvidersResult === 'object') {
-        // activeProvidersResult is a single AIProvider object
-        if (activeProvidersResult.provider_type === providerType && activeProvidersResult.is_active === true) {
-          provider = activeProvidersResult;
+        // Ensure activeProvidersResult is correctly typed as AIProvider (from import)
+        const singleProvider = activeProvidersResult as AIProvider; // Cast if necessary, or ensure service returns correctly typed
+        if (singleProvider.provider_type === providerType && singleProvider.is_active === true) {
+          provider = singleProvider;
         }
       }
       
       if (provider && provider.api_key) {
         DetailedLogger.info('OpenAIService', `Provedor OpenAI '${provider.name}' encontrado. BaseURL: ${provider.base_url || 'Padrão OpenAI'}`);
         return new OpenAI({
-          apiKey: provider.api_key,
+          apiKey: provider.api_key, // api_key is optional on AIProvider, so this check is important
           baseURL: provider.base_url || undefined,
           dangerouslyAllowBrowser: true,
         });
@@ -104,12 +93,12 @@ export const openaiService = {
     try {
       DetailedLogger.info('OpenAIService', 'Enviando requisição de resumo para OpenAI...');
       const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo', // Ou um modelo configurável
+        model: 'gpt-3.5-turbo', 
         messages: [
           { role: 'system', content: 'Você é um assistente útil que resume conversas.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 200, // Ajustar conforme necessário
+        max_tokens: 200,
       });
 
       const summary = completion.choices[0]?.message?.content?.trim();
@@ -153,14 +142,14 @@ export const openaiService = {
       }
       
       const typedData: ConversationMessage[] = (data || []).map((item: any): ConversationMessage => ({
-        id: String(item.id),
+        id: String(item.id), // Ensure id is string
         message: item.message || '',
         nome_do_contato: item.nome_do_contato,
         session_id: item.session_id,
         tipo_remetente: item.tipo_remetente || 'unknown',
         created_at: item.created_at || new Date().toISOString(),
         mensagemtype: item.mensagemtype,
-        media_url: item.media_url || item.media_base64,
+        media_url: item.media_url || item.media_base64, // Handle both possible media fields
         media_caption: item.media_caption,
         is_read: item.is_read,
       }));
@@ -199,17 +188,19 @@ export const openaiService = {
     }
     prompt += 'Histórico da Conversa (mais recentes primeiro):\n';
 
-    messages.slice(-5).reverse().forEach(msg => { // Pega as últimas 5 mensagens
+    messages.slice(-5).reverse().forEach(msg => { 
       const senderPrefix = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO' ? `${contactName}:` : 'Atendente:';
       prompt += `${senderPrefix} ${msg.message}\n`;
     });
     
-    prompt += `\nSugira uma resposta para a última mensagem de ${messages[messages.length -1].tipo_remetente === 'customer' || messages[messages.length -1].tipo_remetente === 'CONTATO_EXTERNO' ? contactName : 'Atendente'}:`;
+    const lastMessageSender = messages[messages.length -1].tipo_remetente;
+    const lastMessageContact = lastMessageSender === 'customer' || lastMessageSender === 'CONTATO_EXTERNO' ? contactName : 'Atendente';
+    prompt += `\nSugira uma resposta para a última mensagem de ${lastMessageContact}:`;
 
     try {
       DetailedLogger.info('OpenAIService', 'Enviando requisição de sugestão de resposta para OpenAI...');
       const completion = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo', // Ou um modelo configurável
+        model: 'gpt-3.5-turbo',
         messages: [
           { role: 'system', content: 'Você é um assistente prestativo que sugere respostas em um chat de atendimento.' },
           { role: 'user', content: prompt },
@@ -235,4 +226,3 @@ export const openaiService = {
     }
   }
 };
-
