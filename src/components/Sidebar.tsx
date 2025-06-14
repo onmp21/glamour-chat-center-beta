@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -53,8 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const userProfile = user ? getProfileByUserId(user.id) : null;
 
-  // Log para debug de avatar_url e nome do usuário
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       console.log("👤 [SIDEBAR] userProfile.avatar_url:", userProfile?.avatar_url, "| user:", user);
     }
@@ -186,9 +186,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </nav>
 
-        {/* Footer com Avatar e Usuário */}
+        {/* --- NOVO FOOTER --- */}
         <div className="p-4 border-t border-inherit">
-          {/* Avatar quando recolhido */}
+          {/* Avatar Colapsado */}
           {isCollapsed && user && (
             <div className="flex flex-col items-center space-y-3 mb-4">
               <button onClick={handleUserProfileClick}>
@@ -201,38 +201,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           )}
-
-          {/* Avatar quando expandido */}
+          {/* Avatar + dados igual ao mock */}
           {!isCollapsed && user && (
-            <button
+            <button 
               onClick={handleUserProfileClick}
-              className="w-full mb-4 p-3 rounded-xl bg-[#b5103c]/5 border border-[#b5103c]/20 hover:bg-[#b5103c]/10 hover:border-[#b5103c]/30 transition-all duration-200"
+              className={cn(
+                "flex items-center px-4 py-3 rounded-xl w-full mb-4 border transition-all duration-200",
+                isDarkMode
+                  ? "bg-[#b5103c]/10 border-[#b5103c]/40 hover:bg-[#b5103c]/20"
+                  : "bg-[#b5103c]/5 border-[#b5103c]/20 hover:bg-[#b5103c]/10"
+              )}
+              style={{
+                boxShadow: isDarkMode
+                  ? "0 0 0 1.5px #b5103c22"
+                  : "0 0 0 1.5px #b5103c22"
+              }}
             >
-              <div className="flex items-center space-x-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
-                  <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className={cn(
-                    "text-sm font-semibold truncate",
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  )}>
-                    {user.name}
-                  </p>
-                  <p className={cn(
-                    "text-xs truncate",
-                    isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
-                  )}>
-                    {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                  </p>
-                </div>
+              <Avatar className="w-10 h-10 mr-3">
+                <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
+                <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
+                  {getInitials(user.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col items-start min-w-0">
+                <span className={cn(
+                  "text-base font-medium truncate",
+                  isDarkMode ? "text-white" : "text-gray-900"
+                )}>
+                  {user.name}
+                </span>
+                <span className={cn(
+                  "text-sm truncate",
+                  isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
+                )}>
+                  {user.role === 'admin' ? 'Administrador' : 'Usuário'}
+                </span>
               </div>
             </button>
           )}
           
+          {/* Controles de tema e logout */}
           <div className={cn(
             "space-y-2", 
             isCollapsed ? "flex flex-col items-center space-y-3" : ""
@@ -270,6 +278,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Button>
           </div>
         </div>
+
+        {/* --- FIM DO FOOTER --- */}
       </div>
 
       {/* Logout Confirmation Dialog */}
