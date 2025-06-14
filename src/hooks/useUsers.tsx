@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'; // Corrigido: sem extensão .js
 import { User, UserRole, DatabaseUser } from '@/types/auth';
 
 export const useUsers = () => {
