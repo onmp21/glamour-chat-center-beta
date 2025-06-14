@@ -85,40 +85,31 @@ export const LoginForm: React.FC = () => {
     <div
       className="w-full min-h-screen flex items-stretch"
       style={{
-        background: `url('/lovable-uploads/56cf76b7-506e-4187-b17f-14ca7ef3306a.png') center center / cover no-repeat`,
-        // O mesmo padrão para escuro/claro pois o pedido foi igual:
+        background: `url('/lovable-uploads/9bab2598-2237-46f1-a400-ec745a53f7fc.png') center center / cover no-repeat`,
       }}
     >
       <div
-        className="flex items-center w-full md:w-[480px] max-w-full bg-white/80 dark:bg-[#101012e6] p-8 md:p-14 min-h-screen shadow-2xl"
-        style={{
-          // opção para ficar um pouco translúcido e trazer efeito "glass" leve
-          backdropFilter: 'blur(8px)',
-        }}
+        className="flex items-center justify-center w-full md:w-[450px] bg-[#fdfcfc] dark:bg-[#18181b] p-8 md:p-14 min-h-screen"
       >
-        <div className="w-full space-y-8">
-          {/* Logo maior e sem fundo */}
-          <div className="flex flex-col items-start">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="flex flex-col items-center text-center">
             <img
-              src="/lovable-uploads/2e823263-bd82-49e9-84f6-6327c136da53.png"
+              src="/lovable-uploads/ea397861-5fcd-451b-872e-727208c03a67.png"
               alt="Villa Glamour Logo"
-              className="w-24 h-24 md:w-36 md:h-36 object-contain mb-1"
-              style={{ background: 'transparent' }}
+              className="w-20 h-20 object-contain mb-4"
             />
-            <div>
-              <div className="font-extrabold text-4xl md:text-5xl bg-gradient-to-r from-[#b5103c] to-[#8a0c2e] bg-clip-text text-transparent leading-tight mb-1 md:mb-2 tracking-tight">
-                Villa Glamour
-              </div>
-              <div className="font-medium text-lg md:text-xl text-slate-600 dark:text-slate-300 opacity-80 mb-2">
-                Sistema de Atendimento
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-[#b5103c]">
+              Villa Glamour
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">
+              Sistema de Atendimento
+            </p>
           </div>
           <Card className="border-0 shadow-none bg-transparent p-0">
             <CardContent className="p-0">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <Label htmlFor="username" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Usuário
                   </Label>
                   <Input
@@ -129,11 +120,11 @@ export const LoginForm: React.FC = () => {
                     placeholder="Digite seu usuário"
                     disabled={isLoading}
                     autoComplete="username"
-                    className="h-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-[#222229e8]"
+                    className="h-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Senha
                   </Label>
                   <div className="relative">
@@ -145,7 +136,7 @@ export const LoginForm: React.FC = () => {
                       placeholder="Digite sua senha"
                       disabled={isLoading}
                       autoComplete="current-password"
-                      className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-[#222229e8]"
+                      className="h-12 pr-12 transition-all duration-200 focus:ring-2 focus:ring-[#b5103c] border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900/50"
                     />
                     <button
                       type="button"
@@ -174,11 +165,11 @@ export const LoginForm: React.FC = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-gradient-to-r from-[#b5103c] to-[#8a0c2e] hover:from-[#8a0c2e] hover:to-[#b5103c] text-white font-semibold transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
+                  className="w-full h-12 bg-[#9f1239] hover:bg-[#b5103c] text-white font-semibold transition-all duration-300 transform hover:scale-[1.02] shadow-lg"
                   disabled={isLoading}
                 >
                   {isLoading ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center justify-center space-x-2">
                       <Sparkles className="w-4 h-4 animate-spin" />
                       <span>Entrando...</span>
                     </div>
