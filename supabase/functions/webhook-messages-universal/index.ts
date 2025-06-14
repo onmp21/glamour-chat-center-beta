@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -51,6 +50,18 @@ const TABLE_COLUMNS = {
   }
 };
 
+// Funções auxiliares para extrair telefone e nome de session_id (novo padrão)
+function extractPhoneAndName(sessionId: string) {
+  // Formato esperado: TELEFONE-NOME, ou se não, só numero
+  if (!sessionId) return { phone: '', name: 'Cliente' };
+  const parts = sessionId.split('-');
+  if (parts.length > 1 && /^\d{10,15}$/.test(parts[0])) {
+    return { phone: parts[0], name: parts.slice(1).join('-') || 'Cliente' };
+  }
+  const phoneMatch = sessionId.match(/(\d{10,15})/);
+  return { phone: phoneMatch ? phoneMatch[1] : sessionId, name: 'Cliente' };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -97,23 +108,31 @@ serve(async (req) => {
       const messageData = data;
       console.log(`💬 [WEBHOOK_UNIVERSAL] Processing message from ${messageData.key?.remoteJid || 'unknown'}`);
 
-      // Extrair informações da mensagem
+      // Extrair sessionId
       const sessionId = messageData.key?.remoteJid || '';
-      const messageContent = messageData.message?.conversation || 
-                           messageData.message?.extendedTextMessage?.text || 
-                           messageData.message?.imageMessage?.caption ||
-                           messageData.message?.audioMessage?.caption ||
-                           messageData.message?.videoMessage?.caption ||
-                           messageData.message?.documentMessage?.caption ||
-                           '[Mídia]';
 
-      // Determinar tipo de remetente
+      // EXTRAIR TELEFONE E NOME DO SESSION_ID (NOVO PADRÃO)
+      const { phone, name } = extractPhoneAndName(sessionId);
+
+      // Extrair conteúdo da mensagem e mídia:
+      const messageContent = messageData.message?.conversation ||
+        messageData.message?.extendedTextMessage?.text ||
+        messageData.message?.imageMessage?.caption ||
+        messageData.message?.audioMessage?.caption ||
+        messageData.message?.videoMessage?.caption ||
+        messageData.message?.documentMessage?.caption ||
+        '[Mídia]';
+
+      // Tipo remetente (como antes)
       let tipoRemetente = 'CONTATO_EXTERNO';
       if (messageData.key?.fromMe) {
-        tipoRemetente = normalizedInstance === 'yelena' || normalizedInstance === 'yelena-ai' ? 'Yelena-ai' : 'USUARIO_INTERNO';
+        tipoRemetente =
+          normalizedInstance === 'yelena' || normalizedInstance === 'yelena-ai'
+            ? 'Yelena-ai'
+            : 'USUARIO_INTERNO';
       }
 
-      // Determinar tipo de mensagem
+      // Tipo de mensagem e mídia_base64 (igual)
       let mensagemType = 'text';
       let mediaBase64 = null;
 
@@ -139,10 +158,6 @@ serve(async (req) => {
         }
       }
 
-      // Extrair nome do contato do session_id
-      const phoneNumber = sessionId.replace('@s.whatsapp.net', '').replace('@c.us', '');
-      const contactName = phoneNumber;
-
       // Configuração da tabela
       const tableConfig = TABLE_COLUMNS[tableName];
       if (!tableConfig) {
@@ -153,24 +168,24 @@ serve(async (req) => {
         );
       }
 
-      // Preparar dados para inserção - começar com campos obrigatórios
+      // Preparar dados para inserção (NOME PADRÃO E PADRÃO DE TELEFONE)
       const insertData: any = {
         session_id: sessionId,
         message: messageContent,
         read_at: new Date().toISOString(),
         mensagemtype: mensagemType,
-        tipo_remetente: tipoRemetente
+        tipo_remetente: tipoRemetente,
       };
 
-      // Adicionar nome do contato usando o campo correto
-      insertData[tableConfig.contactNameField] = contactName;
+      // Adicionar nome do contato padronizado SEMPRE como "nome_do_contato"
+      insertData[tableConfig.contactNameField] = name;
 
-      // Adicionar media_base64 se existir
+      // Adicionar media_base64 caso exista
       if (mediaBase64) {
         insertData.media_base64 = mediaBase64;
       }
 
-      // Adicionar is_read apenas se a tabela suportar
+      // Adicionar is_read só se a tabela suportar
       if (tableConfig.hasIsRead) {
         insertData.is_read = false;
       }
@@ -195,10 +210,7 @@ serve(async (req) => {
 
         if (error) {
           console.error(`❌ [WEBHOOK_UNIVERSAL] Database error details:`, {
-<<<<<<< HEAD
             fullErrorObject: error,
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
             message: error.message,
             details: error.details,
             hint: error.hint,
