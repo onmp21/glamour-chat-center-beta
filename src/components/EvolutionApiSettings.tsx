@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -385,47 +384,42 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         is_active: true
       });
 
-      // Configurar webhook automaticamente (exceto para instância 'glamour')
-      if (selectedInstance.instanceName !== 'glamour') {
-        console.log('🔗 [WEBHOOK] Configurando webhook automaticamente para instância:', selectedInstance.instanceName);
-        
-        const service = new EvolutionApiService({
-          baseUrl: apiConnection.baseUrl,
-          apiKey: apiConnection.apiKey,
-          instanceName: selectedInstance.instanceName
-        });
+      // Configurar webhook automaticamente usando APENAS o webhook universal
+      console.log('🔗 [WEBHOOK] Configurando webhook universal para instância:', selectedInstance.instanceName);
+      
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName: selectedInstance.instanceName
+      });
 
-        // URL do webhook do Supabase para este canal
-        const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/whatsapp-webhook-${selectedChannel.name.toLowerCase().replace(/\s+/g, '-')}`;
-        
-        // Eventos que queremos receber
-        const webhookEvents = [
-          'MESSAGES_UPSERT',
-          'MESSAGES_SET', 
-          'MESSAGES_UPDATE',
-          'CONNECTION_UPDATE',
-          'QRCODE_UPDATED',
-          'CONTACTS_UPSERT',
-          'CHATS_UPSERT'
-        ];
+      // URL do webhook universal que funciona para todos os canais
+      const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/webhook-messages-universal`;
+      
+      // Eventos que queremos receber
+      const webhookEvents = [
+        'MESSAGES_UPSERT',
+        'MESSAGES_SET', 
+        'MESSAGES_UPDATE',
+        'CONNECTION_UPDATE',
+        'QRCODE_UPDATED',
+        'CONTACTS_UPSERT',
+        'CHATS_UPSERT'
+      ];
 
-        const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
-        
-        if (webhookResult.success) {
-          console.log('✅ [WEBHOOK] Webhook configurado com sucesso para instância:', selectedInstance.instanceName);
-        } else {
-          console.warn('⚠️ [WEBHOOK] Falha ao configurar webhook:', webhookResult.error);
-        }
+      const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
+      
+      if (webhookResult.success) {
+        console.log('✅ [WEBHOOK] Webhook universal configurado com sucesso para instância:', selectedInstance.instanceName);
       } else {
-        console.log('⏭️ [WEBHOOK] Instância glamour ignorada (já tem webhook para IA)');
+        console.warn('⚠️ [WEBHOOK] Falha ao configurar webhook universal:', webhookResult.error);
       }
 
-      // Configuração concluída sem WebSocket
-      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName}`)
+      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName} usando webhook universal`)
 
       toast({
         title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook configurado!`,
+        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook universal configurado!`,
       });
 
       // Recarregar mapeamentos
@@ -763,7 +757,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 Vincular Canal à Instância
               </CardTitle>
               <CardDescription>
-                Associe um canal de comunicação a uma instância da API Evolution.
+                Associe um canal de comunicação a uma instância da API Evolution usando webhook universal.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
