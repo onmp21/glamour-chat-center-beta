@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,14 +17,36 @@ interface UnifiedSettingsProps {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   isMobile?: boolean;
+  initialSection?: string; // NOVO
 }
 
 export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   isDarkMode,
   toggleDarkMode,
-  isMobile = false
+  isMobile = false,
+  initialSection
 }) => {
   const [activeSection, setActiveSection] = useState<string>('main');
+
+  // Quando for inicializado, pular para a subseção se for passada
+  useEffect(() => {
+    // Só atualiza se inicializando e initialSection for válida
+    const SUBSECTIONS = [
+      'credentials',
+      'notifications',
+      'users',
+      'channels',
+      'audit',
+      'ai',
+      'evolution',
+      'system',
+      'backup',
+    ];
+    if (initialSection && SUBSECTIONS.includes(initialSection)) {
+      setActiveSection(initialSection);
+    }
+  // Só rodar na montagem ou se initialSection mudar
+  }, [initialSection]);
 
   // Listagem das principais seções da aba configurações:
   // 1. credentials: Alterar Credenciais
