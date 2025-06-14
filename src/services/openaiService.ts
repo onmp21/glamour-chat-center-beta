@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { supabase } from '@/integrations/supabase/client';
 import { AIProviderService } from './AIProviderService';
 import { DetailedLogger } from './DetailedLogger';
-import { getTableNameFromChannelId } from '@/utils/channelMapping'; // Assuming this utility exists
+import { getTableNameForChannel } from '@/utils/channelMapping'; // Changed import
 
 // Tipos básicos para mensagens e conversas
 interface ConversationMessage {
@@ -24,16 +24,25 @@ export const openaiService = {
   async getOpenAIInstance(providerType: 'openai' | string = 'openai'): Promise<OpenAI | null> {
     DetailedLogger.info('OpenAIService', `Buscando provedor OpenAI ativo... Tipo: ${providerType}`);
     try {
-      const provider = await AIProviderService.getActiveProviderByType(providerType);
+      // Changed getActiveProviderByType to getActiveProviders and handle potential array
+      const activeProviders = await AIProviderService.getActiveProviders();
+      let provider = null;
+      if (Array.isArray(activeProviders)) {
+        provider = activeProviders.find(p => p.provider_type === providerType && p.is_active);
+      } else if (activeProviders?.provider_type === providerType && activeProviders?.is_active) {
+        // Assuming getActiveProviders might return a single object if only one matches criteria, or for a default scenario
+        provider = activeProviders;
+      }
+      
       if (provider && provider.api_key) {
         DetailedLogger.info('OpenAIService', `Provedor OpenAI '${provider.name}' encontrado. BaseURL: ${provider.base_url || 'Padrão OpenAI'}`);
         return new OpenAI({
           apiKey: provider.api_key,
-          baseURL: provider.base_url || undefined, // Usar undefined para o padrão da OpenAI se não houver baseURL
-          dangerouslyAllowBrowser: true, // Permitir uso no navegador (idealmente, isso seria no backend)
+          baseURL: provider.base_url || undefined,
+          dangerouslyAllowBrowser: true,
         });
       }
-      DetailedLogger.warn('OpenAIService', 'Nenhum provedor OpenAI ativo ou chave de API não configurada.');
+      DetailedLogger.warn('OpenAIService', `Nenhum provedor OpenAI ativo do tipo '${providerType}' ou chave de API não configurada.`);
       return null;
     } catch (error) {
       DetailedLogger.error('OpenAIService', 'Erro ao obter instância OpenAI:', error);
@@ -103,7 +112,7 @@ export const openaiService = {
     channelId: string,
     conversationId: string
   ): Promise<ConversationMessage[]> {
-    const tableName = getTableNameFromChannelId(channelId);
+    const tableName = getTableNameForChannel(channelId); // Using imported util
     if (!tableName) {
       DetailedLogger.error('OpenAIService', `Nome de tabela inválido para channelId: ${channelId}`);
       return [];
@@ -115,24 +124,22 @@ export const openaiService = {
         .from(tableName as any) // Cast to any to allow dynamic table name
         .select('*')
         .eq('session_id', conversationId)
-        .order('created_at', { ascending: true }); // ou 'id' se 'created_at' não existir consistentemente
+        .order('created_at', { ascending: true });
 
       if (error) {
         DetailedLogger.error('OpenAIService', `Erro ao buscar mensagens da tabela '${tableName}':`, error);
         throw error;
       }
       
-      // Manually map to ConversationMessage[], as 'data' will be 'any[]' due to the cast.
-      // This assumes the columns in the dynamic table are compatible with ConversationMessage.
-      const typedData = (data || []).map((item: any): ConversationMessage => ({
-        id: String(item.id), // Ensure ID is a string
+      const typedData: ConversationMessage[] = (data || []).map((item: any): ConversationMessage => ({
+        id: String(item.id),
         message: item.message || '',
         nome_do_contato: item.nome_do_contato,
         session_id: item.session_id,
         tipo_remetente: item.tipo_remetente || 'unknown',
         created_at: item.created_at || new Date().toISOString(),
         mensagemtype: item.mensagemtype,
-        media_url: item.media_url || item.media_base64, // Prefer media_url, fallback to media_base64
+        media_url: item.media_url || item.media_base64,
         media_caption: item.media_caption,
         is_read: item.is_read,
       }));

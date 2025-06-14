@@ -6,23 +6,7 @@ import { Database } from '@/integrations/supabase/types';
 import { DetailedLogger } from './DetailedLogger';
 import { Buffer } from 'buffer';
 import { ChannelService } from './ChannelService'; // Import ChannelService
-
-// Helper function to get table name
-// TODO: This is not a good solution, the table names should be static and not dynamic.
-// This is a temporary fix to get the code to build.
-const getTableNameFromChannelId = (channelId: string): string => {
-  const mapping: Record<string, string> = {
-    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas', // Yelena AI (Chat)
-    '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas', // Canarana
-    'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas', // Souto Soares
-    '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'joao_dourado_conversas', // João Dourado
-    '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas', // América Dourada
-    'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas', // Gustavo Gerente Lojas
-    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas', // Andressa Gerente Externo
-  };
-  return mapping[channelId] || 'yelena_ai_conversas'; // Fallback to yelena_ai_conversas
-};
-
+import { getTableNameForChannel } from '@/utils/channelMapping'; // Changed import
 
 // Tipos para mensagens
 type MessageType = 'text' | 'media';
@@ -272,7 +256,7 @@ export class EvolutionMessageService {
       mediaBase64,
     } = params;
 
-    const tableName = getTableNameFromChannelId(channelId);
+    const tableName = getTableNameForChannel(channelId); // Using imported util
     if (!tableName) {
       DetailedLogger.error('EvolutionMessageService', `Nome da tabela não encontrado para o channelId: ${channelId}`);
       return;
@@ -303,7 +287,6 @@ export class EvolutionMessageService {
     }
   }
 
-  // Função para sincronizar instâncias de um canal específico
   public static async syncChannelInstances(channelId: string): Promise<void> {
     DetailedLogger.info('EvolutionMessageService', `Sincronizando instâncias para o canal: ${channelId}`);
     const instanceConfig = await this.getInstanceConfig(channelId);
@@ -374,10 +357,15 @@ export class EvolutionMessageService {
       }
       
       // 3. Atualizar ou inserir o mapeamento da instância no Supabase
+      // Ensure channel_name is included as it's required by the table
+      const channelInfo = await ChannelService.getChannelById(channelId);
+      const channelName = channelInfo?.name || instanceName; // Fallback for channelName
+
       await this.updateChannelInstanceMapping(channelId, instanceName, {
         base_url: baseUrl, // O baseUrl da configuração do canal
         api_key: apiKey,   // O apiKey da configuração do canal
         is_active: instanceDetail.status === 'open' || instanceDetail.status === 'connected' || instanceDetail.status === 'OPEN' || instanceDetail.status === 'CONNECTED',
+        channel_name: channelName, // Added required channel_name
         // Outros campos como owner, profileName, etc., podem ser atualizados se necessário e disponíveis
       });
 
@@ -391,13 +379,16 @@ export class EvolutionMessageService {
   private static async updateChannelInstanceMapping(
     channelId: string,
     instanceName: string,
-    updateData: Partial<Database['public']['Tables']['channel_instance_mappings']['Update']>
+    updateData: Partial<Database['public']['Tables']['channel_instance_mappings']['Update']> & { channel_name?: string } // Ensure channel_name can be passed
   ): Promise<void> {
     DetailedLogger.info('EvolutionMessageService', `Atualizando mapeamento para canal ${channelId}, instância ${instanceName}`, updateData);
     
-    // Obter o nome do canal
-    const channelInfo = await ChannelService.getChannelById(channelId);
-    const channelName = channelInfo?.name || 'Desconhecido';
+    // Obter o nome do canal se não for fornecido diretamente
+    let channelName = updateData.channel_name;
+    if (!channelName) {
+        const channelInfo = await ChannelService.getChannelById(channelId);
+        channelName = channelInfo?.name || instanceName; // Use instanceName as fallback
+    }
 
 
     const { data: existing, error: selectError } = await supabase
@@ -411,15 +402,21 @@ export class EvolutionMessageService {
       DetailedLogger.error('EvolutionMessageService', `Erro ao verificar mapeamento existente: ${selectError.message}`);
       return;
     }
+    
+    const dataToUpsert = {
+        ...updateData,
+        channel_name: channelName, // Ensure channel_name is set
+        updated_at: new Date().toISOString(),
+    };
+    // Remove channel_name from updateData if it was added temporarily for type checking
+    // delete dataToUpsert.channel_name; 
+
 
     if (existing) {
       // Atualizar
       const { error: updateError } = await supabase
         .from('channel_instance_mappings')
-        .update({
-          ...updateData,
-          updated_at: new Date().toISOString(),
-        })
+        .update(dataToUpsert)
         .eq('id', existing.id);
       if (updateError) {
         DetailedLogger.error('EvolutionMessageService', `Erro ao atualizar mapeamento: ${updateError.message}`);
@@ -432,13 +429,14 @@ export class EvolutionMessageService {
         .from('channel_instance_mappings')
         .insert({
           channel_id: channelId,
-          channel_name: channelName, // Adicionado channel_name
           instance_name: instanceName,
-          api_key: updateData.api_key || '', // Precisa garantir que api_key e base_url estão presentes
+          api_key: updateData.api_key || '', 
           base_url: updateData.base_url || '',
           is_active: updateData.is_active === undefined ? true : updateData.is_active,
-          instance_id: updateData.instance_id || instanceName, // Usar instanceName como fallback para instance_id
+          instance_id: updateData.instance_id || instanceName, 
+          channel_name: channelName, // Ensure channel_name is part of the insert
           // created_at e updated_at têm default
+          ...updateData // Spread remaining valid properties
         });
       if (insertError) {
         DetailedLogger.error('EvolutionMessageService', `Erro ao inserir novo mapeamento: ${insertError.message}`);
@@ -495,7 +493,9 @@ export class EvolutionMessageService {
       const channelName = channelInfo?.name || instanceId; // Usa instanceId como fallback se o nome do canal não for encontrado
 
       // 2. Atualizar ou inserir o mapeamento da instância no Supabase
-      const updatePayload = {
+      const updatePayload: Database['public']['Tables']['channel_instance_mappings']['Insert'] = {
+        // id is auto-generated for insert, don't include for update where it's used in .eq()
+        // created_at is auto-generated for insert
         updated_at: new Date().toISOString(),
         channel_id: channelId,
         api_key: apiKey,
@@ -517,18 +517,23 @@ export class EvolutionMessageService {
         DetailedLogger.error('EvolutionMessageService', `Erro ao verificar mapeamento para ${instanceId}: ${selectError.message}`);
         return;
       }
+      
+      // Remove id and created_at from payload if it's an update, as they shouldn't be updated directly or are set by DB.
+      // For insert, Supabase handles id and created_at if they have defaults.
+      const { id: _id, created_at: _createdAt, ...payloadForUpsert } = updatePayload;
+
 
       if (existing) {
         const { error: updateError } = await supabase
           .from('channel_instance_mappings')
-          .update(updatePayload)
+          .update(payloadForUpsert) // Use payloadForUpsert for update
           .eq('id', existing.id);
         if (updateError) throw updateError;
         DetailedLogger.info('EvolutionMessageService', `Mapeamento da instância ${instanceId} atualizado.`);
       } else {
         const { error: insertError } = await supabase
           .from('channel_instance_mappings')
-          .insert(updatePayload);
+          .insert(updatePayload); // Use full updatePayload for insert, Supabase handles defaults for id/created_at
         if (insertError) throw insertError;
         DetailedLogger.info('EvolutionMessageService', `Novo mapeamento para instância ${instanceId} inserido.`);
       }
@@ -596,3 +601,6 @@ export class EvolutionMessageService {
     }
   }
 }
+
+// Export an instance of the service
+export const evolutionMessageService = EvolutionMessageService;
