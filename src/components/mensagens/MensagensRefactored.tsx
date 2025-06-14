@@ -35,71 +35,37 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactName, setSelectedContactName] = useState('');
 
   const { channels } = useChannels();
-  console.log("📊 [MENSAGENS_REFACTORED] Canais brutos do useChannels():", channels);
   const { getAccessibleChannels } = usePermissions();
+
+  // Clean, normalized ID mapping: All channels maintain their canonical ID as in permissions.
+  const accessibleChannels = getAccessibleChannels();
+  const canaisData = channels
+    .filter(channel =>
+      channel.isActive &&
+      channel.name &&
+      channel.name.toLowerCase() !== 'pedro'
+    )
+    .map(channel => ({
+      id: channel.id, // Use channel.id directly (and permissions logic must match IDs)
+      nome: channel.name,
+      tipo: channel.type === 'general' ? 'IA Assistant' :
+            channel.type === 'store' ? 'Loja' :
+            channel.type === 'manager' ? 'Gerente' : 'Canal',
+      status: 'ativo' as const,
+      conversasNaoLidas: 0,
+      ultimaAtividade: 'Online'
+    }))
+    .filter(channel => accessibleChannels.includes(channel.id));
 
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
     
     if (initialChannel && initialPhone) {
-      const mappedInitialChannel = getChannelLegacyId({ name: initialChannel, id: initialChannel }); // Mapear o initialChannel
+      const mappedInitialChannel = initialChannel; // Mapear o initialChannel
       console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
       setSelectedChannel(mappedInitialChannel);
     }
   }, [initialChannel, initialPhone]);
-
-  const getChannelLegacyId = (channel: any) => {
-    // Mapear nomes de canais para UUIDs do Supabase
-    const nameToId: Record<string, string> = {
-      'yelena-ai': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-      'chat': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-      'canarana': '011b69ba-cf25-4f63-af2e-4ad0260d9516',
-      'souto soares': 'b7996f75-41a7-4725-8229-564f31868027',
-      'joão dourado': '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
-      'américa dourada': '64d8acad-c645-4544-a1e6-2f0825fae00b',
-      'gustavo gerente das lojas': 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
-      'andressa gerente externo': 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7'
-    };
-    
-    // Converter o nome do canal para uma chave padronizada (ex: tudo minúsculo)
-    const normalizedChannelName = channel.name.toLowerCase();
-
-    // Primeiro tentar mapear pelo nome normalizado
-    console.log(`🔄 [CHANNEL_MAPPING] getChannelLegacyId received channel.name: "${channel.name}", normalized: "${normalizedChannelName}"`);
-    const mappedId = nameToId[normalizedChannelName];
-    if (mappedId) {
-      console.log(`🔄 [CHANNEL_MAPPING] Mapped ${channel.name} to UUID: ${mappedId}`);
-      return mappedId;
-    }
-    
-    // Se não encontrar, usar o ID original
-    console.log(`🔄 [CHANNEL_MAPPING] Using original ID for ${channel.name}: ${channel.id}`);
-    return channel.id;
-  };
-
-  const accessibleChannels = getAccessibleChannels();
-  const canaisData = channels
-    .filter(channel => 
-      channel.isActive && // Corrigido de is_active para isActive
-      channel.name !== 'Pedro' &&
-      channel.name
-    )
-      .map(channel => {
-      console.log(`🔍 [MENSAGENS_REFACTORED] Processing channel name: "${channel.name}", original ID: "${channel.id}"`);
-      return {
-        id: getChannelLegacyId(channel),
-        nome: channel.name,
-        tipo: channel.type === 'general' ? 'IA Assistant' :
-              channel.type === 'store' ? 'Loja' :
-              channel.type === 'manager' ? 'Gerente' : 'Canal',
-        status: 'ativo' as const,
-        conversasNaoLidas: 0,
-        ultimaAtividade: 'Online'
-      };
-    })
-    .filter(channel => accessibleChannels.includes(channel.id));
-
-  console.log("📊 [MENSAGENS_REFACTORED] canaisData gerado:", canaisData);
 
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('File sending handled by ChatOverlayRefactored');

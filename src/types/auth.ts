@@ -8,6 +8,7 @@ export interface User {
   role: UserRole;
   assignedTabs: string[];
   assignedCities: string[];
+  assignedChannels?: string[]; // Novo campo para canais atribuídos (usado para salesperson)
   createdAt: string;
 }
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ExamesTable } from './ExamesTable';
 import { cn } from '@/lib/utils';
@@ -44,7 +43,6 @@ export const Exams: React.FC<ExamsProps> = ({
           </div>
         </div>
       </div>
-
       {/* Tabela de exames */}
       <div className={cn("flex-1",
         isDarkMode ? "bg-[#09090b]" : "bg-gray-50"

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Settings } from 'lucide-react';
@@ -106,19 +105,18 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
         isDarkMode ? "text-[#ffffff] border-[#18181b] bg-[#09090b]" : "text-gray-900 border-gray-200 bg-gray-50"
       )}>
         {activeSection !== 'main' && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleBack} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleBack}
             className={cn(
-              "rounded-full", 
+              "rounded-full",
               isDarkMode ? "text-[#9ca3af] hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
             )}
           >
             <ArrowLeft size={20} />
           </Button>
         )}
-        
         <div className="flex items-center gap-4">
           <div className={cn(
             "p-3 rounded-full",
