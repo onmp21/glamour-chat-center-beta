@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,9 +83,9 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div
-      className="w-full min-h-screen flex items-center justify-center md:justify-start px-4 sm:px-6 md:px-12 lg:px-24"
+      className="w-full min-h-screen flex items-center justify-start px-8 md:px-16 lg:px-24"
       style={{
-        background: `url('/lovable-uploads/9bab2598-2237-46f1-a400-ec745a53f7fc.png') center center / cover no-repeat`,
+        background: `url('/lovable-uploads/1c661b9c-0e2b-4ca8-a326-90cdc8c73635.png') center center / cover no-repeat`,
       }}
     >
       <div
