@@ -1,5 +1,4 @@
-
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { ReportHistory } from '@/types/ai-providers';
 import OpenAI from 'openai';
 
