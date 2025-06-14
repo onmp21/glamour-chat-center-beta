@@ -12,22 +12,34 @@ interface AIConfigPromptsSectionProps {
   isDarkMode: boolean;
 }
 
+// Função auxiliar para mapear todos os tipos de prompt para null (state inicial seguro)
+function getInitialPromptsState(): Record<AIPromptType, AIPrompt | null> {
+  const initial: Record<AIPromptType, AIPrompt | null> = {
+    conversation_summary: null,
+    quick_response: null,
+    report_conversations: null,
+    report_channels: null,
+    report_custom: null,
+  };
+  return initial;
+}
+
 export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ isDarkMode }) => {
-  const [prompts, setPrompts] = useState<Record<AIPromptType, AIPrompt | null>>({});
+  const [prompts, setPrompts] = useState<Record<AIPromptType, AIPrompt | null>>(getInitialPromptsState);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AIPromptType | null>(null);
   const [promptContent, setPromptContent] = useState<string>("");
 
-  // Carregar prompts existentes ao montar
   useEffect(() => {
     loadPrompts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPrompts = async () => {
     setLoading(true);
     try {
       const data = await AIPromptService.getAllPrompts();
-      const map: Record<AIPromptType, AIPrompt | null> = {};
+      const map: Record<AIPromptType, AIPrompt | null> = getInitialPromptsState();
       for (const t of getPromptTypes()) {
         const found = data.find((p) => p.prompt_type === t.type);
         map[t.type as AIPromptType] = found || null;

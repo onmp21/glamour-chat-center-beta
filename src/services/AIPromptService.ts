@@ -69,12 +69,20 @@ export class AIPromptService {
   }
 
   static async upsertPrompt(prompt: Partial<AIPrompt> & { prompt_type: AIPromptType }) {
-    // Se houver id, faz update. Caso contrário, insert.
+    // Garante campos obrigatórios, senão lança erro para dev.
+    const label = getPromptTypes().find((p) => p.type === prompt.prompt_type)?.label || "";
+    const prompt_content = typeof prompt.prompt_content === "string" ? prompt.prompt_content : "";
+    if (!label || !prompt_content) {
+      throw new Error("Campos obrigatórios (name, prompt_content) ausentes no upsertPrompt");
+    }
     let upsertObj = {
       ...prompt,
+      name: label,
+      prompt_content,
       is_active: typeof prompt.is_active === "boolean" ? prompt.is_active : true,
       updated_at: new Date().toISOString(),
     };
+    // upsert espera um array de objetos
     const { data, error } = await supabase
       .from("ai_prompts")
       .upsert([upsertObj], { onConflict: "prompt_type" })
