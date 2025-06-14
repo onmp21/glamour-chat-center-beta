@@ -152,7 +152,7 @@ export const openaiService = {
         .from(tableName as any) 
         .select('*')
         .eq('session_id', conversationId)
-        .order('created_at', { ascending: true });
+        .order('read_at', { ascending: true }); // TROCA AQUI
 
       if (error) {
         DetailedLogger.error('OpenAIService', `Erro ao buscar mensagens da tabela '${tableName}':`, error);
@@ -165,7 +165,7 @@ export const openaiService = {
         nome_do_contato: item.nome_do_contato,
         session_id: item.session_id,
         tipo_remetente: item.tipo_remetente || 'unknown',
-        created_at: item.created_at || new Date().toISOString(),
+        created_at: item.read_at || new Date().toISOString(), // read_at vira created_at no contexto deste service
         mensagemtype: item.mensagemtype,
         media_url: item.media_url || item.media_base64, // Handle both possible media fields
         media_caption: item.media_caption,
