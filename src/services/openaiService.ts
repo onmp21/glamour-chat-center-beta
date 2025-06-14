@@ -1,8 +1,9 @@
+
 import OpenAI from 'openai';
 import { supabase } from '@/integrations/supabase/client';
 import { AIProviderService } from './AIProviderService';
 import { DetailedLogger } from './DetailedLogger';
-import { getTableNameForChannel } from '@/utils/channelMapping'; // Changed import
+import { getTableNameForChannel } from '@/utils/channelMapping'; // Corrected import
 
 // Tipos básicos para mensagens e conversas
 interface ConversationMessage {
@@ -18,20 +19,40 @@ interface ConversationMessage {
   is_read?: boolean | null;
 }
 
+// Define AIProvider type based on table structure
+interface AIProvider {
+  id: string;
+  name: string;
+  provider_type: string;
+  api_key: string;
+  base_url?: string | null;
+  default_model?: string | null;
+  is_active?: boolean | null; // is_active can be boolean or null
+  // Add other fields from your ai_providers table as needed
+  advanced_settings?: any; // Use 'any' or a more specific type for jsonb
+  user_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
 const MAX_PROMPT_MESSAGES = 20; // Limite de mensagens para incluir no prompt
 
 export const openaiService = {
   async getOpenAIInstance(providerType: 'openai' | string = 'openai'): Promise<OpenAI | null> {
     DetailedLogger.info('OpenAIService', `Buscando provedor OpenAI ativo... Tipo: ${providerType}`);
     try {
-      // Changed getActiveProviderByType to getActiveProviders and handle potential array
-      const activeProviders = await AIProviderService.getActiveProviders();
-      let provider = null;
-      if (Array.isArray(activeProviders)) {
-        provider = activeProviders.find(p => p.provider_type === providerType && p.is_active);
-      } else if (activeProviders?.provider_type === providerType && activeProviders?.is_active) {
-        // Assuming getActiveProviders might return a single object if only one matches criteria, or for a default scenario
-        provider = activeProviders;
+      const activeProvidersResult = await AIProviderService.getActiveProviders(); // Should return AIProvider[] | AIProvider | null
+      
+      let provider: AIProvider | null | undefined = null;
+
+      if (Array.isArray(activeProvidersResult)) {
+        provider = activeProvidersResult.find(p => p.provider_type === providerType && p.is_active === true);
+      } else if (activeProvidersResult && typeof activeProvidersResult === 'object') {
+        // activeProvidersResult is a single AIProvider object
+        if (activeProvidersResult.provider_type === providerType && activeProvidersResult.is_active === true) {
+          provider = activeProvidersResult;
+        }
       }
       
       if (provider && provider.api_key) {
@@ -112,7 +133,7 @@ export const openaiService = {
     channelId: string,
     conversationId: string
   ): Promise<ConversationMessage[]> {
-    const tableName = getTableNameForChannel(channelId); // Using imported util
+    const tableName = getTableNameForChannel(channelId);
     if (!tableName) {
       DetailedLogger.error('OpenAIService', `Nome de tabela inválido para channelId: ${channelId}`);
       return [];
@@ -121,7 +142,7 @@ export const openaiService = {
 
     try {
       const { data, error } = await supabase
-        .from(tableName as any) // Cast to any to allow dynamic table name
+        .from(tableName as any) 
         .select('*')
         .eq('session_id', conversationId)
         .order('created_at', { ascending: true });
@@ -153,5 +174,65 @@ export const openaiService = {
     }
   },
   
-  // ... (outras funções como generateSuggestedReply, analyzeSentiment podem ser adicionadas aqui)
+  async generateSuggestedResponse(
+    channelId: string,
+    conversationId: string,
+    customInstructions?: string
+  ): Promise<string> {
+    DetailedLogger.info('OpenAIService', `Gerando resposta sugerida para canal ${channelId}, conversa ${conversationId}`);
+    const openai = await this.getOpenAIInstance();
+    if (!openai) {
+      DetailedLogger.error('OpenAIService', 'Instância OpenAI não disponível para resposta sugerida.');
+      throw new Error('OpenAI não configurado.');
+    }
+
+    const messages = await this.getMessagesForConversation(channelId, conversationId);
+    if (messages.length === 0) {
+      DetailedLogger.info('OpenAIService', 'Nenhuma mensagem na conversa para gerar sugestão.');
+      return 'Não há mensagens suficientes para gerar uma sugestão.';
+    }
+
+    const contactName = messages[0]?.nome_do_contato || 'Cliente';
+    let prompt = `Você é um assistente de atendimento. Com base no histórico da conversa com ${contactName}, sugira uma resposta apropriada para a última mensagem do cliente. Seja breve e útil.\n\n`;
+    if (customInstructions) {
+      prompt += `Instruções adicionais: ${customInstructions}\n\n`;
+    }
+    prompt += 'Histórico da Conversa (mais recentes primeiro):\n';
+
+    messages.slice(-5).reverse().forEach(msg => { // Pega as últimas 5 mensagens
+      const senderPrefix = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO' ? `${contactName}:` : 'Atendente:';
+      prompt += `${senderPrefix} ${msg.message}\n`;
+    });
+    
+    prompt += `\nSugira uma resposta para a última mensagem de ${messages[messages.length -1].tipo_remetente === 'customer' || messages[messages.length -1].tipo_remetente === 'CONTATO_EXTERNO' ? contactName : 'Atendente'}:`;
+
+    try {
+      DetailedLogger.info('OpenAIService', 'Enviando requisição de sugestão de resposta para OpenAI...');
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo', // Ou um modelo configurável
+        messages: [
+          { role: 'system', content: 'Você é um assistente prestativo que sugere respostas em um chat de atendimento.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 100, 
+        temperature: 0.7,
+      });
+
+      const suggestedResponse = completion.choices[0]?.message?.content?.trim();
+      if (suggestedResponse) {
+        DetailedLogger.info('OpenAIService', 'Resposta sugerida gerada com sucesso.');
+        return suggestedResponse;
+      } else {
+        DetailedLogger.warn('OpenAIService', 'OpenAI retornou uma sugestão vazia.');
+        return 'Não foi possível gerar uma sugestão no momento.';
+      }
+    } catch (error) {
+      DetailedLogger.error('OpenAIService', 'Erro ao chamar API da OpenAI para sugestão de resposta:', error);
+      if (error instanceof OpenAI.APIError) {
+        throw new Error(`Erro da API OpenAI: ${error.status} ${error.name} ${error.message}`);
+      }
+      throw new Error('Falha ao gerar sugestão de resposta.');
+    }
+  }
 };
+

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -57,7 +56,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [showFilePreview, setShowFilePreview] = useState(false);
+  const [showFilePreviewModal, setShowFilePreviewModal] = useState(false);
   const [showQuickResponses, setShowQuickResponses] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -71,7 +70,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         console.log("Sending file:", filePreview.file.name);
         onSendFile?.(filePreview.file, message.trim() || undefined);
         setFilePreview(null);
-        setShowFilePreview(false);
+        setShowFilePreviewModal(false);
         setMessage("");
       } else if (message.trim()) {
         onSendMessage(message.trim());
@@ -90,13 +89,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.error('❌ [AI_QUICK_RESPONSE] Conversa ou canal não selecionado');
       return;
     }
+  
+    // Check if the method exists on openaiService before calling
+    if (typeof openaiService.generateSuggestedResponse !== 'function') {
+      console.error('❌ [AI_QUICK_RESPONSE] openaiService.generateSuggestedResponse is not a function.');
+      setMessage("Desculpe, não consigo gerar uma sugestão agora."); // Fallback message
+      return;
+    }
 
     try {
       console.log('🤖 [AI_QUICK_RESPONSE] Gerando resposta rápida com IA...');
       
+      // Ensure selectedConv.contact_phone is valid, otherwise use selectedConv.id or a placeholder
+      const conversationIdentifier = selectedConv.contact_phone || selectedConv.id;
+      if (!conversationIdentifier) {
+        console.error('❌ [AI_QUICK_RESPONSE] Identificador de conversa inválido.');
+        setMessage("Não foi possível identificar a conversa para gerar uma sugestão.");
+        return;
+      }
+
       const suggestedResponse = await openaiService.generateSuggestedResponse(
         channelId, 
-        selectedConv.contact_phone
+        conversationIdentifier 
       );
       
       setMessage(suggestedResponse);
@@ -105,12 +119,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     } catch (error) {
       console.error('❌ [AI_QUICK_RESPONSE] Erro ao gerar resposta:', error);
       
-      // Fallback para respostas padrão em caso de erro
       const fallbackResponses = [
         "Obrigado pelo contato. Como posso ajudá-lo hoje?",
         "Entendi sua solicitação. Vou verificar isso para você.",
         "Agradeço sua paciência. Estou analisando sua situação.",
-        "Vou encaminhar sua solicitação para o setor responsável."
       ];
       
       const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
@@ -122,7 +134,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (filePreview && (filePreview.type === 'image' || filePreview.type === 'video' || filePreview.type === 'audio')) {
-        setShowFilePreview(true);
+        setShowFilePreviewModal(true);
       } else {
         handleSend();
       }
@@ -142,9 +154,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     setFilePreview({ file, url, type });
     
-    // Se for imagem, vídeo ou áudio, mostrar preview automático
     if (type === 'image' || type === 'video' || type === 'audio') {
-      setShowFilePreview(true);
+      setShowFilePreviewModal(true);
     }
     
     event.target.value = '';
@@ -258,7 +269,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setMessage(prev => prev + emoji);
   };
 
-  const renderFilePreview = () => {
+  const renderFilePreviewModal = () => {
     if (!filePreview) return null;
 
     return (
@@ -281,7 +292,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => {
-                setShowFilePreview(false);
+                setShowFilePreviewModal(false);
                 setFilePreview(null);
               }}
             >
@@ -308,6 +319,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               {filePreview.type === 'audio' && (
                 <div className="w-full p-4 bg-gray-100 rounded-lg">
                   <audio src={filePreview.url} className="w-full" controls />
+                </div>
+              )}
+              {filePreview.type === 'document' && (
+                <div className="w-full p-4 bg-gray-100 rounded-lg flex flex-col items-center text-center">
+                  {getFileIcon(filePreview.type)}
+                  <p className="mt-2 text-sm font-medium">{filePreview.file.name}</p>
                 </div>
               )}
             </div>
@@ -342,7 +359,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <Button
               variant="outline"
               onClick={() => {
-                setShowFilePreview(false);
+                setShowFilePreviewModal(false);
                 setFilePreview(null);
               }}
             >
@@ -437,20 +454,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* File Preview simples para documentos */}
-        {filePreview && filePreview.type === 'document' && (
+        {/* File Preview simples para documentos (antes do modal) */}
+        {filePreview && !showFilePreviewModal && (
           <div className={cn(
             "p-3 border-b flex items-center gap-3",
             isDarkMode ? "border-[#3f3f46] bg-[#27272a]" : "border-gray-200 bg-gray-50"
           )}>
             <div className={cn(
-              "w-12 h-12 rounded-lg flex items-center justify-center",
+              "w-10 h-10 rounded-lg flex items-center justify-center text-gray-500",
               isDarkMode ? "bg-[#3f3f46]" : "bg-gray-200"
             )}>
               {getFileIcon(filePreview.type)}
             </div>
             <div className="flex-1">
-              <p className={cn("text-sm font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+              <p className={cn("text-sm font-medium truncate", isDarkMode ? "text-white" : "text-gray-900")}>
                 {filePreview.file.name}
               </p>
               <p className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-600")}>
@@ -458,10 +475,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               </p>
             </div>
             <Button
+              onClick={() => setShowFilePreviewModal(true)}
+              variant="ghost"
+              size="sm"
+              className={cn(isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-700")}
+            >
+              Ver
+            </Button>
+            <Button
               onClick={() => setFilePreview(null)}
               variant="ghost"
               size="icon"
-              className="text-red-500"
+              className={cn("text-red-500 hover:bg-red-100/20", isDarkMode ? "hover:text-red-400" : "hover:text-red-600")}
             >
               <X size={16} />
             </Button>
@@ -481,13 +506,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   "h-9 w-9",
                   isDarkMode ? "text-gray-400 hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
                 )}
+                title="Anexar arquivo"
               >
                 <Paperclip size={20} />
               </Button>
               
               <EmojiPickerCompact onEmojiSelect={handleEmojiSelect} isDarkMode={isDarkMode} />
               
-              {/* Botão de Respostas Rápidas */}
               <Button 
                 variant="ghost" 
                 size="icon"
@@ -496,11 +521,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   "h-9 w-9",
                   isDarkMode ? "text-gray-400 hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
                 )}
+                title="Respostas rápidas"
               >
                 <Zap size={20} />
               </Button>
               
-              {/* Botão de IA para Resposta Rápida */}
               <Button 
                 variant="ghost" 
                 size="icon"
@@ -523,7 +548,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onKeyPress={handleKeyPress}
                 placeholder="Digite sua mensagem..."
                 className={cn(
-                  "min-h-[40px] max-h-32 resize-none border rounded-xl",
+                  "min-h-[40px] max-h-32 resize-none border rounded-xl py-2 px-3",
                   isDarkMode 
                     ? "bg-[#27272a] border-[#3f3f46] text-white placeholder:text-gray-500" 
                     : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
@@ -534,8 +559,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             {/* Send/Mic Button */}
             <Button
-              onClick={message.trim() || filePreview ? handleSend : handleRecordStart}
-              className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0"
+              onClick={message.trim() || filePreview ? (filePreview && !showFilePreviewModal ? () => setShowFilePreviewModal(true) : handleSend) : handleRecordStart}
+              className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0 rounded-full"
             >
               {message.trim() || filePreview ? <Send size={18} /> : <Mic size={18} />}
             </Button>
@@ -548,12 +573,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           type="file"
           onChange={handleFileSelect}
           className="hidden"
-          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
         />
       </div>
 
       {/* File Preview Modal */}
-      {showFilePreview && renderFilePreview()}
+      {showFilePreviewModal && renderFilePreviewModal()}
     </>
   );
 };
