@@ -1,5 +1,3 @@
-
-<<<<<<< HEAD
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
@@ -7,12 +5,6 @@ import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
 import { Brain, Sparkles, Loader2 } from 'lucide-react';
 import { openaiService } from '@/services/openaiService';
-=======
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { ChannelConversation } from '@/types/messages';
-import { ChatInput } from '@/components/mensagens/ChatInput';
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 
 interface Message {
   id: string;
@@ -37,10 +29,7 @@ export interface ChatMainAreaProps {
   selectedConv?: ChannelConversation;
   conversationForHeader?: Conversation | null;
   messages: Message[];
-<<<<<<< HEAD
-=======
   messagesLoading: boolean;
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   isSidebarOpen: boolean;
   isDarkMode: boolean;
   channelId: string;
@@ -49,11 +38,7 @@ export interface ChatMainAreaProps {
   onSendMessage: (message: string) => Promise<void>;
   onSendFile: (file: File, caption?: string) => Promise<void>;
   onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
-<<<<<<< HEAD
 };
-=======
-}
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 
 export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   selectedConv,
@@ -69,7 +54,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   onSendFile,
   onSendAudio
 }) => {
-<<<<<<< HEAD
   console.log("🐛 [ChatMainArea] Renderizando. selectedConv:", selectedConv, "conversationForHeader:", conversationForHeader);
   
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
@@ -105,8 +89,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     }
   };
 
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   if (!selectedConv) {
     return (
       <div className={cn(
@@ -123,20 +105,12 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       "flex-1 flex flex-col",
       isDarkMode ? "bg-[#09090b]" : "bg-white"
     )}>
-<<<<<<< HEAD
       {/* Header com funções de IA */}
-=======
-      {/* Header */}
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       <div className={cn(
         "p-4 border-b flex items-center justify-between",
         isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
       )}>
-<<<<<<< HEAD
         <div className="flex flex-col">
-=======
-        <div className="flex items-center space-x-3">
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
           <h2 className={cn(
             "font-semibold",
             isDarkMode ? "text-white" : "text-gray-900"
@@ -149,7 +123,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           )}>
             {conversationForHeader?.contactNumber || selectedConv.contact_phone}
           </span>
-<<<<<<< HEAD
         </div>
         
         <div className="flex items-center space-x-2">
@@ -181,15 +154,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           >
             Marcar como Resolvido
           </Button>
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
         </div>
-        <button
-          onClick={onMarkAsResolved}
-          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-        >
-          Marcar como Resolvido
-        </button>
       </div>
 
       {/* Messages */}
@@ -218,11 +183,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                       : "bg-gray-200 text-gray-900"
                   )}
                 >
-<<<<<<< HEAD
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-=======
-                  <p className="text-sm">{message.content}</p>
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
                   <p className="text-xs opacity-70 mt-1">
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </p>
@@ -233,11 +194,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         )}
       </div>
 
-<<<<<<< HEAD
       {/* Chat Input com funções de IA */}
-=======
-      {/* Chat Input - usando o componente completo */}
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       <ChatInput
         isDarkMode={isDarkMode}
         onSendMessage={onSendMessage}

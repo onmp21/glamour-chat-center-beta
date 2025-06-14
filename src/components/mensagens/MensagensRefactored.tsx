@@ -84,7 +84,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       channel.name !== 'Pedro' &&
       channel.name
     )
-<<<<<<< HEAD
       .map(channel => {
       console.log(`🔍 [MENSAGENS_REFACTORED] Processing channel name: "${channel.name}", original ID: "${channel.id}"`);
       return {
@@ -102,20 +101,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
 
   console.log("📊 [MENSAGENS_REFACTORED] canaisData gerado:", canaisData);
 
-=======
-    .map(channel => ({
-      id: getChannelLegacyId(channel),
-      nome: channel.name,
-      tipo: channel.type === 'general' ? 'IA Assistant' : 
-            channel.type === 'store' ? 'Loja' : 
-            channel.type === 'manager' ? 'Gerente' : 'Canal',
-      status: 'ativo' as const,
-      conversasNaoLidas: 0,
-      ultimaAtividade: 'Online'
-    }))
-    .filter(channel => accessibleChannels.includes(channel.id));
-
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('File sending handled by ChatOverlayRefactored');
   };
@@ -125,26 +110,16 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   };
 
   const handleChannelClick = (channelId: string) => {
-    console.log("📺 [MENSAGENS] Channel clicked (raw channelId):", channelId);
     setSelectedChannel(channelId);
-    console.log("📺 [MENSAGENS] selectedChannel updated to (after click):", channelId);
   };
 
   const handleCloseOverlay = () => {
-    console.log("❌ [MENSAGENS] Closing chat overlay");
     setSelectedChannel(null);
-    console.log("❌ [MENSAGENS] selectedChannel set to null.");
-    
     const newUrl = "/?section=mensagens";
     window.history.replaceState({}, "", newUrl);
   };
 
-<<<<<<< HEAD
-  console.log("Current selectedChannel in MensagensRefactored (before render):", selectedChannel);
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   if (selectedChannel) {
-    console.log("Rendering ChatOverlayRefactored for channel:", selectedChannel);
     return (
       <ChatOverlayRefactored
         channelId={selectedChannel}
