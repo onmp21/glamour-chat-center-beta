@@ -1,12 +1,11 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { useAuditLogger } from '@/hooks/useAuditLogger';
 import { ProfilePicture } from '../ProfilePicture';
 import { cn } from '@/lib/utils';
@@ -18,23 +17,30 @@ interface ProfileSectionProps {
 
 export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) => {
   const { user } = useAuth();
-  const { getProfile, updateProfile, loading } = useUserProfile();
+  const { loadProfile, uploadAvatar, updateProfile, loading } = useUserProfiles();
   const { logProfileAction } = useAuditLogger();
   const [formData, setFormData] = useState({
     name: '',
-    bio: ''
+    bio: '',
   });
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarDraftPreview, setAvatarDraftPreview] = useState<string | null>(null);
+  const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
 
   useEffect(() => {
-    const profile = getProfile();
-    if (profile) {
-      setFormData({
-        name: profile.name,
-        bio: profile.bio
+    if (user) {
+      loadProfile(user.id).then((profile) => {
+        setFormData((prev) => ({
+          ...prev,
+          bio: profile?.bio || '',
+        }));
+        setAvatarSaved(profile?.avatar_url || null);
+        setAvatarDraftPreview(null); // limpa preview ao montar
       });
     }
-  }, [user]);
+  }, [user, loadProfile]);
 
+  // Atualiza nome local
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -42,28 +48,49 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
     }));
   };
 
+  // Recebe arquivo da foto temporária
+  const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
+    setAvatarDraftFile(file);
+    setAvatarDraftPreview(previewUrl);
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarDraftFile(null);
+    setAvatarDraftPreview(null);
+    setAvatarSaved(null);
+  };
+
+  // Clique em "Salvar Perfil": salva bio e SÓ ENTÃO faz upload da imagem para o supabase
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) return;
 
-    const changes: string[] = [];
-    const profile = getProfile();
-    
-    if (profile) {
-      if (formData.name !== profile.name) changes.push('name');
-      if (formData.bio !== profile.bio) changes.push('bio');
+    let avatarUrlToSave = avatarSaved;
+
+    // Se usuário selecionou nova foto/crop
+    if (avatarDraftFile) {
+      const url = await uploadAvatar(avatarDraftFile);
+      avatarUrlToSave = url;
+      setAvatarSaved(url); // atualiza para preview imediato
+      setAvatarDraftFile(null); // limpa draft após salvar
+      setAvatarDraftPreview(null);
+    } else if (avatarDraftPreview === null && avatarSaved) {
+      // Se apagou preview, remove também do Supabase
+      avatarUrlToSave = null;
+      setAvatarSaved(null);
     }
 
-    const success = await updateProfile(formData);
-    
-    if (success && changes.length > 0) {
-      // Log da ação
-      await logProfileAction('update', {
-        changes,
-        timestamp: new Date().toISOString()
-      });
-    }
+    await updateProfile({
+      bio: formData.bio,
+      avatar_url: avatarUrlToSave ?? null,
+    });
+
+    // Log profile changes
+    await logProfileAction('update', {
+      timestamp: new Date().toISOString(),
+      changes: ["bio", "avatar_url"]
+    });
   };
 
   const getRoleLabel = (role: string) => {
@@ -99,6 +126,8 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
             <ProfilePicture
               isDarkMode={isDarkMode}
               userName={user?.name || ''}
+              onAvatarChange={handleAvatarChange}
+              externalPreview={avatarDraftPreview}
             />
           </div>
 
@@ -169,7 +198,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
               />
             </div>
             
-            <Button 
+            <Button
               type="submit"
               disabled={loading}
               style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
