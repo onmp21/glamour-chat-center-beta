@@ -3,6 +3,13 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
+type UserProfile = {
+  id: string;
+  avatar_url: string | null;
+  bio?: string | null;
+  updated_at?: string;
+};
+
 // Exporta tudo relacionado ao avatar do usuário no Supabase Storage/banco.
 export function useSupabaseAvatar() {
   const { user } = useAuth();
@@ -12,19 +19,21 @@ export function useSupabaseAvatar() {
   const getAvatarUrl = useCallback(async (): Promise<string | null> => {
     if (!user) return null;
     const { data, error } = await supabase
-      .from("user_profiles")
+      .from<UserProfile>("user_profiles")
       .select("avatar_url")
       .eq("id", user.id)
-      .single();
-    if (error) return null;
-    return data?.avatar_url || null;
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data.avatar_url || null;
   }, [user]);
 
   // Atualiza o avatar_url (quando faz upload)
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     if (!user) return;
+    // upsert (se não existe, cria, se existe, atualiza)
     await supabase
-      .from("user_profiles")
+      .from<UserProfile>("user_profiles")
       .upsert(
         { id: user.id, avatar_url: avatarUrl || null, updated_at: new Date().toISOString() },
         { onConflict: "id" }
@@ -38,6 +47,7 @@ export function useSupabaseAvatar() {
     try {
       const ext = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${ext}`;
+      // 1. Upload do arquivo
       const { data, error: uploadError } = await supabase
         .storage
         .from("avatars")
@@ -45,7 +55,7 @@ export function useSupabaseAvatar() {
 
       if (uploadError) throw uploadError;
 
-      // Get publicly accessible url
+      // 2. Gerar URL pública
       const { data: urlData } = supabase
         .storage
         .from("avatars")
@@ -64,7 +74,7 @@ export function useSupabaseAvatar() {
     }
   };
 
-  // Remove a foto do perfil
+  // Remove a foto do perfil (apenas zera o campo no banco)
   const removeAvatar = async () => {
     await updateAvatarUrl(null);
   };
