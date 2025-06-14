@@ -30,7 +30,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     confirmPassword: ''
   });
 
-  // State para draft/avatar preview
+  // Avatar draft state
   const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
   const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
   const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     loading: avatarLoading,
   } = useSupabaseAvatar();
 
-  // Carrega avatar salvo do Supabase ao iniciar
+  // Load saved avatar from Supabase on init
   useEffect(() => {
     if (user?.id) {
       getAvatarUrl().then((url) => {
@@ -55,11 +55,11 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     }
   }, [user?.id, getAvatarUrl]);
 
-  // Handler para alterações draft/crop via componente ProfilePicture
+  // Handle changes from ProfilePicture (only updates draft, not uploaded)
   const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
     setAvatarDraftFile(file);
     setAvatarDraftUrl(previewUrl);
-    // Não faz upload agora, só ao salvar!
+    // Do not upload now, only on save!
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -94,9 +94,10 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       setLoading(true);
       const updateData: any = {};
       const changes: string[] = [];
-      // Avatar
+
+      // FOTO DE PERFIL: UPLOAD OU REMOÇÃO
       if (avatarDraftFile && avatarDraftUrl) {
-        // Faz upload agora
+        // Upload da nova foto ao clicar em salvar
         const publicUrl = await uploadAvatar(avatarDraftFile);
         if (publicUrl) {
           await updateAvatarUrl(publicUrl);
@@ -117,7 +118,8 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         setAvatarSaved(null);
         changes.push('profile_picture');
       }
-      // Username/senha
+
+      // USER/SENHA
       if (formData.username !== user.username) {
         updateData.username = formData.username;
         changes.push('username');
@@ -148,7 +150,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       }));
       setAvatarDraftFile(null);
       setAvatarDraftUrl(null);
-      // Garante que reload de preview mostra foto salva, caso tenha mudado
+      // Reload avatar saved after update/upload/removal
       if (user?.id) {
         const novaUrl = await getAvatarUrl();
         setAvatarSaved(novaUrl || null);
@@ -166,7 +168,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
 
   return (
     <>
-      {/* Seção de Foto de Perfil */}
+      {/* Foto de Perfil */}
       <Card className={cn(
         "border mb-6",
         isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
@@ -189,7 +191,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         </CardContent>
       </Card>
 
-      {/* Seção de Credenciais */}
+      {/* Credenciais */}
       <Card className={cn(
         "border shadow-sm",
         isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
