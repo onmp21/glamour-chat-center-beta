@@ -97,13 +97,13 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
 
   return (
     <div className={cn(
-      "h-full flex flex-col",
+      "h-full flex flex-col min-h-screen w-full",
       isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
     )}>
       {/* Header - apenas quando não está na seção principal */}
       <div className={cn(
-        "flex items-center gap-4 p-6 mb-6",
-        isDarkMode ? "text-[#ffffff]" : "text-gray-900"
+        "flex items-center gap-4 p-6 mb-6 border-b",
+        isDarkMode ? "text-[#ffffff] border-[#18181b] bg-[#09090b]" : "text-gray-900 border-gray-200 bg-gray-50"
       )}>
         {activeSection !== 'main' && (
           <Button 
@@ -120,7 +120,10 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
         )}
         
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-full bg-[#b5103c]/10">
+          <div className={cn(
+            "p-3 rounded-full",
+            isDarkMode ? "bg-[#27272a]" : "bg-[#b5103c]/10"
+          )}>
             <Settings className="h-6 w-6 text-[#b5103c]" />
           </div>
           <div>
@@ -140,7 +143,10 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
         </div>
       </div>
       {/* Conteúdo principal */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className={cn(
+        "flex-1 overflow-y-auto px-6 pb-6",
+        isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+      )}>
         {renderSection()}
       </div>
     </div>

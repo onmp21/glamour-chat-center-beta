@@ -13,13 +13,13 @@ export const Exams: React.FC<ExamsProps> = ({
 }) => {
   return (
     <div className={cn(
-      "h-full flex flex-col",
+      "h-full flex flex-col min-h-screen",
       isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
     )}>
       {/* Header alinhado à esquerda */}
       <div className={cn(
-        "p-6",
-        isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+        "p-6 border-b",
+        isDarkMode ? "bg-[#09090b] border-[#18181b]" : "bg-gray-50 border-gray-200"
       )}>
         <div className="flex items-center gap-4">
           <div className={cn(
@@ -46,7 +46,9 @@ export const Exams: React.FC<ExamsProps> = ({
       </div>
 
       {/* Tabela de exames */}
-      <div className="flex-1">
+      <div className={cn("flex-1",
+        isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+      )}>
         <ExamesTable isDarkMode={isDarkMode} />
       </div>
     </div>

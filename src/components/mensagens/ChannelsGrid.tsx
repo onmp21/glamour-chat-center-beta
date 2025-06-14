@@ -21,6 +21,27 @@ interface ChannelsGridProps {
 export const ChannelsGrid: React.FC<ChannelsGridProps> = ({ channels, onChannelClick, isDarkMode }) => {
   const { isPinned, togglePin } = useChannelPin();
 
+  if (channels.length === 0) {
+    // Estado vazio com padrão de cor correto
+    return (
+      <div className={cn(
+        "w-full flex flex-col items-center justify-center",
+        isDarkMode ? "bg-[#09090b] text-[#9ca3af] min-h-[240px]" : "bg-white text-gray-500 min-h-[240px]"
+      )}>
+        <div className={cn("text-center px-6 py-12 rounded-lg border-2 border-dashed",
+          isDarkMode ? "border-[#27272a]" : "border-gray-200"
+        )}>
+          <p className={cn("font-medium text-base", isDarkMode ? "text-white" : "text-gray-800")}>
+            Nenhum canal disponível
+          </p>
+          <p className={cn("mt-2 text-sm", isDarkMode ? "text-[#9ca3af]" : "text-gray-500")}>
+            Você ainda não tem canal cadastrado ou não tem permissão.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {channels.map(channel => {
@@ -30,8 +51,10 @@ export const ChannelsGrid: React.FC<ChannelsGridProps> = ({ channels, onChannelC
           <div
             key={channel.id}
             className={cn(
-              "relative p-4 rounded-lg shadow-md cursor-pointer transition-all duration-200 group",
-              isDarkMode ? "bg-[#18181b] hover:bg-[#27272a]" : "bg-white hover:bg-gray-100",
+              "relative p-4 rounded-xl border transition-all duration-200 cursor-pointer group flex flex-col shadow-sm",
+              isDarkMode
+                  ? "bg-[#18181b] border-[#27272a] hover:bg-[#232327]"
+                  : "bg-white border-gray-200 hover:bg-gray-100",
               channelIsPinned && "ring-2 ring-[#b5103c]/30"
             )}
             onClick={() => {
@@ -42,22 +65,20 @@ export const ChannelsGrid: React.FC<ChannelsGridProps> = ({ channels, onChannelC
             <div className="flex items-start justify-between">
               <div>
                 <h3 className={cn(
-                  "font-semibold text-lg",
+                  "font-bold text-lg truncate",
                   isDarkMode ? "text-white" : "text-gray-900"
                 )}>
                   {channel.nome}
                 </h3>
                 <p className={cn(
-                  "text-sm",
-                  isDarkMode ? "text-[#9ca3af]" : "text-gray-500"
-                )}>
-                  {channel.tipo}
-                </p>
+                  "text-xs font-medium rounded px-2 py-0.5 mt-1 inline-block",
+                  isDarkMode ? "bg-[#27272a] text-[#b5103c]" : "bg-[#b5103c]/10 text-[#b5103c]"
+                )}>{channel.tipo}</p>
                 <div className={cn(
-                  "mt-2 text-xs",
+                  "mt-2 text-xs font-semibold",
                   isDarkMode ? "text-[#9ca3af]" : "text-gray-600"
                 )}>
-                  {channel.ultimaAtividade} &middot; {channel.status}
+                  {channel.ultimaAtividade} • {channel.status}
                 </div>
               </div>
               {/* Pin sempre visível */}
@@ -73,7 +94,7 @@ export const ChannelsGrid: React.FC<ChannelsGridProps> = ({ channels, onChannelC
                 title={channelIsPinned ? "Desafixar canal" : "Fixar canal"}
               >
                 <Pin 
-                  size={18}
+                  size={20}
                   className={cn(
                     channelIsPinned ? "text-[#b5103c] fill-current" : (isDarkMode ? "text-gray-400" : "text-gray-600")
                   )}
