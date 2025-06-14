@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -5,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Folder } from 'lucide-react';
 import { ChannelCard } from './ChannelCard';
+import { useAuth } from '@/contexts/AuthContext'; // Importação correta
 
 interface ChannelsSectionProps {
   isDarkMode: boolean;
@@ -17,6 +19,7 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
 }) => {
   const { channels, loading } = useChannels();
   const { getAccessibleChannels } = usePermissions();
+  const { user } = useAuth(); // hook no contexto React
 
   const getChannelLegacyId = (channel: any) => {
     const nameToId: Record<string, string> = {
@@ -42,9 +45,6 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   };
 
   const accessibleChannels = getAccessibleChannels();
-  
-  // NOVO: Exibir para admin todos os canais ativos exceto Pedro
-  const { user } = require('@/contexts/AuthContext').useAuth?.() || {};
   let availableChannels = [];
 
   if (user?.role === 'admin') {
