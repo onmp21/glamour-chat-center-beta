@@ -1,4 +1,3 @@
-
 // Mantendo toda funcionalidade existente da API Evolution
 export interface EvolutionApiConfig {
   baseUrl: string;
@@ -787,7 +786,7 @@ export class EvolutionApiService {
         success: true
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', error);
       return {
         success: false,
@@ -833,7 +832,7 @@ export class EvolutionApiService {
         webhook: result
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [EVOLUTION_API] Erro ao obter webhook:', error);
       return {
         success: false,
