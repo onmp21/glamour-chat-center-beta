@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -80,6 +79,23 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ isDarkMode }) => {
       isDarkMode ? "bg-background" : "bg-gray-50"
     )}>
       <div className="max-w-2xl mx-auto space-y-6">
+        {/* Novo header visual */}
+        <div className={cn(
+          "flex items-center gap-3 mb-8",
+          isDarkMode ? "text-card-foreground" : "text-gray-900"
+        )}>
+          <div className="p-3 rounded-full bg-gray-600/10 flex items-center">
+            <Settings className="h-6 w-6 text-gray-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Configurações do Sistema</h2>
+            <p className={cn("text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Personalize o funcionamento e o comportamento do sistema conforme suas preferências.
+            </p>
+          </div>
+        </div>
         {/* Configurações Gerais */}
         <Card className={cn(
           "border",

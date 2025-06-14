@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -88,6 +87,23 @@ export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ isDa
       isDarkMode ? "bg-background" : "bg-gray-50"
     )}>
       <div className="max-w-2xl mx-auto">
+        {/* Novo header visual */}
+        <div className={cn(
+          "flex items-center gap-3 mb-8",
+          isDarkMode ? "text-card-foreground" : "text-gray-900"
+        )}>
+          <div className="p-3 rounded-full bg-blue-500/10 flex items-center">
+            <Bell className="h-6 w-6 text-blue-500" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Configurações de Notificação</h2>
+            <p className={cn("text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Gerencie como você recebe alertas e notificações importantes da plataforma.
+            </p>
+          </div>
+        </div>
         <Card className={cn(
           "border",
           isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"

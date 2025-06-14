@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -148,6 +147,24 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       isDarkMode ? "bg-background" : "bg-gray-50"
     )}>
       <div className="max-w-2xl mx-auto">
+        {/* Novo header visual */}
+        <div className={cn(
+          "flex items-center gap-3 mb-8",
+          isDarkMode ? "text-card-foreground" : "text-gray-900"
+        )}>
+          <div className="p-3 rounded-full bg-[#b5103c]/10 flex items-center">
+            <User className="h-6 w-6 text-[#b5103c]" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold">Alteração de Credenciais</h2>
+            <p className={cn("text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Atualize seu nome de usuário, senha e foto de perfil de forma segura.
+            </p>
+          </div>
+        </div>
+
         {/* Seção de Foto de Perfil */}
         <Card className={cn(
           "border mb-6",
@@ -175,17 +192,15 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
 
         {/* Seção de Credenciais */}
         <Card className={cn(
-          "border",
+          "border shadow-sm",
           isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
         )}>
           <CardHeader className="pb-4">
             <CardTitle className={cn(
-              "flex items-center gap-3 text-lg",
+              "flex items-center gap-3 text-xl font-semibold",
               isDarkMode ? "text-card-foreground" : "text-gray-900"
             )}>
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Lock className="h-5 w-5 text-primary" />
-              </div>
+              <Lock className="h-5 w-5 text-primary" />
               Informações de Acesso
             </CardTitle>
           </CardHeader>
