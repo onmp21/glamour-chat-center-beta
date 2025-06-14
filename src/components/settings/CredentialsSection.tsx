@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,10 +29,11 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     confirmPassword: ''
   });
 
-  // Avatar draft state
+  // Avatar states
   const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
   const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
   const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
+  const [avatarForceReload, setAvatarForceReload] = useState(0); // Para forçar re-render/useEffect
   const [loading, setLoading] = useState(false);
 
   const {
@@ -44,22 +44,28 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     loading: avatarLoading,
   } = useSupabaseAvatar();
 
-  // Load saved avatar from Supabase on init
+  // Carrega avatar salvo do Supabase ao montar ou quando alterado
   useEffect(() => {
-    if (user?.id) {
-      getAvatarUrl().then((url) => {
+    let isMounted = true;
+    async function fetchAvatar() {
+      if (!user?.id) return;
+      const url = await getAvatarUrl();
+      if (isMounted) {
         setAvatarSaved(url || null);
         setAvatarDraftFile(null);
         setAvatarDraftUrl(null);
-      });
+      }
     }
-  }, [user?.id, getAvatarUrl]);
+    fetchAvatar();
 
-  // Handle changes from ProfilePicture (only updates draft, not uploaded)
+    return () => { isMounted = false };
+    // avatarForceReload faz efeito após alterações
+  }, [user?.id, getAvatarUrl, avatarForceReload]);
+
+  // Handle draft/crop do componente ProfilePicture (não salva nem faz upload ainda)
   const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
     setAvatarDraftFile(file);
     setAvatarDraftUrl(previewUrl);
-    // Do not upload now, only on save!
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -94,15 +100,16 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       setLoading(true);
       const updateData: any = {};
       const changes: string[] = [];
+      let fezUploadOuRemocao = false;
 
       // FOTO DE PERFIL: UPLOAD OU REMOÇÃO
       if (avatarDraftFile && avatarDraftUrl) {
-        // Upload da nova foto ao clicar em salvar
+        // Só envia se o draft mudar
         const publicUrl = await uploadAvatar(avatarDraftFile);
         if (publicUrl) {
           await updateAvatarUrl(publicUrl);
-          setAvatarSaved(publicUrl);
           changes.push('profile_picture');
+          fezUploadOuRemocao = true;
         } else {
           toast({
             title: "Erro",
@@ -113,10 +120,10 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
           return;
         }
       } else if (!avatarDraftUrl && avatarSaved) {
-        // Usuário removeu a foto e havia uma antiga salva
+        // Se tinha uma salva e apagou no draft, deleta do banco
         await removeAvatar();
-        setAvatarSaved(null);
         changes.push('profile_picture');
+        fezUploadOuRemocao = true;
       }
 
       // USER/SENHA
@@ -131,6 +138,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       if (Object.keys(updateData).length > 0) {
         await updateUser(user.id, updateData);
       }
+
       if (changes.length > 0) {
         await logCredentialsAction('update', {
           changes,
@@ -142,6 +150,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         description: "Credenciais atualizadas com sucesso!",
         variant: "default"
       });
+
       setFormData(prev => ({
         ...prev,
         oldPassword: '',
@@ -150,10 +159,10 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       }));
       setAvatarDraftFile(null);
       setAvatarDraftUrl(null);
-      // Reload avatar saved after update/upload/removal
-      if (user?.id) {
-        const novaUrl = await getAvatarUrl();
-        setAvatarSaved(novaUrl || null);
+
+      // Se mudou algo na foto, refaz fetch do avatar salvo
+      if (fezUploadOuRemocao) {
+        setAvatarForceReload(c => c + 1);
       }
     } catch (error) {
       toast({
