@@ -1,7 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ReportHistory } from '@/types/ai-providers';
+<<<<<<< HEAD
 import OpenAI from 'openai';
+=======
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 
 export class IntelligentReportsService {
   static async getReports(): Promise<ReportHistory[]> {
@@ -123,6 +126,7 @@ export class IntelligentReportsService {
     data: any;
     custom_prompt?: string;
   }): Promise<ReportHistory> {
+<<<<<<< HEAD
     const openai = new OpenAI({
       apiKey: import.meta.env.VITE_OPENAI_API_KEY,
     });
@@ -167,5 +171,20 @@ export class IntelligentReportsService {
     });
 
     return report;
+=======
+    // Mock implementation for now
+    const mockReport = await this.createReport({
+      prompt: params.custom_prompt || `Generate ${params.report_type} report`,
+      report_type: params.report_type,
+      generated_report: `Mock report generated for ${params.report_type}`,
+      provider_id: params.provider_id,
+      model_used: 'mock-model',
+      tokens_used: 100,
+      generation_time: 2.5,
+      metadata: { data_source: params.report_type }
+    });
+
+    return mockReport;
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   }
 }

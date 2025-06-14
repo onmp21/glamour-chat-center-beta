@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelMessage, RawMessage } from '@/types/messages';
+<<<<<<< HEAD
 import { evolutionMessageService } from '@/services/EvolutionMessageService';
+=======
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 
 export const useChannelMessagesRefactored = (channelId: string, conversationId?: string) => {
   console.log(`[useChannelMessagesRefactored] channelId recebido: ${channelId}`);
@@ -62,6 +65,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
     const convertedMessage = convertRawToChannelMessage(newMessage);
     setMessages(prev => [...prev, convertedMessage]);
   }, []);
+<<<<<<< HEAD
 
   // Função para enviar mensagem de texto
   const sendMessage = useCallback(async (message: string): Promise<void> => {
@@ -236,16 +240,22 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
       throw error;
     }
   }, [channelId, conversationId, addMessage, loadMessages]);
+=======
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 
   return {
     messages,
     loading,
     error,
     refetch: loadMessages,
+<<<<<<< HEAD
     addMessage,
     sendMessage,
     sendFile,
     sendAudio
+=======
+    addMessage
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   };
 };
 

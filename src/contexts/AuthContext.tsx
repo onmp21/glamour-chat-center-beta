@@ -1,7 +1,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthState, LoginCredentials, UserRole, AuthContextType } from '@/types/auth';
+<<<<<<< HEAD
 import { supabase } from "@/integrations/supabase/client.js";
+=======
+import { supabase } from '@/integrations/supabase/client';
+
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

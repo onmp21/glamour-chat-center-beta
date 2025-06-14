@@ -39,7 +39,11 @@ serve(async (req) => {
     const { provider_id, report_type, data, custom_prompt, filters } = requestBody
 
     // Buscar o provedor de IA
+<<<<<<< HEAD
     let { data: provider, error: providerError } = await supabaseClient
+=======
+    const { data: provider, error: providerError } = await supabaseClient
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       .from('ai_providers')
       .select('*')
       .eq('id', provider_id)
@@ -47,6 +51,7 @@ serve(async (req) => {
       .single()
 
     if (providerError || !provider) {
+<<<<<<< HEAD
       // Se não encontrar provedor específico, usar configuração padrão
       console.log(`⚠️ [GENERATE_REPORT] Provider not found for user ${user.id}, using default configuration`);
       
@@ -71,6 +76,15 @@ serve(async (req) => {
         default_model: 'gpt-3.5-turbo',
         advanced_settings: {}
       };
+=======
+      return new Response(
+        JSON.stringify({ error: 'Provider not found or unauthorized' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
     }
 
     // Preparar prompt baseado no tipo de relatório

@@ -195,7 +195,10 @@ serve(async (req) => {
 
         if (error) {
           console.error(`❌ [WEBHOOK_UNIVERSAL] Database error details:`, {
+<<<<<<< HEAD
             fullErrorObject: error,
+=======
+>>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
             message: error.message,
             details: error.details,
             hint: error.hint,
