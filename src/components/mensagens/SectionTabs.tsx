@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface SectionTabsProps {
   activeTab: 'canais' | 'contatos';
@@ -15,33 +15,30 @@ export const SectionTabs: React.FC<SectionTabsProps> = ({
   isDarkMode
 }) => {
   return (
-    <div className="flex space-x-1 p-1 bg-gray-100 dark:bg-[#18181b] rounded-lg max-w-xs">
-      <Button
-        variant={activeTab === 'canais' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => onTabChange('canais')}
-        className={cn(
-          "flex-1 text-xs px-2 py-1",
-          activeTab === 'canais'
-            ? "bg-white dark:bg-[#27272a] text-gray-900 dark:text-white shadow-sm"
-            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-        )}
-      >
-        Canais
-      </Button>
-      <Button
-        variant={activeTab === 'contatos' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => onTabChange('contatos')}
-        className={cn(
-          "flex-1 text-xs px-2 py-1",
-          activeTab === 'contatos'
-            ? "bg-white dark:bg-[#27272a] text-gray-900 dark:text-white shadow-sm"
-            : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-        )}
-      >
-        Contatos
-      </Button>
-    </div>
+    <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as 'canais' | 'contatos')}>
+      <TabsList className={cn(
+        "grid w-full grid-cols-2",
+        isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-gray-100"
+      )}>
+        <TabsTrigger 
+          value="canais" 
+          className={cn(
+            "data-[state=active]:bg-[#b5103c] data-[state=active]:text-white",
+            isDarkMode ? "text-[#9ca3af] data-[state=inactive]:hover:bg-[#27272a]" : "text-gray-600"
+          )}
+        >
+          Canais
+        </TabsTrigger>
+        <TabsTrigger 
+          value="contatos"
+          className={cn(
+            "data-[state=active]:bg-[#b5103c] data-[state=active]:text-white",
+            isDarkMode ? "text-[#9ca3af] data-[state=inactive]:hover:bg-[#27272a]" : "text-gray-600"
+          )}
+        >
+          Contatos
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -146,7 +147,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
 
       <div className="flex gap-4 items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+          <Search className={cn("absolute left-3 top-1/2 transform -translate-y-1/2", isDarkMode ? "text-[#9ca3af]" : "text-gray-400")} size={16} />
           <Input
             placeholder={
               activeTab === 'canais' 
@@ -157,7 +158,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className={cn(
               "pl-10",
-              isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+              isDarkMode ? "bg-[#18181b] border-[#3f3f46] text-[#ffffff]" : "bg-white border-gray-200"
             )}
           />
         </div>

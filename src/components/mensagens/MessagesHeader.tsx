@@ -9,25 +9,26 @@ interface MessagesHeaderProps {
 
 export const MessagesHeader: React.FC<MessagesHeaderProps> = ({ isDarkMode }) => {
   return (
-    <div className="text-left mb-8">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="p-3 rounded-full bg-[#b5103c]/10">
-          <MessageSquare size={32} className="text-[#b5103c]" strokeWidth={1.5} />
-        </div>
-        <div>
-          <h1 className={cn(
-            "text-3xl font-bold",
-            isDarkMode ? "text-white" : "text-gray-900"
-          )}>
-            Mensagens
-          </h1>
-          <p className={cn(
-            "text-lg",
-            isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
-          )}>
-            Central de comunicação com seus clientes
-          </p>
-        </div>
+    <div className="flex items-center space-x-3">
+      <div className={cn(
+        "p-3 rounded-lg",
+        isDarkMode ? "bg-[#18181b]" : "bg-white"
+      )}>
+        <MessageSquare size={24} className="text-[#b5103c]" />
+      </div>
+      <div>
+        <h1 className={cn(
+          "text-2xl font-bold",
+          isDarkMode ? "text-[#ffffff]" : "text-gray-900"
+        )}>
+          Mensagens
+        </h1>
+        <p className={cn(
+          "text-sm",
+          isDarkMode ? "text-[#9ca3af]" : "text-gray-600"
+        )}>
+          Gerencie suas conversas e contatos
+        </p>
       </div>
     </div>
   );
