@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,11 +23,10 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
     name: '',
     bio: '',
   });
-  // Armazena arquivo ainda não enviado
-  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
-  // Armazena preview/base64 temporário
-  const [avatarDraftPreview, setAvatarDraftPreview] = useState<string | null>(null);
-  // Armazena link salvo no Supabase, esse sim é definitivo
+  // Draft temporário
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null); // File temporário (upload só no submit)
+  const [avatarDraftPreview, setAvatarDraftPreview] = useState<string | null>(null); // base64 preview/crop
+  // URL definitivo salvo no Supabase
   const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,7 +36,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
           ...prev,
           bio: profile?.bio || '',
         }));
-        setAvatarSaved(profile?.avatar_url || null);
+        setAvatarSaved(profile?.avatar_url || null); // url que está no backend
         setAvatarDraftFile(null);
         setAvatarDraftPreview(null);
       });
@@ -52,36 +50,40 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
     }));
   };
 
-  // Recebe arquivo TEMPORÁRIO
+  // Recebe draft temporário do ProfilePicture
   const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
     setAvatarDraftFile(file);
     setAvatarDraftPreview(previewUrl);
+    // Importante: NÃO faz upload aqui!
   };
 
+  // Limpa apenas o draft do avatar (preview temporário)
   const handleRemoveAvatar = () => {
     setAvatarDraftFile(null);
     setAvatarDraftPreview(null);
-    setAvatarSaved(null);
+    // NÃO remove no Supabase ainda
   };
 
-  // Ao enviar o perfil: se houver file novo, faz upload, senão só atualiza bio
+  // Submit do perfil: só aqui faz upload se há draft novo, e remove se não há
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     let avatarUrlToSave = avatarSaved;
 
-    // Se há foto temporária diferente da salva
+    // 1. Novo avatar escolhido mas diferente do salvo (draft temporário)
     if (avatarDraftFile && avatarDraftPreview && avatarDraftPreview !== avatarSaved) {
-      // Faz upload AGORA
+      // Faz upload na hora do submit
       const url = await uploadAvatar(avatarDraftFile);
       avatarUrlToSave = url;
       setAvatarSaved(url);
       setAvatarDraftFile(null);
       setAvatarDraftPreview(null);
-    } else if (!avatarDraftFile && avatarDraftPreview === null && avatarSaved) {
-      // Remove no supabase se pediu para remover
+    }
+    // 2. Se o usuário removeu o draft e já tinha avatar salvo → remove também no Supabase
+    else if (!avatarDraftFile && !avatarDraftPreview && avatarSaved) {
       avatarUrlToSave = null;
       setAvatarSaved(null);
+      // Obs: Supabase removerá no updateProfile abaixo
     }
 
     await updateProfile({
@@ -128,6 +130,7 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
             <ProfilePicture
               isDarkMode={isDarkMode}
               userName={user?.name || ''}
+              // Só passa o draft, nunca faz upload aqui!
               onAvatarChange={handleAvatarChange}
               externalPreview={avatarDraftPreview || avatarSaved}
             />
