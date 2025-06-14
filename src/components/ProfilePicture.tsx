@@ -20,21 +20,21 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   onAvatarChange,
   externalPreview,
 }) => {
-  // previewImage: pode ser base64 novo OU url do avatar salvo
-  const [previewImage, setPreviewImage] = useState<string | null>(null); // preview temporário (base64/crop) OU avatar salvo
-  const [pendingFile, setPendingFile] = useState<File | null>(null); // File de upload (temporário, só para submit)
+  // Estado só para captura local
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null); // Arquivo temporário só para o pai no Save
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Mostra sempre avatar do props, ou temporário se está cortando
+  // Sempre que o draft externo muda (ProfileSection), ou avatar salvo, atualize o preview mostrado
   useEffect(() => {
-    // Se for passada prop externalPreview, usar ela, senão limpa preview local
-    if (externalPreview !== undefined) {
-      setPreviewImage(externalPreview);
+    setPreviewImage(externalPreview ?? null);
+    if (!externalPreview) {
       setPendingFile(null);
     }
   }, [externalPreview]);
 
+  // Gera iniciais se não houver imagem
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -44,7 +44,6 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
       .slice(0, 2);
   };
 
-  // Quando o usuário escolhe nova imagem, exibe crop
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -58,30 +57,28 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      // NÃO salva nem envia NADA ainda! Só preview & abre crop.
       setPreviewImage(e.target?.result as string);
       setPendingFile(file);
-      setAdjustDialogOpen(true);
+      setAdjustDialogOpen(true); // Abre ajuste/crop
     };
     reader.readAsDataURL(file);
-    event.target.value = ''; // Limpa input para permitir novo upload
+    event.target.value = ''; // Limpa input, permitindo outro upload
   };
 
-  // Usuário cancela corte/seleção → limpa prévia local (não remove foto salva!)
+  // Usuário cancela crop: limpa apenas draft local, não afeta gravado no backend
   const handleRemovePreview = () => {
     setPreviewImage(null);
     setPendingFile(null);
     setAdjustDialogOpen(false);
-    onAvatarChange?.(null, null); // Informa ao pai para limpar draft
+    onAvatarChange?.(null, null); // Reseta draft no pai
   };
 
-  // Após ajustar/cortar e confirmar:
+  // Ao confirmar o crop, envia pro pai só o arquivo temporário (não faz upload)
   const handleConfirmPreview = (confirmedUrl: string) => {
     setPreviewImage(confirmedUrl);
     setAdjustDialogOpen(false);
     if (pendingFile && confirmedUrl) {
-      // Passa arquivo temporário e base64 ajustado só pro pai (ProfileSection)
-      onAvatarChange?.(pendingFile, confirmedUrl);
+      onAvatarChange?.(pendingFile, confirmedUrl); // Salva draft temporário
     }
   };
 
@@ -97,6 +94,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
             {getInitials(userName)}
           </AvatarFallback>
         </Avatar>
+        {/* Dialog para crop/ajuste */}
         <AvatarAdjustDialog
           open={adjustDialogOpen}
           imageUrl={previewImage}

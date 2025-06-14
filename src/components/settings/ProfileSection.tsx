@@ -54,36 +54,34 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
   const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
     setAvatarDraftFile(file);
     setAvatarDraftPreview(previewUrl);
-    // Importante: NÃO faz upload aqui!
+    // Não faz upload aqui!
   };
 
   // Limpa apenas o draft do avatar (preview temporário)
   const handleRemoveAvatar = () => {
     setAvatarDraftFile(null);
     setAvatarDraftPreview(null);
-    // NÃO remove no Supabase ainda
+    // NÃO remove no Supabase ainda, só no submit
   };
 
-  // Submit do perfil: só aqui faz upload se há draft novo, e remove se não há
+  // Submit do perfil: faz upload só aqui
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     let avatarUrlToSave = avatarSaved;
 
-    // 1. Novo avatar escolhido mas diferente do salvo (draft temporário)
+    // Se usuário selecionou nova imagem (draft), faz upload agora
     if (avatarDraftFile && avatarDraftPreview && avatarDraftPreview !== avatarSaved) {
-      // Faz upload na hora do submit
       const url = await uploadAvatar(avatarDraftFile);
       avatarUrlToSave = url;
       setAvatarSaved(url);
       setAvatarDraftFile(null);
       setAvatarDraftPreview(null);
     }
-    // 2. Se o usuário removeu o draft e já tinha avatar salvo → remove também no Supabase
+    // Se o usuário removeu a foto (draft limpo) e tinha avatar salvo, remove no backend
     else if (!avatarDraftFile && !avatarDraftPreview && avatarSaved) {
       avatarUrlToSave = null;
       setAvatarSaved(null);
-      // Obs: Supabase removerá no updateProfile abaixo
     }
 
     await updateProfile({
@@ -130,7 +128,6 @@ export const ProfileSection: React.FC<ProfileSectionProps> = ({ isDarkMode }) =>
             <ProfilePicture
               isDarkMode={isDarkMode}
               userName={user?.name || ''}
-              // Só passa o draft, nunca faz upload aqui!
               onAvatarChange={handleAvatarChange}
               externalPreview={avatarDraftPreview || avatarSaved}
             />
