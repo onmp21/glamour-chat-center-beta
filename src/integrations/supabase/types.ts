@@ -151,15 +151,7 @@ export type Database = {
           user_id?: string | null
           user_name?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       canarana_conversas: {
         Row: {
@@ -606,38 +598,38 @@ export type Database = {
       }
       users: {
         Row: {
-          assigned_cities: string[] | null
-          assigned_tabs: string[] | null
+          assigned_channels: string[]
+          assigned_tabs: string[]
           created_at: string
           id: string
           is_active: boolean
           name: string
           password_hash: string
-          role: Database["public"]["Enums"]["user_role"]
+          role: string
           updated_at: string
           username: string
         }
         Insert: {
-          assigned_cities?: string[] | null
-          assigned_tabs?: string[] | null
+          assigned_channels?: string[]
+          assigned_tabs?: string[]
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
           password_hash: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role: string
           updated_at?: string
           username: string
         }
         Update: {
-          assigned_cities?: string[] | null
-          assigned_tabs?: string[] | null
+          assigned_channels?: string[]
+          assigned_tabs?: string[]
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           password_hash?: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: string
           updated_at?: string
           username?: string
         }
@@ -705,9 +697,9 @@ export type Database = {
           p_username: string
           p_password: string
           p_name: string
-          p_role: Database["public"]["Enums"]["user_role"]
+          p_role: string
           p_assigned_tabs: string[]
-          p_assigned_cities: string[]
+          p_assigned_channels: string[]
         }
         Returns: string
       }
@@ -824,9 +816,9 @@ export type Database = {
           p_username?: string
           p_password?: string
           p_name?: string
-          p_role?: Database["public"]["Enums"]["user_role"]
+          p_role?: string
           p_assigned_tabs?: string[]
-          p_assigned_cities?: string[]
+          p_assigned_channels?: string[]
         }
         Returns: undefined
       }
@@ -860,9 +852,9 @@ export type Database = {
           user_id: string
           user_username: string
           user_name: string
-          user_role: Database["public"]["Enums"]["user_role"]
+          user_role: string
           user_assigned_tabs: string[]
-          user_assigned_cities: string[]
+          user_assigned_channels: string[]
         }[]
       }
     }

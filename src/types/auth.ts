@@ -1,4 +1,6 @@
 
+// Atualização do tipo de usuário e a interface DatabaseUser para refletir a nova estrutura.
+
 export type UserRole = 'admin' | 'salesperson' | 'manager_external' | 'manager_store' | 'manager';
 
 export interface User {
@@ -7,8 +9,7 @@ export interface User {
   name: string;
   role: UserRole;
   assignedTabs: string[];
-  assignedCities: string[];
-  assignedChannels?: string[]; // Novo campo para canais atribuídos (usado para salesperson)
+  assignedChannels: string[]; // Agora obrigatoriamente presente
   createdAt: string;
 }
 
@@ -18,9 +19,11 @@ export interface DatabaseUser {
   name: string;
   role: UserRole;
   assigned_tabs: string[];
-  assigned_cities: string[];
-  created_at: string;
+  assigned_channels: string[];
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  password_hash: string;
 }
 
 export interface AuthState {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, UserRole, DatabaseUser } from '@/types/auth';
@@ -28,7 +27,7 @@ export const useUsers = () => {
       console.log('🔍 [useUsers] Dados brutos recebidos:', data);
       console.log('🔍 [useUsers] Quantidade de usuários encontrados:', data?.length || 0);
 
-      // Adaptar para consumir tanto assigned_channels (moderno) quanto assigned_cities (legado)
+      // Adaptado para nova estrutura: assigned_channels e assigned_tabs SEM assigned_cities legado
       const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => {
         console.log('🔍 [useUsers] Formatando usuário:', user);
         return {
@@ -37,8 +36,7 @@ export const useUsers = () => {
           name: user.name,
           role: user.role as UserRole,
           assignedTabs: user.assigned_tabs || [],
-          assignedChannels: (user as any).assigned_channels || user.assigned_cities || [], // novo > legado
-          assignedCities: user.assigned_cities || [], // mantém para transição
+          assignedChannels: user.assigned_channels || [],
           createdAt: user.created_at
         };
       });
@@ -56,7 +54,7 @@ export const useUsers = () => {
     loadUsers();
   }, [loadUsers]);
 
-  // Novo formato: Salva assignedChannels no lugar de assignedCities (compatível com backend atual)
+  // Novo: cria usuário para nova estrutura (assigned_channels passa direto)
   const createUser = async (userData: {
     username: string;
     password: string;
@@ -73,7 +71,7 @@ export const useUsers = () => {
         p_name: userData.name,
         p_role: userData.role as any,
         p_assigned_tabs: userData.assignedTabs,
-        p_assigned_cities: userData.assignedChannels // Mapeia canais para o campo cities (até migrar banco)
+        p_assigned_channels: userData.assignedChannels
       });
 
       if (error) {
@@ -81,7 +79,6 @@ export const useUsers = () => {
         throw error;
       }
 
-      console.log('Usuário criado com sucesso:', data);
       await loadUsers();
       return data;
     } catch (error) {
@@ -102,7 +99,7 @@ export const useUsers = () => {
           p_name: userData.name || null,
           p_role: userData.role as any || null,
           p_assigned_tabs: userData.assignedTabs || null,
-          p_assigned_cities: userData.assignedChannels || null // Só assumimos canais
+          p_assigned_channels: userData.assignedChannels || null
         });
 
         if (error) {
@@ -116,7 +113,7 @@ export const useUsers = () => {
         if (userData.name) updateData.name = userData.name;
         if (userData.role) updateData.role = userData.role;
         if (userData.assignedTabs) updateData.assigned_tabs = userData.assignedTabs;
-        if (userData.assignedChannels) updateData.assigned_cities = userData.assignedChannels; // assumimos canais
+        if (userData.assignedChannels) updateData.assigned_channels = userData.assignedChannels;
 
         const { error } = await supabase
           .from('users')
@@ -129,7 +126,6 @@ export const useUsers = () => {
         }
       }
 
-      console.log('Usuário atualizado com sucesso');
       await loadUsers();
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
@@ -139,21 +135,17 @@ export const useUsers = () => {
 
   const deleteUser = async (userId: string) => {
     try {
-      console.log('Excluindo usuário:', userId);
       const { error } = await supabase
         .from('users')
         .update({ is_active: false })
         .eq('id', userId);
 
       if (error) {
-        console.error('Erro ao excluir usuário:', error);
         throw error;
       }
 
-      console.log('Usuário excluído com sucesso');
-      await loadUsers(); // Recarregar lista
+      await loadUsers();
     } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
       throw error;
     }
   };

@@ -34,8 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     try {
       console.log('🔐 [AUTH_PROVIDER] Tentando login:', credentials.username);
-      
-      // Login via Supabase usando a tabela users
+
+      // Novo: login via função que retorna assigned_tabs/assigned_channels
       const { data: userData, error: userError } = await supabase.rpc('verify_user_credentials', {
         input_username: credentials.username,
         input_password: credentials.password
@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: userInfo.user_name,
           role: userInfo.user_role as UserRole,
           assignedTabs: userInfo.user_assigned_tabs || [],
-          assignedCities: userInfo.user_assigned_cities || [],
+          assignedChannels: userInfo.user_assigned_channels || [],
           createdAt: new Date().toISOString()
         };
 
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('❌ [AUTH_PROVIDER] Credenciais inválidas');
       return false;
-      
+
     } catch (error) {
       console.error('❌ [AUTH_PROVIDER] Erro durante login:', error);
       return false;
