@@ -13,6 +13,7 @@ import { ChatOverlayRefactored } from './chat/ChatOverlayRefactored';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useInternalChannels } from '@/hooks/useInternalChannels';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MensagensRefactoredProps {
   isDarkMode: boolean;
@@ -35,10 +36,9 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  // Trocar para usar o hook correto: buscar channels com legacyId, recupera do useInternalChannels:
   const { channels: internalChannels } = useInternalChannels(); // InternalChannel[], cada um tem .legacyId
   const { getAccessibleChannels } = usePermissions();
-  const { user } = require('@/contexts/AuthContext').useAuth();
+  const { user } = useAuth(); // ✅ Use hook properly
 
   // Montar lista de canais baseada no role:
   let canaisData = [];
