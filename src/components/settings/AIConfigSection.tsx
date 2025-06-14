@@ -11,6 +11,7 @@ import { Brain, Plus, Edit, Trash2, Eye, EyeOff, Key, Settings } from 'lucide-re
 import { AIProviderService } from '@/services/AIProviderService';
 import { AIProvider, ProviderType } from '@/types/ai-providers';
 import { toast } from '@/hooks/use-toast';
+import { AIConfigPromptsSection } from "./AIConfigPromptsSection";
 
 interface AIConfigSectionProps {
   isDarkMode: boolean;
@@ -435,7 +436,13 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
             </div>
           )}
         </div>
+
+        {/* Nova seção: configuração de prompts */}
+        <AIConfigPromptsSection isDarkMode={isDarkMode} />
+
       </CardContent>
     </Card>
   );
 };
+
+export default AIConfigSection;
