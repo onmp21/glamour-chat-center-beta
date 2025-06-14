@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/contexts/AuthContext';
 
 export const usePermissions = () => {
@@ -31,8 +30,7 @@ export const usePermissions = () => {
     // salesperson (vendedora): access chat + assigned channel(s)
     if (user.role === 'salesperson') {
       const channels = ['chat'];
-      // prefer assignedChannels, fallback to assignedCities for legacy
-      const assignments = (user as any).assignedChannels || user.assignedCities || [];
+      const assignments = user.assignedChannels || [];
       channels.push(...assignments.filter(Boolean));
       return Array.from(new Set(channels));
     }

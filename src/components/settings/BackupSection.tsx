@@ -101,8 +101,8 @@ export const BackupSection: React.FC<BackupSectionProps> = ({ isDarkMode }) => {
       content += `### ${index + 1}. ${user.name}\n`;
       content += `- Username: ${user.username}\n`;
       content += `- Função: ${user.role}\n`;
-      content += `- Canais atribuídos: ${user.assignedTabs?.length || 0}\n`;
-      content += `- Cidades atribuídas: ${user.assignedCities?.length || 0}\n\n`;
+      content += `- Canais atribuídos: ${user.assignedChannels?.length || 0}\n`;
+      content += `\n`;
     });
     
     // Adicionar informações de canais
@@ -165,7 +165,7 @@ export const BackupSection: React.FC<BackupSectionProps> = ({ isDarkMode }) => {
       content += `- Username: ${user.username}\n`;
       content += `- Função: ${user.role}\n`;
       content += `- Canais atribuídos: ${user.assignedTabs?.join(', ') || 'Nenhum'}\n`;
-      content += `- Cidades atribuídas: ${user.assignedCities?.join(', ') || 'Nenhuma'}\n`;
+      content += `- Canais: ${user.assignedChannels?.join(', ') || 'Nenhum'}\n`;
       content += `- Criado em: N/A\n`;
       content += `- Atualizado em: N/A\n\n`;
     });
