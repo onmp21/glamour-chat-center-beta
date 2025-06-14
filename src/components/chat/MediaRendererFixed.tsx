@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MediaProcessor } from '@/services/MediaProcessor'; // agora assíncrono
+import { MediaProcessor } from '@/services/MediaProcessor';
 import { AudioPlayerFixed } from './AudioPlayerFixed';
 import { MediaOverlay } from './MediaOverlay';
 import { AlertCircle, Download, Play, Pause, Volume2 } from 'lucide-react';
@@ -32,8 +32,6 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   balloonColor = 'received'
 }) => {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-
-  // Novo: processamento assíncrono da mídia
   const [processedResult, setProcessedResult] = useState<MediaResult | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -88,6 +86,10 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   }
 
   const { url, mimeType, type, size } = processedResult;
+
+  // Exibir apenas se URL está no storage público.
+  const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/');
+  if (!isBucketUrl) return renderError();
 
   // Renderizar áudio
   if (type === 'audio') {

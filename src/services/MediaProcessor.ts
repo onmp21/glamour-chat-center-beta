@@ -1,4 +1,3 @@
-
 import { MediaDetector } from './media/MediaDetector';
 import { MediaStorageService } from './MediaStorageService';
 
@@ -12,14 +11,14 @@ interface ProcessResult {
 }
 
 export class MediaProcessor {
-  // Nova: faz upload de base64 no Supabase Storage e retorna o link público
   static async processAsync(content: string, messageType?: string): Promise<ProcessResult> {
     try {
       if (!content || content.length < 20) {
         return { isProcessed: false, error: 'Conteúdo muito pequeno' };
       }
 
-      if (content.includes('supabase.co/storage/v1/object/public/media-files/')) {
+      // Se já é uma URL pública válida do storage
+      if (content.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/')) {
         return {
           isProcessed: true,
           url: content,
@@ -28,8 +27,8 @@ export class MediaProcessor {
         };
       }
 
+      // Se é um data URL base64
       if (content.startsWith('data:')) {
-        // Salva no storage e retorna URL
         const uploadResult = await MediaStorageService.uploadBase64ToStorage(content);
         if (uploadResult.success && uploadResult.url) {
           return {
@@ -43,8 +42,8 @@ export class MediaProcessor {
         }
       }
 
+      // Se é um base64 puro
       if (MediaDetector.looksLikeBase64(content)) {
-        // Converte base64 puro para dataurl, salva e retorna URL
         const dataUrl = `data:${this.getMimeTypeFromType(messageType ?? 'image')};base64,${content}`;
         const uploadResult = await MediaStorageService.uploadBase64ToStorage(dataUrl);
         if (uploadResult.success && uploadResult.url) {
@@ -60,7 +59,6 @@ export class MediaProcessor {
       }
 
       return { isProcessed: false, error: 'Não é conteúdo de mídia válido' };
-
     } catch (error) {
       console.error('❌ [MEDIA_PROCESSOR] Error:', error);
       return { isProcessed: false, error: 'Erro ao processar mídia' };

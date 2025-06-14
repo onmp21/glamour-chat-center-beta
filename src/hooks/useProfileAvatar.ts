@@ -16,7 +16,6 @@ export function useProfileAvatar() {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
 
-  // Busca avatar_url ao montar
   const fetchAvatar = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -26,7 +25,7 @@ export function useProfileAvatar() {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!error && data && data.avatar_url) {
+    if (!error && data && data.avatar_url && data.avatar_url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/avatars/')) {
       setAvatarUrl(data.avatar_url);
       setFilePath(getFilePathFromUrl(data.avatar_url));
     } else {
@@ -52,7 +51,6 @@ export function useProfileAvatar() {
   const uploadAvatar = async (file: File) => {
     if (!user) return null;
     setLoading(true);
-    // Remove antiga se houver
     if (filePath) await removeOldAvatar();
 
     const ext = file.name.split('.').pop();
@@ -66,8 +64,6 @@ export function useProfileAvatar() {
       setLoading(false);
       return null;
     }
-
-    // Gerar URL pública e atualizar no perfil
     const { data: urlData } = supabase
       .storage
       .from("avatars")
@@ -75,8 +71,7 @@ export function useProfileAvatar() {
 
     const publicUrl = urlData?.publicUrl || null;
 
-    if (publicUrl) {
-      // Atualiza no banco user_profiles
+    if (publicUrl && publicUrl.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/avatars/')) {
       await supabase
         .from("user_profiles")
         .upsert({
@@ -84,11 +79,9 @@ export function useProfileAvatar() {
           avatar_url: publicUrl,
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" });
-
       setAvatarUrl(publicUrl);
       setFilePath(getFilePathFromUrl(publicUrl));
     }
-
     setLoading(false);
     return publicUrl;
   };
@@ -98,7 +91,6 @@ export function useProfileAvatar() {
     setLoading(true);
     if (filePath) await removeOldAvatar();
 
-    // Limpa avatar_url no perfil
     if (user?.id)
       await supabase
         .from("user_profiles")
