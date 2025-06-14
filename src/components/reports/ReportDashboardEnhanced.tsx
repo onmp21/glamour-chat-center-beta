@@ -53,14 +53,16 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     try {
       console.log("📊 [ReportDashboardEnhanced] Carregando provedores de IA...");
       const activeProviders = await AIProviderService.getProviders();
-      setProviders(activeProviders);
-      if (activeProviders.length > 0) {
+      setProviders(activeProviders || []);
+      if (activeProviders && activeProviders.length > 0) {
         setSelectedProvider(String(activeProviders[0].id));
         console.log("📊 [ReportDashboardEnhanced] Provedores carregados. Primeiro provedor selecionado:", activeProviders[0].id);
       } else {
+        setSelectedProvider('');
         console.log("📊 [ReportDashboardEnhanced] Nenhum provedor de IA ativo encontrado.");
       }
     } catch (error) {
+      setSelectedProvider('');
       console.error("Erro ao carregar provedores:", error);
     }
   };
@@ -98,7 +100,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const generateReport = async () => {
     if (!selectedProvider) {
-      setError('Selecione um provedor de IA');
+      setError('É necessário cadastrar e selecionar ao menos um provedor de IA ativo antes de gerar relatórios.');
       return;
     }
 
@@ -113,13 +115,23 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         data: {},
         custom_prompt: filters.custom_prompt
       });
-      
-      setReportResult(result.result);
-      toast({
-        title: "Sucesso",
-        description: "Relatório gerado com sucesso",
-      });
-      loadRecentReports();
+
+      // Exibe mensagem customizada se houver erro no conteúdo do relatório
+      if (
+        result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
+        || result.generated_report?.includes("chave de API")
+        || result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
+      ) {
+        setError(result.generated_report);
+        setReportResult(null);
+      } else {
+        setReportResult(result.result);
+        toast({
+          title: "Sucesso",
+          description: "Relatório gerado com sucesso",
+        });
+        loadRecentReports();
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
       toast({
