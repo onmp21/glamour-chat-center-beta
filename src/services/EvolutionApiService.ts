@@ -135,32 +135,37 @@ export class EvolutionApiService {
    */
   sendMediaMessage = async (
     phoneNumber: string, 
-    mediaUrl: string, 
+    media: string, 
     caption: string = '', 
-    mediaType: 'image' | 'audio' | 'video' | 'document' = 'image'
+    mediaType: 'image' | 'audio' | 'video' | 'document',
+    mimetype: string = '', // agora explicitamente recebido ou derivado pelo chamador
+    fileName: string = ''  // agora explicitamente recebido ou derivado pelo chamador
   ): Promise<SendMessageResult> => {
     try {
       console.log('🎥 [EVOLUTION_API] Enviando mensagem de mídia:', {
         instanceName: this.config.instanceName,
         phoneNumber,
         mediaType,
-        captionLength: caption.length
+        captionLength: caption.length,
+        mimetype,
+        fileName
       });
 
       const url = `${this.config.baseUrl}/message/sendMedia/${this.config.instanceName}`;
       
-      // Formato correto conforme especificação
+      // Payload EXATO conforme documentação da Evolution API v2
       const payload = {
         number: phoneNumber,
-        mediaMessage: {
-          media: mediaUrl,
-          caption: caption,
-          mediatype: mediaType
-        }
+        mediatype: mediaType,
+        mimetype,
+        caption,
+        media,
+        fileName
+        // Campos extras opcionais (delay, linkPreview etc) podem ser adicionados se necessário
       };
 
       console.log('🎥 [EVOLUTION_API] URL:', url);
-      console.log('🎥 [EVOLUTION_API] Payload:', payload);
+      console.log('🎥 [EVOLUTION_API] Payload:', JSON.stringify(payload));
 
       const response = await fetch(url, {
         method: 'POST',
