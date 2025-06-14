@@ -1,7 +1,6 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 
 export type ConversationStatus = 'unread' | 'in_progress' | 'resolved';
 
