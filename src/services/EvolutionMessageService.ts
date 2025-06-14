@@ -28,6 +28,13 @@ interface SendMessageResult {
   error?: string;
 }
 
+interface ConnectionStatusResult {
+  success: boolean;
+  connected: boolean;
+  instanceName?: string;
+  error?: string;
+}
+
 export class EvolutionMessageService {
   private static instances: Map<string, any> = new Map();
 
@@ -72,6 +79,70 @@ export class EvolutionMessageService {
     } catch (e) {
       DetailedLogger.error('EvolutionMessageService', `Exceção ao buscar configuração da instância para o canal ${channelId}`, e);
       return null;
+    }
+  }
+
+  // Add the missing checkChannelConnectionStatus method
+  public static async checkChannelConnectionStatus(channelId: string): Promise<ConnectionStatusResult> {
+    DetailedLogger.info('EvolutionMessageService', `Verificando status de conexão para o canal: ${channelId}`);
+    
+    const instanceConfig = await this.getInstanceConfig(channelId);
+    if (!instanceConfig) {
+      DetailedLogger.error('EvolutionMessageService', `Configuração não encontrada para canal ${channelId}`);
+      return { success: false, connected: false, error: 'Instance configuration not found' };
+    }
+
+    const { apiKey, baseUrl, instanceName } = instanceConfig;
+    const endpoint = `${baseUrl}/instance/fetchInstances`;
+
+    try {
+      DetailedLogger.info('EvolutionMessageService', `Verificando conexão da instância ${instanceName}...`);
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'apikey': apiKey },
+      });
+
+      if (!response.ok) {
+        const errorMsg = `Erro HTTP ${response.status}`;
+        DetailedLogger.error('EvolutionMessageService', `Erro ao verificar status da instância: ${errorMsg}`);
+        return { success: false, connected: false, error: errorMsg };
+      }
+
+      const instancesData = await response.json();
+      DetailedLogger.info('EvolutionMessageService', `Dados das instâncias recebidos:`, instancesData);
+
+      if (!Array.isArray(instancesData)) {
+        DetailedLogger.error('EvolutionMessageService', 'Resposta inesperada da API - não é um array');
+        return { success: false, connected: false, error: 'Invalid API response format' };
+      }
+
+      const targetInstance = instancesData.find(inst => inst.instance?.instanceName === instanceName);
+      
+      if (!targetInstance || !targetInstance.instance) {
+        DetailedLogger.warn('EvolutionMessageService', `Instância '${instanceName}' não encontrada`);
+        return { success: true, connected: false, instanceName, error: 'Instance not found' };
+      }
+
+      const isConnected = targetInstance.instance.status === 'open' || 
+                         targetInstance.instance.status === 'connected' || 
+                         targetInstance.instance.status === 'OPEN' || 
+                         targetInstance.instance.status === 'CONNECTED';
+
+      DetailedLogger.info('EvolutionMessageService', `Status da instância ${instanceName}: ${targetInstance.instance.status} (conectado: ${isConnected})`);
+      
+      return {
+        success: true,
+        connected: isConnected,
+        instanceName,
+      };
+
+    } catch (error) {
+      DetailedLogger.error('EvolutionMessageService', `Exceção ao verificar status da conexão:`, error);
+      return { 
+        success: false, 
+        connected: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
     }
   }
 
