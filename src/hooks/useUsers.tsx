@@ -7,7 +7,7 @@ export const useUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔍 [useUsers] Carregando usuários da tabela users...');
@@ -50,11 +50,11 @@ export const useUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   // Novo formato: Salva assignedChannels no lugar de assignedCities (compatível com backend atual)
   const createUser = async (userData: {
