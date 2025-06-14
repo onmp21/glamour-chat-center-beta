@@ -196,24 +196,32 @@ export const openaiService = {
     const messages = await this.getMessagesForConversation(channelId, conversationId);
     if (messages.length === 0) {
       DetailedLogger.info('OpenAIService', 'Nenhuma mensagem na conversa para gerar sugestão.');
-      return 'Não há mensagens suficientes para gerar uma sugestão.';
+      // Permitir resposta com mensagem padrão mesmo se vazio
+      return 'Nenhuma mensagem disponível nesta conversa.';
     }
 
+    // O contexto completo da conversa
     const contactName = messages[0]?.nome_do_contato || 'Cliente';
-    let prompt = `Você é um assistente de atendimento. Com base no histórico da conversa com ${contactName}, sugira uma resposta apropriada para a última mensagem do cliente. Seja breve e útil.\n\n`;
+    // Encontra a última mensagem do cliente (customer ou CONTATO_EXTERNO)
+    const lastMsgCliente = [...messages].reverse().find(
+      m => m.tipo_remetente === 'customer' || m.tipo_remetente === 'CONTATO_EXTERNO'
+    );
+    const lastMsgClienteTexto = lastMsgCliente?.message || messages[messages.length - 1].message || '';
+
+    // Prompt considera todo o histórico (máx 50) e pede resposta para a última do cliente
+    let prompt = `Você é um assistente de atendimento ao cliente.\n`;
+    prompt += `Baseando-se em todo o histórico da conversa abaixo, sugira uma resposta apropriada, breve e profissional para a ÚLTIMA mensagem enviada pelo cliente.\n\n`;
     if (customInstructions) {
       prompt += `Instruções adicionais: ${customInstructions}\n\n`;
     }
-    prompt += 'Histórico da Conversa (mais recentes primeiro):\n';
-
-    messages.slice(-5).reverse().forEach(msg => { 
-      const senderPrefix = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO' ? `${contactName}:` : 'Atendente:';
-      prompt += `${senderPrefix} ${msg.message}\n`;
+    prompt += 'Histórico da Conversa:\n';
+    messages.slice(-50).forEach(msg => {
+      const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO'
+        ? (msg.nome_do_contato || contactName)
+        : 'Atendente';
+      prompt += `${sender}: ${msg.message}\n`;
     });
-    
-    const lastMessageSender = messages[messages.length -1].tipo_remetente;
-    const lastMessageContact = lastMessageSender === 'customer' || lastMessageSender === 'CONTATO_EXTERNO' ? contactName : 'Atendente';
-    prompt += `\nSugira uma resposta para a última mensagem de ${lastMessageContact}:`;
+    prompt += `\nResponder a seguinte mensagem do cliente:\n"${lastMsgClienteTexto}"\nResposta:\n`;
 
     try {
       DetailedLogger.info('OpenAIService', 'Enviando requisição de sugestão de resposta para OpenAI...');
@@ -223,7 +231,7 @@ export const openaiService = {
           { role: 'system', content: 'Você é um assistente prestativo que sugere respostas em um chat de atendimento.' },
           { role: 'user', content: prompt },
         ],
-        max_tokens: 100, 
+        max_tokens: 100,
         temperature: 0.7,
       });
 
