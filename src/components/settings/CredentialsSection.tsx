@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Lock } from 'lucide-react';
 import { ProfilePicture } from '@/components/ProfilePicture';
 import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
+import { supabase } from "@/lib/supabase";
 
 interface CredentialsSectionProps {
   isDarkMode: boolean;
@@ -35,6 +36,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
   const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
   const [avatarForceReload, setAvatarForceReload] = useState(0); // Para forçar re-render/useEffect
   const [loading, setLoading] = useState(false);
+  const [avatarOldFilePath, setAvatarOldFilePath] = useState<string | null>(null);
 
   const {
     getAvatarUrl,
@@ -44,7 +46,14 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     loading: avatarLoading,
   } = useSupabaseAvatar();
 
-  // Carrega avatar salvo do Supabase ao montar ou quando alterado
+  // Função utilitária para extrair o caminho do arquivo da publicUrl
+  function getFilePathFromUrl(url: string | null): string | null {
+    if (!url) return null;
+    const match = url.match(/\/storage\/v1\/object\/public\/avatars\/(.+)/);
+    return match ? match[1] : null;
+  }
+
+  // Carrega avatar salvo + caminho do arquivo antigo ao montar ou quando alterado
   useEffect(() => {
     let isMounted = true;
     async function fetchAvatar() {
@@ -54,12 +63,12 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         setAvatarSaved(url || null);
         setAvatarDraftFile(null);
         setAvatarDraftUrl(null);
+        setAvatarOldFilePath(getFilePathFromUrl(url || null));
       }
     }
     fetchAvatar();
 
     return () => { isMounted = false };
-    // avatarForceReload faz efeito após alterações
   }, [user?.id, getAvatarUrl, avatarForceReload]);
 
   // Handle draft/crop do componente ProfilePicture (não salva nem faz upload ainda)
@@ -101,13 +110,25 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       const updateData: any = {};
       const changes: string[] = [];
       let fezUploadOuRemocao = false;
+      let novoPublicUrl: string | null = null;
 
       // FOTO DE PERFIL: UPLOAD OU REMOÇÃO
       if (avatarDraftFile && avatarDraftUrl) {
-        // Só envia se o draft mudar
-        const publicUrl = await uploadAvatar(avatarDraftFile);
-        if (publicUrl) {
-          await updateAvatarUrl(publicUrl);
+        // 1. Remove do Storage se houver uma anterior
+        if (avatarSaved && avatarOldFilePath) {
+          // Excluir antigo do storage diretamente via Supabase client
+          const { error } = await supabase.storage.from("avatars").remove([avatarOldFilePath]);
+          if (error) {
+            // Não bloqueia o processo mas loga
+            console.warn("Erro ao remover foto antiga do storage:", error);
+          }
+        }
+        // 2. Upload nova
+        novoPublicUrl = await uploadAvatar(avatarDraftFile);
+        if (novoPublicUrl) {
+          await updateAvatarUrl(novoPublicUrl);
+          setAvatarSaved(novoPublicUrl);
+          setAvatarOldFilePath(getFilePathFromUrl(novoPublicUrl));
           changes.push('profile_picture');
           fezUploadOuRemocao = true;
         } else {
@@ -120,13 +141,18 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
           return;
         }
       } else if (!avatarDraftUrl && avatarSaved) {
-        // Se tinha uma salva e apagou no draft, deleta do banco
+        // Se tinha uma salva e apagou no draft, deleta do bucket
+        if (avatarOldFilePath) {
+          await supabase.storage.from("avatars").remove([avatarOldFilePath]);
+        }
         await removeAvatar();
+        setAvatarSaved(null);
+        setAvatarOldFilePath(null);
         changes.push('profile_picture');
         fezUploadOuRemocao = true;
       }
 
-      // USER/SENHA
+      // USER/SENHA (mantém igual)
       if (formData.username !== user.username) {
         updateData.username = formData.username;
         changes.push('username');
@@ -160,7 +186,13 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       setAvatarDraftFile(null);
       setAvatarDraftUrl(null);
 
-      // Se mudou algo na foto, refaz fetch do avatar salvo
+      // Atualiza preview da nova foto imediatamente
+      if (novoPublicUrl) {
+        setAvatarSaved(novoPublicUrl);
+        setAvatarOldFilePath(getFilePathFromUrl(novoPublicUrl));
+      }
+
+      // Força reload apenas se mudou algo na foto
       if (fezUploadOuRemocao) {
         setAvatarForceReload(c => c + 1);
       }
