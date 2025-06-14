@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SimpleConversation {
@@ -98,8 +97,8 @@ export const useSimpleConversations = (channelId: string | null) => {
             contact_phone: extractPhoneFromSession(sessionId),
             last_message: message.message || '',
             last_message_time: message.read_at || new Date().toISOString(),
-            status: 'unread',
-            unread_count: 0,
+            status: 'unread', // Default status, can be enhanced later
+            unread_count: 0, // Default unread count
             updated_at: message.read_at || new Date().toISOString()
           });
         }
