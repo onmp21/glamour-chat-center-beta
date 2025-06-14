@@ -110,18 +110,9 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
   }
 
   const generateAIContent = async () => {
-    // Precisa de pelo menos 2 mensagens (ou ajuste conforme UX)
+    // Agora permite 0, 1 ou mais mensagens
     if (!selectedProvider || !conversationId || !channelId) {
       setError('Dados insuficientes para gerar conteúdo');
-      return;
-    }
-    if (!messages || messages.length < 2) {
-      setError('A conversa precisa ter pelo menos 2 mensagens para acionar IA.');
-      toast({
-        title: "Sem contexto suficiente",
-        description: "É necessário pelo menos 2 mensagens na conversa para a IA funcionar.",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -133,8 +124,9 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
       const actionConfig = getActionConfig(activeAction);
       const prompt = customPrompt.trim() || actionConfig.defaultPrompt;
 
-      // Chamar a API de geração correta
-      // Aqui, em vez de buscar de localhost, chamamos um endpoint real (ajuste conforme sua stack)
+      // Se não houver mensagens, envia contexto vazio mas deixa IA tentar, especialmente quick_response
+      const ctxMessages = prepareMessageContext(messages || []);
+
       const response = await fetch('/functions/v1/generate-report', {
         method: 'POST',
         headers: {
@@ -147,7 +139,7 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
             conversation_id: conversationId,
             channel_id: channelId,
             contact_name: contactName,
-            messages: prepareMessageContext(messages),
+            messages: ctxMessages,
             action_type: activeAction,
           },
           custom_prompt: prompt
@@ -418,12 +410,6 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
             </Card>
           )}
         </div>
-        {(!loadingMessages && (!messages || messages.length < 2)) && (
-          <div className="text-red-600 text-center text-sm font-semibold p-3 rounded bg-red-50 border border-red-200 my-2">
-            Adicione mais mensagens na conversa para liberar as funções de IA.
-          </div>
-        )}
-
         {/* Ações */}
         <div className="flex justify-between pt-4 border-t border-border">
           <Button 
