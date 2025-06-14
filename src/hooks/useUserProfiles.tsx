@@ -1,6 +1,7 @@
 
+
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -141,3 +142,4 @@ export const useUserProfiles = () => {
     updateProfile
   };
 };
+
