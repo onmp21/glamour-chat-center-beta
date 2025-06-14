@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -69,8 +68,8 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       setPreviewImage(e.target?.result as string);
-      setAdjustDialogOpen(true);
       setPendingFile(file);
+      setAdjustDialogOpen(true); // <-- aqui garante que vai abrir a overlay!
       onAvatarChange?.(file, e.target?.result as string);
     };
     reader.readAsDataURL(file);
@@ -109,7 +108,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
           </AvatarFallback>
         </Avatar>
 
-        {/* Overlay delay */}
+        {/* Overlay de ajuste */}
         <AvatarAdjustDialog
           open={adjustDialogOpen}
           imageUrl={previewImage}
