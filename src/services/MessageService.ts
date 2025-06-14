@@ -1,214 +1,309 @@
-
 import { MessageRepository } from '@/repositories/MessageRepository';
-import { RawMessage, ChannelConversation, ChannelMessage } from '@/types/messages';
-import { MessageTypeMapper } from '@/utils/MessageTypeMapper';
-import { getTableNameForChannel } from '@/utils/channelMapping';
-import { MessageConverter } from '@/utils/MessageConverter';
-import { ConversationGrouper } from '@/utils/ConversationGrouper';
-import { PhoneExtractor } from '@/utils/PhoneExtractor';
-import { PaginationService, CursorPaginationResult } from './PaginationService';
-import { DetailedLogger } from './DetailedLogger';
+import { RawMessage, ChannelConversation } from '@/types/messages';
+import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
+import { supabase } from '@/integrations/supabase/client';
 
 export class MessageService {
-  private repository: MessageRepository;
+  private repositories: Map<string, MessageRepository> = new Map();
   private channelId: string;
+  private static activeSubscriptions: Map<string, any> = new Map();
+  private static queryCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private static readonly CACHE_DURATION = 30000; // 30 segundos
 
-  constructor(channelId: string) {
-    this.channelId = channelId;
-    const tableName = getTableNameForChannel(channelId);
-    this.repository = new MessageRepository(tableName);
+  constructor(channelId?: string) {
+    this.channelId = channelId || '';
   }
 
-  async getAllMessages(options?: { limit?: number; offset?: number; page?: number }): Promise<ChannelMessage[]> {
-    DetailedLogger.info("MessageService", `Carregando mensagens para o canal ${this.channelId}`, { options });
+  private getRepository(channelId?: string): MessageRepository {
+    const targetChannelId = channelId || this.channelId;
+    if (!this.repositories.has(targetChannelId)) {
+      const tableName = getTableNameForChannel(targetChannelId);
+      this.repositories.set(targetChannelId, new MessageRepository(tableName));
+    }
+    return this.repositories.get(targetChannelId)!;
+  }
+
+  private getCacheKey(method: string, params: any = {}): string {
+    return `${this.channelId}-${method}-${JSON.stringify(params)}`;
+  }
+
+  private getFromCache<T>(cacheKey: string): T | null {
+    const cached = MessageService.queryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < MessageService.CACHE_DURATION) {
+      console.log(`📊 [MESSAGE_SERVICE] Cache hit for ${cacheKey}`);
+      return cached.data;
+    }
+    return null;
+  }
+
+  private setCache(cacheKey: string, data: any): void {
+    MessageService.queryCache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  async getMessagesForChannel(limit = 50): Promise<RawMessage[]> {
+    const cacheKey = this.getCacheKey('getMessages', { limit });
+    const cached = this.getFromCache<RawMessage[]>(cacheKey);
+    if (cached) return cached;
+
+    const repository = this.getRepository();
+    console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
-      // Se tiver page, usar paginação
-      if (options?.page !== undefined) {
-        const paginationResult = await PaginationService.paginateQuery<RawMessage>(
-          this.repository.tableName,
-          {
-            page: options.page,
-            limit: options.limit || 50,
-            sortBy: 'id',
-            sortOrder: 'desc'
-          }
-        );
-        
-        DetailedLogger.info("MessageService", `Mensagens carregadas com paginação`, { 
-          count: paginationResult.data.length,
-          totalItems: paginationResult.pagination.totalItems,
-          currentPage: paginationResult.pagination.currentPage,
-          totalPages: paginationResult.pagination.totalPages
-        });
-        
-        return paginationResult.data.map(rawMessage => 
-          MessageConverter.rawToChannelMessage(rawMessage)
-        );
-      } else {
-        // Método original para compatibilidade
-        const rawMessages = await this.repository.findAll(options?.limit, options?.offset);
-        DetailedLogger.info("MessageService", `Mensagens carregadas sem paginação`, { count: rawMessages.length });
-        
-        // Map to ChannelMessage format with support for media_base64
-        return rawMessages.map(rawMessage => {
-          const channelMessage = MessageConverter.rawToChannelMessage(rawMessage);
+      const messages = await repository.findAll(limit);
+      this.setCache(cacheKey, messages);
+      return messages;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${this.channelId}:`, error);
+      return [];
+    }
+  }
 
-          // Log detalhado para debug de mídia
-          if (rawMessage.mensagemtype && rawMessage.mensagemtype !== 'text') {
-            DetailedLogger.debug("MessageService", `Mensagem de mídia mapeada`, {
-              id: rawMessage.id,
-              mensagemtype: rawMessage.mensagemtype,
-              hasMediaBase64: !!rawMessage.media_base64,
-              mediaContentLength: rawMessage.media_base64?.length || 0,
-              messageContentLength: rawMessage.message.length
-            });
-          }
+  async saveMessage(messageData: Partial<RawMessage>): Promise<RawMessage> {
+    const repository = this.getRepository();
+    console.log(`💾 [MESSAGE_SERVICE] Saving message to channel ${this.channelId}`);
+    
+    try {
+      const result = await repository.create(messageData);
+      // Invalidar cache após salvar
+      MessageService.queryCache.clear();
+      return result;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error saving message to channel ${this.channelId}:`, error);
+      throw error;
+    }
+  }
 
-          return channelMessage;
-        });
+  async getMessagesByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
+    const cacheKey = this.getCacheKey('getByPhone', { phoneNumber });
+    const cached = this.getFromCache<RawMessage[]>(cacheKey);
+    if (cached) return cached;
+
+    const repository = this.getRepository();
+    console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${this.channelId}`);
+    
+    try {
+      const messages = await repository.findByPhoneNumber(phoneNumber);
+      this.setCache(cacheKey, messages);
+      return messages;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${this.channelId}:`, error);
+      return [];
+    }
+  }
+
+  async getNewMessages(afterTimestamp: string): Promise<RawMessage[]> {
+    const repository = this.getRepository();
+    console.log(`🆕 [MESSAGE_SERVICE] Getting new messages after ${afterTimestamp} for channel ${this.channelId}`);
+    
+    try {
+      const { data, error } = await repository.findMessagesAfterTimestamp(afterTimestamp);
+      
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Error getting new messages:`, error);
+        return [];
       }
+      
+      return data || [];
     } catch (error) {
-      DetailedLogger.error("MessageService", `Erro ao carregar mensagens para o canal ${this.channelId}`, { error });
-      throw error;
+      console.error(`❌ [MESSAGE_SERVICE] Error getting new messages for channel ${this.channelId}:`, error);
+      return [];
     }
   }
 
-  async getMessagesByConversation(
-    conversationId: string, 
-    options?: { limit?: number; offset?: number; cursor?: string }
-  ): Promise<CursorPaginationResult<ChannelMessage>> {
-    DetailedLogger.info("MessageService", `Carregando mensagens para a conversa ${conversationId}`, { options });
+  async markConversationAsRead(sessionId: string): Promise<void> {
+    const repository = this.getRepository();
+    console.log(`✅ [MESSAGE_SERVICE] Marking conversation as read: ${sessionId} in channel ${this.channelId}`);
     
     try {
-      // Usar paginação baseada em cursor para melhor performance
-      const paginationResult = await PaginationService.paginateMessages<RawMessage>(
-        this.repository.tableName,
-        conversationId,
-        {
-          limit: options?.limit || 50,
-          cursor: options?.cursor,
-          sortBy: 'id',
-          sortOrder: 'desc'
+      await repository.markAsRead(sessionId);
+      // Invalidar cache após atualização
+      MessageService.queryCache.clear();
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error marking conversation as read:`, error);
+    }
+  }
+
+  async getConversations(limit = 20): Promise<ChannelConversation[]> {
+    const cacheKey = this.getCacheKey('getConversations', { limit });
+    const cached = this.getFromCache<ChannelConversation[]>(cacheKey);
+    if (cached) return cached;
+
+    const repository = this.getRepository();
+    const tableName = repository.getTableName();
+    
+    try {
+      console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
+      
+      // Query otimizada
+      const { data, error } = await supabase
+        .from(tableName as any)
+        .select('*')
+        .order('read_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Database error:`, error);
+        return [];
+      }
+
+      const conversationsMap = new Map<string, ChannelConversation>();
+      
+      (data || []).forEach((message: any) => {
+        const sessionId = message.session_id;
+        if (!conversationsMap.has(sessionId)) {
+          conversationsMap.set(sessionId, {
+            id: sessionId,
+            contact_name: message.nome_do_contato || message.Nome_do_contato || 'Unknown',
+            contact_phone: this.extractPhoneFromSessionId(sessionId),
+            last_message: message.message,
+            last_message_time: message.read_at || new Date().toISOString(),
+            status: message.is_read ? 'resolved' : 'unread',
+            updated_at: message.read_at || new Date().toISOString(),
+            unread_count: message.is_read ? 0 : 1
+          });
+        }
+      });
+
+      const conversations = Array.from(conversationsMap.values());
+      console.log(`✅ [MESSAGE_SERVICE] Loaded ${conversations.length} conversations from ${tableName}`);
+      
+      this.setCache(cacheKey, conversations);
+      return conversations;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting conversations:`, error);
+      return [];
+    }
+  }
+
+  async getMessagesByConversation(sessionId: string, limit = 50): Promise<{ data: RawMessage[] }> {
+    const cacheKey = this.getCacheKey('getByConversation', { sessionId, limit });
+    const cached = this.getFromCache<{ data: RawMessage[] }>(cacheKey);
+    if (cached) return cached;
+
+    const repository = this.getRepository();
+    const tableName = repository.getTableName();
+    
+    try {
+      const { data, error } = await supabase
+        .from(tableName as any)
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('read_at', { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
+        return { data: [] };
+      }
+
+      const mappedData = (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
+      const result = { data: mappedData };
+      
+      this.setCache(cacheKey, result);
+      return result;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
+      return { data: [] };
+    }
+  }
+
+  async getAllMessages(limit = 50): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(limit);
+  }
+
+  extractPhoneFromSessionId(sessionId: string): string {
+    const match = sessionId.match(/(\d+)@/);
+    return match ? match[1] : sessionId;
+  }
+
+  createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
+    const repository = this.getRepository();
+    const tableName = repository.getTableName();
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
+    
+    // Check if subscription already exists
+    if (MessageService.activeSubscriptions.has(subscriptionKey)) {
+      console.log(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing`);
+      return MessageService.activeSubscriptions.get(subscriptionKey);
+    }
+    
+    const channel = supabase
+      .channel(`${tableName}-changes${channelSuffix}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: tableName as any },
+        (payload) => {
+          console.log(`🔔 [MESSAGE_SERVICE] Realtime update for ${tableName}:`, payload);
+          // Invalidar cache quando há mudanças
+          MessageService.queryCache.clear();
+          callback(payload);
         }
       );
-      
-      DetailedLogger.info("MessageService", `Mensagens da conversa carregadas`, { 
-        count: paginationResult.data.length,
-        hasMore: paginationResult.hasMore,
-        nextCursor: paginationResult.nextCursor
-      });
-      
-      // Converter para formato ChannelMessage
-      const channelMessages = paginationResult.data.map(rawMessage => 
-        MessageConverter.rawToChannelMessage(rawMessage)
-      );
-      
-      return {
-        data: channelMessages,
-        nextCursor: paginationResult.nextCursor,
-        hasMore: paginationResult.hasMore
-      };
-    } catch (error) {
-      DetailedLogger.error("MessageService", `Erro ao carregar mensagens para a conversa ${conversationId}`, { error });
-      throw error;
-    }
-  }
 
-  async getConversations(): Promise<ChannelConversation[]> {
-    DetailedLogger.info("MessageService", `Carregando conversas para o canal ${this.channelId}`);
+    // Store the subscription
+    MessageService.activeSubscriptions.set(subscriptionKey, channel);
     
-    try {
-      // Otimização: Obter apenas a contagem total de mensagens para estatísticas
-      const totalMessagesCount = await this.repository.countAll();
-      DetailedLogger.info("MessageService", `Total de mensagens no canal ${this.channelId}`, { count: totalMessagesCount });
-
-      // Para agrupar conversas, ainda precisamos de todas as mensagens para extrair os IDs de sessão únicos.
-      // Podemos limitar a quantidade de mensagens para melhorar a performance
-      const rawMessages = await this.repository.findAll(1000); // Limitar a 1000 mensagens mais recentes
-      return ConversationGrouper.groupMessagesByPhone(rawMessages, this.channelId);
-    } catch (error) {
-      DetailedLogger.error("MessageService", `Erro ao carregar conversas para o canal ${this.channelId}`, { error });
-      throw error;
-    }
-  }
-
-  async searchMessages(
-    searchTerm: string,
-    options?: { page?: number; limit?: number }
-  ): Promise<{ messages: ChannelMessage[], pagination: any }> {
-    DetailedLogger.info("MessageService", `Pesquisando mensagens no canal ${this.channelId}`, { searchTerm, options });
-    
-    try {
-      const result = await PaginationService.searchWithPagination<RawMessage>(
-        this.repository.tableName,
-        searchTerm,
-        ['message', 'Nome_do_contato', 'session_id'],
-        {
-          page: options?.page || 1,
-          limit: options?.limit || 20,
-          sortBy: 'id',
-          sortOrder: 'desc'
-        }
-      );
-      
-      DetailedLogger.info("MessageService", `Resultados da pesquisa`, { 
-        count: result.data.length,
-        totalItems: result.pagination.totalItems
-      });
-      
-      return {
-        messages: result.data.map(rawMessage => 
-          MessageConverter.rawToChannelMessage(rawMessage)
-        ),
-        pagination: result.pagination
-      };
-    } catch (error) {
-      DetailedLogger.error("MessageService", `Erro na pesquisa de mensagens`, { error, searchTerm });
-      throw error;
-    }
-  }
-
-  async sendMessage(sessionId: string, content: string, agentName?: string): Promise<RawMessage> {
-    DetailedLogger.info("MessageService", `Enviando mensagem para o canal ${this.channelId}`, { sessionId });
-    
-    try {
-      return await this.repository.insertMessage(sessionId, content, agentName);
-    } catch (error) {
-      DetailedLogger.error("MessageService", `Erro ao enviar mensagem para o canal ${this.channelId}`, { error, sessionId });
-      throw error;
-    }
-  }
-
-  async markConversationAsRead(conversationId: string): Promise<void> {
-    DetailedLogger.info("MessageService", `Marcando conversa como lida: ${conversationId}`);
-    
-    try {
-      await this.repository.markAsRead(conversationId);
-    } catch (error) {
-      DetailedLogger.error("MessageService", `Erro ao marcar conversa como lida ${conversationId}`, { error });
-      throw error;
-    }
-  }
-
-  createRealtimeSubscription(callback: (payload: any) => void, conversationId?: string) {
-     const suffix = conversationId ? `-${conversationId}` : "";
-    const channel = this.repository
-      .createRealtimeChannel(suffix)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: this.repository.tableNamePublic,
-        },
-        callback
-      );
-
     return channel;
-    }
+  }
 
-  public extractPhoneFromSessionId(sessionId: string): string {
-    return PhoneExtractor.extractPhoneFromSessionId(sessionId);
+  static unsubscribeChannel(channelSuffix: string, tableName: string) {
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
+    const channel = MessageService.activeSubscriptions.get(subscriptionKey);
+    
+    if (channel) {
+      console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from ${subscriptionKey}`);
+      supabase.removeChannel(channel);
+      MessageService.activeSubscriptions.delete(subscriptionKey);
+    }
+  }
+
+  static clearCache() {
+    MessageService.queryCache.clear();
+    console.log(`🧹 [MESSAGE_SERVICE] Cache cleared`);
+  }
+
+  async getChannelStats(): Promise<{
+    totalMessages: number;
+    totalConversations: number;
+    unreadMessages: number;
+  }> {
+    const cacheKey = this.getCacheKey('getStats');
+    const cached = this.getFromCache<any>(cacheKey);
+    if (cached) return cached;
+
+    const repository = this.getRepository();
+    console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId} from table ${repository.getTableName()}`);
+    
+    try {
+      // Stats simplificados para evitar queries pesadas
+      const conversations = await this.getConversations(10);
+      const stats = {
+        totalMessages: 0,
+        totalConversations: conversations.length,
+        unreadMessages: conversations.filter(c => c.status === 'unread').length
+      };
+      
+      this.setCache(cacheKey, stats);
+      return stats;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error getting channel stats:`, error);
+      return {
+        totalMessages: 0,
+        totalConversations: 0,
+        unreadMessages: 0
+      };
+    }
+  }
+
+  async getNewMessagesAfterTimestamp(timestamp: string): Promise<RawMessage[]> {
+    return this.getNewMessages(timestamp);
+  }
+
+  async fetchMessages(limit = 50): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(limit);
   }
 }
+
+export const messageService = new MessageService();

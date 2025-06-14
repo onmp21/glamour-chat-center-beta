@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Settings, Brain } from 'lucide-react';
+import { Brain } from 'lucide-react';
 import { AIProviderList } from './AIProviderList';
 import { useAIProviders } from '@/hooks/useAIProviders';
 
@@ -41,13 +42,9 @@ export const AIProviderSettings: React.FC = () => {
             </div>
           )}
 
-          <AIProviderList 
-            providers={providers} 
-            loading={loading} 
-          />
+          <AIProviderList isDarkMode={true} />
         </div>
       </div>
     </div>
   );
 };
-

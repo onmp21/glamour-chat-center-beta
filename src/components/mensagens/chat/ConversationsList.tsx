@@ -41,26 +41,28 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
   };
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="p-2 space-y-1">
-        {conversations.map((conversation) => {
-          const status = getConversationStatus(channelId, conversation.id);
-          
-          return (
-            <ConversationCard
-              key={conversation.id}
-              conversation={conversation}
-              channelId={channelId}
-              selectedConversation={selectedConversation}
-              isDarkMode={isDarkMode}
-              status={status}
-              onConversationSelect={onConversationSelect}
-              getStatusColor={getStatusColor}
-              getStatusLabel={getStatusLabel}
-            />
-          );
-        })}
-      </div>
-    </ScrollArea>
+    <div className="flex-1 overflow-hidden">
+      <ScrollArea className="h-full">
+        <div className="p-2 space-y-1">
+          {conversations.map((conversation) => {
+            const status = getConversationStatus(channelId, conversation.id);
+            
+            return (
+              <ConversationCard
+                key={conversation.id}
+                conversation={conversation}
+                channelId={channelId}
+                selectedConversation={selectedConversation}
+                isDarkMode={isDarkMode}
+                status={status}
+                onConversationSelect={onConversationSelect}
+                getStatusColor={getStatusColor}
+                getStatusLabel={getStatusLabel}
+              />
+            );
+          })}
+        </div>
+      </ScrollArea>
+    </div>
   );
 };

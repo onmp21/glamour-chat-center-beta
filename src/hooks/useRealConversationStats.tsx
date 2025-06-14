@@ -40,7 +40,7 @@ export const useRealConversationStats = () => {
   const loadRealStats = async () => {
     try {
       setLoading(true);
-      console.log('🔍 [REAL_STATS] Starting conversation statistics calculation');
+      console.log('🔍 [REAL_STATS] Starting optimized conversation statistics calculation');
       
       const accessibleChannels = getAccessibleChannels();
       console.log('🔐 [REAL_STATS] Accessible channels:', accessibleChannels);
@@ -59,13 +59,16 @@ export const useRealConversationStats = () => {
       const allConversations: ConversationData[] = [];
       let mostRecentActivity: string | null = null;
 
-      console.log('🔄 [REAL_STATS] Processing channels...');
+      console.log('🔄 [REAL_STATS] Processing channels with delay to avoid overwhelming database...');
 
-      // Buscar dados de todos os canais ativos
-      for (const channel of channels.filter(c => c.isActive)) {
+      // Processar canais sequencialmente com delay para evitar sobrecarga
+      for (let i = 0; i < channels.length; i++) {
+        const channel = channels[i];
+        if (!channel.isActive) continue;
+
         const channelId = channelMapping[channel.name as keyof typeof channelMapping];
         
-        console.log(`📊 [REAL_STATS] Processing channel: ${channel.name} -> ${channelId}`);
+        console.log(`📊 [REAL_STATS] Processing channel ${i + 1}/${channels.length}: ${channel.name} -> ${channelId}`);
         
         if (!channelId) {
           console.log(`⚠️ [REAL_STATS] Channel ${channel.name} not found in mapping, skipping`);
@@ -79,7 +82,9 @@ export const useRealConversationStats = () => {
 
         try {
           const messageService = new MessageService(channelId);
-          const conversations = await messageService.getConversations();
+          
+          // Usar limite menor para conversas para evitar timeouts
+          const conversations = await messageService.getConversations(15);
           
           console.log(`📈 [REAL_STATS] Channel ${channelId}: found ${conversations.length} conversations`);
           
@@ -113,8 +118,14 @@ export const useRealConversationStats = () => {
             console.log(`✅ [REAL_STATS] Added conversation: ${uniqueConversationId} for ${phone} in ${channelId}`);
           });
 
+          // Delay entre canais para não sobrecarregar o banco
+          if (i < channels.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
         } catch (error) {
           console.error(`❌ [REAL_STATS] Error loading stats for channel ${channelId}:`, error);
+          // Continue with other channels instead of failing completely
         }
       }
 
@@ -130,6 +141,7 @@ export const useRealConversationStats = () => {
         switch (conv.status) {
           case 'unread':
             pendingCount++;
+            unreadMessages++;
             break;
           case 'in_progress':
             inProgressCount++;
@@ -140,18 +152,8 @@ export const useRealConversationStats = () => {
           default:
             // Se não tem status definido, considerar como pendente
             pendingCount++;
-            break;
-        }
-
-        // Contar mensagens não lidas baseado no status e tempo
-        if (conv.status !== 'resolved') {
-          const lastMessageTime = new Date(conv.lastMessageTime || 0);
-          const now = new Date();
-          const hoursDiff = (now.getTime() - lastMessageTime.getTime()) / (1000 * 60 * 60);
-          
-          if (hoursDiff < 24) {
             unreadMessages++;
-          }
+            break;
         }
       });
 
@@ -159,13 +161,6 @@ export const useRealConversationStats = () => {
 
       console.log('📊 [REAL_STATS] Final count summary:');
       console.log(`  🔢 Total conversations across all channels: ${totalConversations}`);
-      console.log(`  📋 All conversations:`, allConversations.map(conv => `${conv.id} (${conv.phone} in ${conv.channel})`));
-      console.log(`  🏷️ Conversations by channel:`, 
-        allConversations.reduce((acc, conv) => {
-          acc[conv.channel] = (acc[conv.channel] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>)
-      );
       console.log(`  ⏳ Pending: ${pendingCount}`);
       console.log(`  🔄 In Progress: ${inProgressCount}`);
       console.log(`  ✅ Resolved: ${resolvedCount}`);
@@ -186,6 +181,14 @@ export const useRealConversationStats = () => {
 
     } catch (error) {
       console.error('❌ [REAL_STATS] Error loading real conversation statistics:', error);
+      // Set default stats on error to prevent UI issues
+      setStats({
+        total: 0,
+        pending: 0,
+        inProgress: 0,
+        resolved: 0,
+        unreadMessages: 0
+      });
     } finally {
       setLoading(false);
     }
@@ -195,8 +198,8 @@ export const useRealConversationStats = () => {
     if (channels.length > 0) {
       loadRealStats();
       
-      // Auto refresh a cada 2 minutos
-      const interval = setInterval(loadRealStats, 120000);
+      // Auto refresh a cada 5 minutos (aumentado de 2 minutos)
+      const interval = setInterval(loadRealStats, 300000);
       return () => clearInterval(interval);
     }
   }, [channels]);

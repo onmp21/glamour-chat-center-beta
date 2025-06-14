@@ -1,3 +1,36 @@
+
+export interface RawMessage {
+  id: string;
+  session_id: string;
+  message: string;
+  mensagemtype?: string;
+  tipo_remetente?: string;
+  nome_do_contato?: string;
+  Nome_do_contato?: string;
+  media_base64?: string;
+  is_read?: boolean;
+  read_at?: string;
+  sender: string;
+  timestamp: string;
+  content: string;
+}
+
+export interface ChannelMessage {
+  id: string;
+  content: string;
+  sender: string;
+  timestamp: string;
+  type: 'text' | 'image' | 'audio' | 'video' | 'document';
+  isFromUser: boolean;
+  mediaUrl?: string;
+  session_id: string;
+  tipo_remetente?: string;
+  mensagemtype?: string;
+  Nome_do_contato?: string;
+  nome_do_contato?: string;
+  contactName?: string;
+}
+
 export interface ChannelConversation {
   id: string;
   contact_name: string;
@@ -6,45 +39,19 @@ export interface ChannelConversation {
   last_message_time: string | null;
   status: 'unread' | 'in_progress' | 'resolved';
   updated_at: string;
-  unread_count?: number;
+  unread_count: number;
+  message_count?: number;
 }
 
-export interface ChannelMessage {
-  id: string;
-  content: string;
-  timestamp: string;
-  sender: 'customer' | 'agent';
-  isOwn?: boolean;
-  agentName?: string;
-  contactName?: string;
-  contactPhone?: string;
-  messageType?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'human' | 'ai';
-  tipo_remetente?: string;
-  Nome_do_contato?: string;
-  nome_do_contato?: string;
-  mensagemtype?: string;
+export interface CursorPaginationResult<T> {
+  data: T[];
+  hasMore: boolean;
+  nextCursor?: string;
 }
 
-export interface ProcessedMessage {
-  id: string;
-  content: string;
-  timestamp: string;
-  isOwn: boolean;
-  contactName: string;
-  contactPhone: string;
-  agentName?: string;
-  tipo_remetente?: string;
-  Nome_do_contato?: string;
-  mensagemtype?: string;
-}
-
-export interface RawMessage {
-  id: number;
-  session_id: string;
-  message: string;
-  read_at: string;
-  Nome_do_contato: string;
-  mensagemtype: string;
-  tipo_remetente: string;
-  media_base64?: string;
+export interface ConversationStats {
+  totalConversations: number;
+  activeConversations: number;
+  totalMessages: number;
+  unreadMessages: number;
 }

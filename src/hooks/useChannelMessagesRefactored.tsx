@@ -1,107 +1,251 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelMessage, RawMessage } from '@/types/messages';
-import { MessageConverter } from '@/utils/MessageConverter';
-import { MessageSorter } from '@/utils/MessageSorter';
-import { DetailedLogger } from '@/services/DetailedLogger';
+import { evolutionMessageService } from '@/services/EvolutionMessageService';
 
 export const useChannelMessagesRefactored = (channelId: string, conversationId?: string) => {
+  console.log(`[useChannelMessagesRefactored] channelId recebido: ${channelId}`);
   const [messages, setMessages] = useState<ChannelMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const convertRawToChannelMessage = (raw: RawMessage): ChannelMessage => {
+    return {
+      id: raw.id.toString(),
+      content: raw.content,
+      sender: raw.sender,
+      timestamp: raw.timestamp,
+      type: 'text',
+      isFromUser: raw.sender === 'customer',
+      session_id: raw.session_id,
+      tipo_remetente: raw.tipo_remetente,
+      mensagemtype: raw.mensagemtype,
+      Nome_do_contato: raw.Nome_do_contato,
+      nome_do_contato: raw.nome_do_contato
+    };
+  };
+
   const loadMessages = useCallback(async () => {
-    if (!channelId) {
-      DetailedLogger.warn('useChannelMessagesRefactored', 'Nenhum channelId fornecido');
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
+    if (!channelId) return;
 
     try {
       setLoading(true);
-      setError(null);
-
-      DetailedLogger.info('useChannelMessagesRefactored', `Carregando mensagens para o canal: ${channelId}, conversa: ${conversationId}`);
-
       const messageService = new MessageService(channelId);
       
-      let loadedMessages: ChannelMessage[];
+      let result: RawMessage[] | { data: RawMessage[] };
       if (conversationId) {
-        const result = await messageService.getMessagesByConversation(conversationId);
-        loadedMessages = result.data;
+        result = await messageService.getMessagesByConversation(conversationId) || [];
       } else {
-        loadedMessages = await messageService.getAllMessages();
+        result = await messageService.getAllMessages() || [];
       }
 
-      const sortedMessages = MessageSorter.sortChannelMessages(loadedMessages);
-      
-      DetailedLogger.info('useChannelMessagesRefactored', `Carregadas ${sortedMessages.length} mensagens`);
-      setMessages(sortedMessages);
+      const rawMessages = Array.isArray(result) ? result : (result?.data || []);
+      const convertedMessages = rawMessages.map(convertRawToChannelMessage);
+      setMessages(convertedMessages);
+      setError(null);
     } catch (err) {
-      DetailedLogger.error('useChannelMessagesRefactored', `Erro ao carregar mensagens`, { error: err });
+      console.error('Error loading messages:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
-      setMessages([]);
     } finally {
       setLoading(false);
     }
   }, [channelId, conversationId]);
 
-  const addMessage = useCallback((newMessage: RawMessage) => {
-    setMessages(prevMessages => {
-      const processedMessage = MessageConverter.rawToChannelMessage(newMessage);
-      
-      if (MessageConverter.isDuplicate(prevMessages, processedMessage)) {
-        DetailedLogger.warn('useChannelMessagesRefactored', `Mensagem com ID ${processedMessage.id} já existe, ignorando.`);
-        return prevMessages;
-      }
-
-      DetailedLogger.info('useChannelMessagesRefactored', `Adicionando nova mensagem ao estado:`, processedMessage);
-      return MessageSorter.sortChannelMessages([...prevMessages, processedMessage]);
-    });
-  }, []);
-
   useEffect(() => {
     loadMessages();
+    
+    const interval = setInterval(loadMessages, 5000);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
 
-    let channel: any = null;
+  const addMessage = useCallback((newMessage: RawMessage) => {
+    const convertedMessage = convertRawToChannelMessage(newMessage);
+    setMessages(prev => [...prev, convertedMessage]);
+  }, []);
 
-    if (channelId) {
-      const messageService = new MessageService(channelId);
-      const channelSuffix = conversationId ? `-${conversationId}-${Date.now()}` : `-messages-${Date.now()}`;
-      
-      channel = messageService.createRealtimeSubscription((payload) => {
-        DetailedLogger.info("useChannelMessagesRefactored", `Nova mensagem via realtime:`, payload);
-        
-        if (conversationId) {
-          const messagePhone = messageService.extractPhoneFromSessionId(payload.new.session_id);
-          if (messagePhone !== conversationId) {
-            DetailedLogger.info("useChannelMessagesRefactored", `Mensagem não é para a conversa atual, ignorando`);
-            return;
-          }
-        }
-        
-        addMessage(payload.new as RawMessage);
-      }, channelSuffix);
-
-      channel.subscribe();
-      DetailedLogger.info("useChannelMessagesRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
+  // Função para enviar mensagem de texto
+  const sendMessage = useCallback(async (message: string): Promise<void> => {
+    if (!channelId || !conversationId || !message.trim()) {
+      console.error('❌ [SEND_MESSAGE] Parâmetros inválidos:', { channelId, conversationId, message });
+      throw new Error('Canal, conversa ou mensagem inválidos');
     }
 
-    return () => {
-      if (channel) {
-        DetailedLogger.info("useChannelMessagesRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
-        channel.unsubscribe();
+    try {
+      console.log('📤 [SEND_MESSAGE] Enviando mensagem:', { channelId, conversationId, message });
+
+      const result = await evolutionMessageService.sendTextMessage({
+        channelId: channelId,
+        phoneNumber: conversationId,
+        message: message
+      });
+
+      if (result.success) {
+        console.log('✅ [SEND_MESSAGE] Mensagem enviada com sucesso:', result.messageId);
+        
+        // Adicionar mensagem localmente para feedback imediato
+        const newMessage: RawMessage = {
+          id: Date.now(),
+          content: message,
+          sender: 'agent',
+          timestamp: new Date().toISOString(),
+          session_id: conversationId,
+          tipo_remetente: 'agent',
+          mensagemtype: 'text',
+          Nome_do_contato: 'Atendente',
+          nome_do_contato: 'Atendente'
+        };
+        
+        addMessage(newMessage);
+        
+        // Recarregar mensagens após um breve delay
+        setTimeout(() => {
+          loadMessages();
+        }, 1000);
+      } else {
+        console.error('❌ [SEND_MESSAGE] Erro ao enviar mensagem:', result.error);
+        throw new Error(result.error || 'Erro ao enviar mensagem');
       }
-    };
-  }, [channelId, conversationId, loadMessages, addMessage]);
+    } catch (error) {
+      console.error('❌ [SEND_MESSAGE] Erro inesperado:', error);
+      throw error;
+    }
+  }, [channelId, conversationId, addMessage, loadMessages]);
+
+  // Função para enviar arquivo
+  const sendFile = useCallback(async (file: File, caption?: string): Promise<void> => {
+    if (!channelId || !conversationId) {
+      console.error('❌ [SEND_FILE] Parâmetros inválidos:', { channelId, conversationId });
+      throw new Error('Canal ou conversa inválidos');
+    }
+
+    try {
+      console.log('📤 [SEND_FILE] Enviando arquivo:', { channelId, conversationId, fileName: file.name });
+
+      // Converter arquivo para base64 ou URL (implementação simplificada)
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const fileData = e.target?.result as string;
+        
+        // Determinar tipo de mídia
+        let mediaType: 'image' | 'audio' | 'video' | 'document' = 'document';
+        if (file.type.startsWith('image/')) mediaType = 'image';
+        else if (file.type.startsWith('audio/')) mediaType = 'audio';
+        else if (file.type.startsWith('video/')) mediaType = 'video';
+
+        const result = await evolutionMessageService.sendMediaMessage({
+          channelId: channelId,
+          phoneNumber: conversationId,
+          message: caption || `[${file.name}]`,
+          messageType: 'media',
+          mediaUrl: fileData,
+          mediaType: mediaType,
+          caption: caption
+        });
+
+        if (result.success) {
+          console.log('✅ [SEND_FILE] Arquivo enviado com sucesso:', result.messageId);
+          
+          // Adicionar mensagem localmente
+          const newMessage: RawMessage = {
+            id: Date.now(),
+            content: caption || `[Arquivo: ${file.name}]`,
+            sender: 'agent',
+            timestamp: new Date().toISOString(),
+            session_id: conversationId,
+            tipo_remetente: 'agent',
+            mensagemtype: mediaType,
+            Nome_do_contato: 'Atendente',
+            nome_do_contato: 'Atendente'
+          };
+          
+          addMessage(newMessage);
+          
+          // Recarregar mensagens
+          setTimeout(() => {
+            loadMessages();
+          }, 1000);
+        } else {
+          console.error('❌ [SEND_FILE] Erro ao enviar arquivo:', result.error);
+          throw new Error(result.error || 'Erro ao enviar arquivo');
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('❌ [SEND_FILE] Erro inesperado:', error);
+      throw error;
+    }
+  }, [channelId, conversationId, addMessage, loadMessages]);
+
+  // Função para enviar áudio
+  const sendAudio = useCallback(async (audioBlob: Blob, duration: number): Promise<void> => {
+    if (!channelId || !conversationId) {
+      console.error('❌ [SEND_AUDIO] Parâmetros inválidos:', { channelId, conversationId });
+      throw new Error('Canal ou conversa inválidos');
+    }
+
+    try {
+      console.log('📤 [SEND_AUDIO] Enviando áudio:', { channelId, conversationId, duration });
+
+      // Converter blob para base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const audioData = e.target?.result as string;
+
+        const result = await evolutionMessageService.sendMediaMessage({
+          channelId: channelId,
+          phoneNumber: conversationId,
+          message: `[Áudio - ${duration}s]`,
+          messageType: 'media',
+          mediaUrl: audioData,
+          mediaType: 'audio',
+          caption: `Áudio de ${duration} segundos`
+        });
+
+        if (result.success) {
+          console.log('✅ [SEND_AUDIO] Áudio enviado com sucesso:', result.messageId);
+          
+          // Adicionar mensagem localmente
+          const newMessage: RawMessage = {
+            id: Date.now(),
+            content: `[Áudio - ${duration}s]`,
+            sender: 'agent',
+            timestamp: new Date().toISOString(),
+            session_id: conversationId,
+            tipo_remetente: 'agent',
+            mensagemtype: 'audio',
+            Nome_do_contato: 'Atendente',
+            nome_do_contato: 'Atendente'
+          };
+          
+          addMessage(newMessage);
+          
+          // Recarregar mensagens
+          setTimeout(() => {
+            loadMessages();
+          }, 1000);
+        } else {
+          console.error('❌ [SEND_AUDIO] Erro ao enviar áudio:', result.error);
+          throw new Error(result.error || 'Erro ao enviar áudio');
+        }
+      };
+      
+      reader.readAsDataURL(audioBlob);
+    } catch (error) {
+      console.error('❌ [SEND_AUDIO] Erro inesperado:', error);
+      throw error;
+    }
+  }, [channelId, conversationId, addMessage, loadMessages]);
 
   return {
     messages,
     loading,
     error,
-    refreshMessages: loadMessages,
-    addMessage
+    refetch: loadMessages,
+    addMessage,
+    sendMessage,
+    sendFile,
+    sendAudio
   };
 };
+

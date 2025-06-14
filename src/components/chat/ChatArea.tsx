@@ -1,12 +1,11 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ChannelConversation } from '@/hooks/useChannelConversations';
+import { ChannelConversation } from '@/types/messages';
 import { MessageHistory } from './MessageHistory';
 import { ChatHeader } from './ChatHeader';
 import { ChatInput } from './ChatInput';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useChannelMessagesRefactored } from '@/hooks/useChannelMessagesRefactored'; // Importar o hook
 
 interface ChatAreaProps {
   isDarkMode: boolean;
@@ -15,11 +14,15 @@ interface ChatAreaProps {
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, channelId }) => {
-  const { addMessage } = useChannelMessagesRefactored(channelId, conversation.id); // Obter addMessage
+  console.log('🎯 [CHAT_AREA] Rendering with:', { conversation: conversation.id, channelId });
+
+  const handleAddMessage = (message: any) => {
+    console.log('➕ [CHAT_AREA] Message added:', message.id);
+    // A funcionalidade será implementada posteriormente
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-      {/* Cabeçalho (não rola) */}
       <div className="flex-shrink-0">
         <ChatHeader 
           isDarkMode={isDarkMode} 
@@ -28,7 +31,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, ch
         />
       </div>
       
-      {/* Área de Mensagens (rola) */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <MessageHistory
@@ -40,17 +42,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ isDarkMode, conversation, ch
         </ScrollArea>
       </div>
 
-      {/* Barra de Input (não rola, fica embaixo) */}
       <div className="flex-shrink-0">
         <ChatInput 
           channelId={channelId} 
           conversationId={conversation.id} 
           isDarkMode={isDarkMode} 
-          addMessageToState={addMessage} // Passar addMessage para ChatInput
+          addMessageToState={handleAddMessage}
         />
       </div>
     </div>
   );
 };
-
-

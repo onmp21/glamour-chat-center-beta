@@ -1,67 +1,54 @@
-import { useState, useEffect } from 'react'
-import { IntelligentReportsService, ReportGenerationRequest, ReportHistoryOptions } from '../services/IntelligentReportsService'
-import { useAuth } from '../contexts/AuthContext'
 
-export function useIntelligentReports() {
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
-  const { user } = useAuth()
+import { useState, useEffect } from 'react';
+import { IntelligentReportsService } from '@/services/IntelligentReportsService';
 
-  const fetchReports = async (options: ReportHistoryOptions = {}) => {
-    try {
-      setLoading(true)
-      setError(null)
-      const data = await IntelligentReportsService.getReportHistory(options)
-      setReports(data.reports)
-      return data
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }
+interface GenerateReportParams {
+  provider_id: string;
+  report_type: 'conversations' | 'channels' | 'custom';
+  data: any;
+  custom_prompt?: string;
+}
 
-  const generateReport = async (request: ReportGenerationRequest) => {
-    try {
-      setGenerating(true)
-      setError(null)
-      const result = await IntelligentReportsService.generateReport(request)
-      await fetchReports()
-      return result
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
-      throw err
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const deleteReport = async (reportId: number) => {
-    try {
-      await IntelligentReportsService.deleteReport(reportId)
-      await fetchReports()
-    } catch (err) {
-      throw err
-    }
-  }
+export const useIntelligentReports = () => {
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      fetchReports()
+    loadReports();
+  }, []);
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      const data = await IntelligentReportsService.getReports();
+      setReports(data);
+    } catch (error) {
+      console.error('Erro ao carregar relatórios:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [user])
+  };
+
+  const generateReport = async (params: GenerateReportParams) => {
+    try {
+      setGenerating(true);
+      const result = await IntelligentReportsService.generateReport(params);
+      await loadReports(); // Reload reports after generating
+      return result;
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      throw error;
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return {
     reports,
     loading,
-    error,
     generating,
-    fetchReports,
     generateReport,
-    deleteReport
-  }
-}
-
+    refreshReports: loadReports
+  };
+};

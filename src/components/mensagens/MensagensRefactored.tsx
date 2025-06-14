@@ -35,135 +35,105 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactName, setSelectedContactName] = useState('');
 
   const { channels } = useChannels();
+  console.log("📊 [MENSAGENS_REFACTORED] Canais brutos do useChannels():", channels);
   const { getAccessibleChannels } = usePermissions();
 
-  // Detect initial parameters to open ChatOverlay automatically
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
     
     if (initialChannel && initialPhone) {
-      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel:', initialChannel);
-      setSelectedChannel(initialChannel);
+      const mappedInitialChannel = getChannelLegacyId({ name: initialChannel, id: initialChannel }); // Mapear o initialChannel
+      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
+      setSelectedChannel(mappedInitialChannel);
     }
   }, [initialChannel, initialPhone]);
 
-  // Mapear canais do banco para IDs legados e filtrar por permissões e status ativo
   const getChannelLegacyId = (channel: any) => {
+    // Mapear nomes de canais para UUIDs do Supabase
     const nameToId: Record<string, string> = {
-      'Yelena-AI': 'chat',
-      'Canarana': 'canarana',
-      'Souto Soares': 'souto-soares',
-      'João Dourado': 'joao-dourado',
-      'América Dourada': 'america-dourada',
-      'Gustavo Gerente das Lojas': 'gerente-lojas',
-      'Andressa Gerente Externo': 'gerente-externo'
+      'yelena-ai': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
+      'chat': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
+      'canarana': '011b69ba-cf25-4f63-af2e-4ad0260d9516',
+      'souto soares': 'b7996f75-41a7-4725-8229-564f31868027',
+      'joão dourado': '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
+      'américa dourada': '64d8acad-c645-4544-a1e6-2f0825fae00b',
+      'gustavo gerente das lojas': 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
+      'andressa gerente externo': 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7'
     };
-    return nameToId[channel.name] || channel.id;
+    
+    // Converter o nome do canal para uma chave padronizada (ex: tudo minúsculo)
+    const normalizedChannelName = channel.name.toLowerCase();
+
+    // Primeiro tentar mapear pelo nome normalizado
+    console.log(`🔄 [CHANNEL_MAPPING] getChannelLegacyId received channel.name: "${channel.name}", normalized: "${normalizedChannelName}"`);
+    const mappedId = nameToId[normalizedChannelName];
+    if (mappedId) {
+      console.log(`🔄 [CHANNEL_MAPPING] Mapped ${channel.name} to UUID: ${mappedId}`);
+      return mappedId;
+    }
+    
+    // Se não encontrar, usar o ID original
+    console.log(`🔄 [CHANNEL_MAPPING] Using original ID for ${channel.name}: ${channel.id}`);
+    return channel.id;
   };
 
   const accessibleChannels = getAccessibleChannels();
   const canaisData = channels
     .filter(channel => 
-      channel.isActive && 
-      channel.name !== 'Pedro' && // Filtrar o canal Pedro que não existe mais
-      channel.name // Garantir que o canal tem um nome válido
+      channel.isActive && // Corrigido de is_active para isActive
+      channel.name !== 'Pedro' &&
+      channel.name
     )
-    .map(channel => ({
-      id: getChannelLegacyId(channel),
-      nome: channel.name,
-      tipo: channel.type === 'general' ? 'IA Assistant' : 
-            channel.type === 'store' ? 'Loja' : 
-            channel.type === 'manager' ? 'Gerente' : 'Canal',
-      status: 'ativo' as const,
-      conversasNaoLidas: 0,
-      ultimaAtividade: 'Online'
-    }))
-    .filter(channel => accessibleChannels.includes(channel.id)); // Filtrar por permissões
+      .map(channel => {
+      console.log(`🔍 [MENSAGENS_REFACTORED] Processing channel name: "${channel.name}", original ID: "${channel.id}"`);
+      return {
+        id: getChannelLegacyId(channel),
+        nome: channel.name,
+        tipo: channel.type === 'general' ? 'IA Assistant' :
+              channel.type === 'store' ? 'Loja' :
+              channel.type === 'manager' ? 'Gerente' : 'Canal',
+        status: 'ativo' as const,
+        conversasNaoLidas: 0,
+        ultimaAtividade: 'Online'
+      };
+    })
+    .filter(channel => accessibleChannels.includes(channel.id));
 
-  const contatosData = [
-    { 
-      id: '1', 
-      nome: 'Pedro Vila Nova', 
-      telefone: '+55 77 99999-9999',
-      canais: ['canarana', 'gerente-externo'], 
-      ultimaMensagem: 'Obrigado pelo atendimento!', 
-      tempo: '2 min', 
-      status: 'resolvida' as const
-    },
-    { 
-      id: '2', 
-      nome: 'Maria Silva', 
-      telefone: '+55 77 88888-8888',
-      canais: ['souto-soares', 'gerente-lojas'], 
-      ultimaMensagem: 'Quando chegará meu pedido?', 
-      tempo: '15 min', 
-      status: 'pendente' as const
-    },
-    { 
-      id: '3', 
-      nome: 'João Santos', 
-      telefone: '+55 77 77777-7777',
-      canais: ['joao-dourado'], 
-      ultimaMensagem: 'Vocês têm esse produto?', 
-      tempo: '1 hora', 
-      status: 'em_andamento' as const
-    },
-  ];
+  console.log("📊 [MENSAGENS_REFACTORED] canaisData gerado:", canaisData);
+
+  const handleSendFile = async (file: File, caption?: string) => {
+    console.log('File sending handled by ChatOverlayRefactored');
+  };
+
+  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+    console.log('Audio sending handled by ChatOverlayRefactored');
+  };
 
   const handleChannelClick = (channelId: string) => {
-    console.log('📺 [MENSAGENS] Channel clicked:', channelId);
+    console.log("📺 [MENSAGENS] Channel clicked (raw channelId):", channelId);
     setSelectedChannel(channelId);
+    console.log("📺 [MENSAGENS] selectedChannel updated to (after click):", channelId);
   };
 
   const handleCloseOverlay = () => {
-    console.log('❌ [MENSAGENS] Closing chat overlay');
+    console.log("❌ [MENSAGENS] Closing chat overlay");
     setSelectedChannel(null);
+    console.log("❌ [MENSAGENS] selectedChannel set to null.");
     
-    const newUrl = '/?section=mensagens';
-    window.history.replaceState({}, '', newUrl);
+    const newUrl = "/?section=mensagens";
+    window.history.replaceState({}, "", newUrl);
   };
 
-  const handleContactClick = (contactId: string, canais: string[]) => {
-    const contact = contatosData.find(c => c.id === contactId);
-    if (!contact) return;
-
-    if (canais.length > 1) {
-      setSelectedContactName(contact.nome);
-      setSelectedContactChannels(canais);
-      setIsChannelSelectorOpen(true);
-    } else {
-      setSelectedChannel(canais[0]);
-    }
-  };
-
-  const handleChannelSelect = (channel: string) => {
-    setSelectedChannel(channel);
-    setIsChannelSelectorOpen(false);
-  };
-
-  const handleNewContact = (contactData: {
-    nome: string;
-    telefone: string;
-    canal: string;
-  }) => {
-    console.log('Creating new contact:', contactData);
-  };
-
-  const filteredChannels = canaisData.filter(canal =>
-    canal.nome.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredContacts = contatosData.filter(contato =>
-    contato.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contato.telefone.includes(searchTerm)
-  );
-
+  console.log("Current selectedChannel in MensagensRefactored (before render):", selectedChannel);
   if (selectedChannel) {
+    console.log("Rendering ChatOverlayRefactored for channel:", selectedChannel);
     return (
       <ChatOverlayRefactored
         channelId={selectedChannel}
         isDarkMode={isDarkMode}
         onClose={handleCloseOverlay}
+        onSendFile={handleSendFile}
+        onSendAudio={handleSendAudio}
       />
     );
   }
@@ -181,7 +151,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         isDarkMode={isDarkMode}
       />
 
-      {/* Search and Action Bar */}
       <div className="flex gap-4 items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
@@ -210,33 +179,31 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         )}
       </div>
 
-      {/* Content */}
       {activeTab === 'canais' ? (
         <ChannelsGrid
-          channels={filteredChannels}
+          channels={canaisData}
           onChannelClick={handleChannelClick}
           isDarkMode={isDarkMode}
         />
       ) : (
         <ContactsListOptimized
-          contacts={filteredContacts}
-          onContactClick={handleContactClick}
+          contacts={[]}
+          onContactClick={() => {}}
           isDarkMode={isDarkMode}
         />
       )}
 
-      {/* Modals */}
       <NewContactModal
         isOpen={isNewContactModalOpen}
         onClose={() => setIsNewContactModalOpen(false)}
-        onSubmit={handleNewContact}
+        onSubmit={() => {}}
         isDarkMode={isDarkMode}
       />
 
       <ChannelSelectorModal
         isOpen={isChannelSelectorOpen}
         onClose={() => setIsChannelSelectorOpen(false)}
-        onChannelSelect={handleChannelSelect}
+        onChannelSelect={() => {}}
         contactName={selectedContactName}
         availableChannels={selectedContactChannels}
         isDarkMode={isDarkMode}

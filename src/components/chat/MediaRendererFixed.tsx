@@ -22,6 +22,7 @@ interface MediaRendererFixedProps {
   fileName?: string;
   balloonColor?: 'sent' | 'received'; // Nova prop para determinar a cor do balão
 }
+
 export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   content,
   messageType,
@@ -242,7 +243,7 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
       onClick={() => window.open(url, '_blank')}
     >
       <div className="text-2xl mr-3">
-        {MediaProcessor.getMediaIcon(type)}
+        {MediaProcessor.getMediaIcon((type as "document" | "text" | "audio" | "image" | "video" | "sticker") || 'document')}
       </div>
       <div className="flex-1 min-w-0">
         <div className={cn(
@@ -270,4 +271,3 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     </div>
   );
 };
-

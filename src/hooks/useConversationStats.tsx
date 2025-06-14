@@ -1,116 +1,74 @@
 
 import { useState, useEffect } from 'react';
-import { useChannels } from '@/contexts/ChannelContext';
-import { useChannelConversations } from './useChannelConversations';
-import { getTableNameForChannel } from '@/utils/channelMapping';
-import { supabase } from '@/integrations/supabase/client';
-import { ConversationGrouper } from '@/utils/ConversationGrouper';
+import { MessageService } from '@/services/MessageService';
+import { ConversationStats, RawMessage } from '@/types/messages';
 
-export interface ConversationStats {
-  totalConversations: number;
-  unreadConversations: number;
-  inProgressConversations: number;
-  resolvedConversations: number;
-}
-
-export const useConversationStats = () => {
+export const useConversationStats = (channelId: string) => {
   const [stats, setStats] = useState<ConversationStats>({
     totalConversations: 0,
-    unreadConversations: 0,
-    inProgressConversations: 0,
-    resolvedConversations: 0
+    activeConversations: 0,
+    totalMessages: 0,
+    unreadMessages: 0
   });
   const [loading, setLoading] = useState(true);
-  const { channels } = useChannels();
-
-  const loadAllConversations = async () => {
-    try {
-      setLoading(true);
-      console.log('Carregando estatísticas de todas as conversas...');
-
-      const allConversations = [];
-      
-      // Mapear nomes de canais para IDs de tabela
-      const channelMapping = {
-        'Yelena-AI': 'chat',
-        'Canarana': 'canarana',
-        'Souto Soares': 'souto-soares',
-        'João Dourado': 'joao-dourado',
-        'América Dourada': 'america-dourada',
-        'Gerente das Lojas': 'gerente-lojas',
-        'Gerente do Externo': 'gerente-externo',
-        'Pedro': 'pedro'
-      };
-
-      for (const channel of channels) {
-        if (!channel.isActive) continue;
-        
-        const channelId = channelMapping[channel.name as keyof typeof channelMapping];
-        if (!channelId) continue;
-
-        try {
-          const tableName = getTableNameForChannel(channelId);
-          console.log(`Carregando dados da tabela: ${tableName}`);
-          
-          const { data, error } = await supabase
-            .from(tableName)
-            .select('*')
-            .order('id', { ascending: false });
-
-          if (error) {
-            console.error(`Erro ao carregar dados de ${tableName}:`, error);
-            continue;
-          }
-
-          if (data && data.length > 0) {
-            const conversations = ConversationGrouper.groupMessagesByPhone(data, channelId);
-            allConversations.push(...conversations);
-          }
-        } catch (error) {
-          console.error(`Erro ao processar canal ${channelId}:`, error);
-        }
-      }
-
-      console.log('Total de conversas carregadas:', allConversations.length);
-
-      // Calcular estatísticas reais
-      const totalConversations = allConversations.length;
-      
-      // Para demonstração, vamos simular alguns status
-      // Em uma implementação real, estes status viriam do banco de dados
-      const unreadConversations = Math.floor(totalConversations * 0.3); // 30% não lidas
-      const inProgressConversations = Math.floor(totalConversations * 0.4); // 40% em andamento
-      const resolvedConversations = totalConversations - unreadConversations - inProgressConversations;
-
-      setStats({
-        totalConversations,
-        unreadConversations,
-        inProgressConversations,
-        resolvedConversations
-      });
-
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas de conversas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    loadAllConversations();
+    const loadStats = async () => {
+      if (!channelId) return;
 
-    // Auto refresh a cada minuto
-    const interval = setInterval(() => {
-      console.log('Auto refresh - carregando estatísticas...');
-      loadAllConversations();
-    }, 60000); // 1 minuto
+      try {
+        setLoading(true);
+        const messageService = new MessageService(channelId);
+        
+        // Get all messages for the channel
+        const messagesResult = await messageService.getAllMessages();
+        const messages: RawMessage[] = messagesResult || [];
 
-    return () => clearInterval(interval);
-  }, [channels]);
+        // Convert messages to proper format
+        const formattedMessages: RawMessage[] = messages.map(msg => ({
+          id: msg.id,
+          session_id: msg.session_id,
+          message: msg.message,
+          mensagemtype: msg.mensagemtype,
+          tipo_remetente: msg.tipo_remetente,
+          nome_do_contato: msg.nome_do_contato,
+          media_base64: msg.media_base64,
+          is_read: msg.is_read,
+          read_at: msg.read_at,
+          sender: msg.tipo_remetente || 'unknown',
+          timestamp: new Date().toISOString(),
+          content: msg.message
+        }));
 
-  return {
-    stats,
-    loading,
-    refreshStats: loadAllConversations
-  };
+        // Calculate stats from messages
+        const uniqueSessions = new Set(formattedMessages.map(m => m.session_id));
+        const totalConversations = uniqueSessions.size;
+        
+        // Count active conversations (those with messages in last 24 hours)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const activeConversations = formattedMessages.filter(m => 
+          new Date(m.timestamp) > yesterday
+        ).length;
+
+        const totalMessages = formattedMessages.length;
+        const unreadMessages = formattedMessages.filter(m => !m.is_read).length;
+
+        setStats({
+          totalConversations,
+          activeConversations,
+          totalMessages,
+          unreadMessages
+        });
+      } catch (error) {
+        console.error('Error loading conversation stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, [channelId]);
+
+  return { stats, loading };
 };

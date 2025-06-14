@@ -27,13 +27,7 @@ export const MobileChatInputBar: React.FC<MobileChatInputBarProps> = ({
 
   const handleSend = async () => {
     if (message.trim() && conversationId && channelId) {
-      const success = await sendMessage({
-        conversationId,
-        channelId,
-        content: message.trim(),
-        sender: 'agent',
-        agentName: 'Atendente'
-      });
+      const success = await sendMessage(channelId, conversationId, message.trim());
       
       if (success) {
         onSendMessage(message.trim());

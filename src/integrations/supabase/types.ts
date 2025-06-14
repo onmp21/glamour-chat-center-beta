@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_providers: {
+        Row: {
+          advanced_settings: Json | null
+          api_key: string
+          base_url: string | null
+          created_at: string | null
+          default_model: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          provider_type: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          advanced_settings?: Json | null
+          api_key: string
+          base_url?: string | null
+          created_at?: string | null
+          default_model?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          provider_type: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          advanced_settings?: Json | null
+          api_key?: string
+          base_url?: string | null
+          created_at?: string | null
+          default_model?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          provider_type?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       america_dourada_conversas: {
         Row: {
           id: number
@@ -360,7 +402,7 @@ export type Database = {
           media_base64: string | null
           mensagemtype: string | null
           message: string
-          Nome_do_contato: string | null
+          nome_do_contato: string | null
           read_at: string | null
           session_id: string
           tipo_remetente: string | null
@@ -371,7 +413,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
           tipo_remetente?: string | null
@@ -382,7 +424,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id?: string
           tipo_remetente?: string | null
@@ -479,6 +521,53 @@ export type Database = {
         }
         Relationships: []
       }
+      report_history: {
+        Row: {
+          created_at: string | null
+          generated_report: string
+          generation_time: number | null
+          id: string
+          model_used: string | null
+          prompt: string
+          provider_id: string | null
+          report_metadata: Json | null
+          report_type: string
+          tokens_used: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          generated_report: string
+          generation_time?: number | null
+          id?: string
+          model_used?: string | null
+          prompt: string
+          provider_id?: string | null
+          report_metadata?: Json | null
+          report_type: string
+          tokens_used?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          generated_report?: string
+          generation_time?: number | null
+          id?: string
+          model_used?: string | null
+          prompt?: string
+          provider_id?: string | null
+          report_metadata?: Json | null
+          report_type?: string
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_history_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "ai_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       souto_soares_conversas: {
         Row: {
           id: number
@@ -514,41 +603,6 @@ export type Database = {
           tipo_remetente?: string | null
         }
         Relationships: []
-      }
-      user_profiles: {
-        Row: {
-          avatar_url: string | null
-          bio: string | null
-          created_at: string | null
-          id: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          id?: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          avatar_url?: string | null
-          bio?: string | null
-          created_at?: string | null
-          id?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_profiles_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       users: {
         Row: {
@@ -595,7 +649,7 @@ export type Database = {
           media_base64: string | null
           mensagemtype: string | null
           message: string
-          Nome_do_contato: string | null
+          nome_do_contato: string | null
           read_at: string | null
           session_id: string
           tipo_remetente: string | null
@@ -605,7 +659,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
           tipo_remetente?: string | null
@@ -615,7 +669,7 @@ export type Database = {
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string
-          Nome_do_contato?: string | null
+          nome_do_contato?: string | null
           read_at?: string | null
           session_id?: string
           tipo_remetente?: string | null
@@ -664,6 +718,15 @@ export type Database = {
       format_base64_to_data_url: {
         Args: { base64_content: string; message_type?: string }
         Returns: string
+      }
+      get_base64_messages: {
+        Args: { table_name: string; batch_size?: number }
+        Returns: {
+          id: number
+          media_base64: string
+          session_id: string
+          message: string
+        }[]
       }
       halfvec_avg: {
         Args: { "": number[] }
@@ -730,6 +793,10 @@ export type Database = {
           similarity: number
         }[]
       }
+      process_base64_to_storage: {
+        Args: { base64_content: string; file_name?: string; mime_type?: string }
+        Returns: string
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
@@ -741,6 +808,15 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      update_media_url: {
+        Args: {
+          table_name: string
+          record_id: number
+          media_url: string
+          placeholder_message?: string
+        }
+        Returns: boolean
       }
       update_user_with_hash: {
         Args: {

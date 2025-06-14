@@ -4,6 +4,7 @@ export interface FileData {
   mimeType: string;
   fileName: string;
   size?: number;
+  duration?: number;
 }
 
 export interface ExtendedMessageData {
@@ -12,16 +13,23 @@ export interface ExtendedMessageData {
   content: string;
   sender: 'customer' | 'agent';
   agentName?: string;
-  messageType?: 'text' | 'file' | 'audio' | 'image' | 'video';
+  messageType?: 'text' | 'file' | 'audio' | 'image' | 'video' | 'document';
   fileData?: FileData;
 }
 
+// Use the same RawMessage interface as in messages.ts to avoid conflicts
 export interface RawMessage {
-  id?: string;
-  session_id: string; // numero do cliente
-  message: string; // texto ou base64 da mensagem
-  read_at: string; // hora que a mensagem foi enviada (horário de Brasília)
-  Nome_do_contato: string; // nome do cliente
-  mensagemtype: string; // audioMenssage, imageMenssage, videoMenssage, stickerMessage ou conversation
-  tipo_remetente: string; // quem enviou a mensagem "nome do cliente" ou "nome do canal"
+  id: string;
+  session_id: string;
+  message: string;
+  sender: 'customer' | 'agent';
+  timestamp: string;
+  content: string;
+  tipo_remetente?: string;
+  mensagemtype?: string;
+  Nome_do_contato?: string;
+  nome_do_contato?: string;
+  media_base64?: string;
+  read_at?: string;
+  is_read?: boolean;
 }

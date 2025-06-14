@@ -39,12 +39,14 @@ export class MessageConverter {
       content: content,
       timestamp: rawMessage.read_at || new Date().toISOString(),
       sender: isAgent ? 'agent' : 'customer',
+      type: 'text',
+      isFromUser: !isAgent,
+      session_id: rawMessage.session_id,
       tipo_remetente: rawMessage.tipo_remetente,
-      isOwn: isAgent,
-      agentName: isAgent ? contactName : undefined,
+      mensagemtype: messageType,
       Nome_do_contato: contactName,
       nome_do_contato: rawMessage.nome_do_contato,
-      mensagemtype: messageType
+      contactName: contactName
     };
   }
 

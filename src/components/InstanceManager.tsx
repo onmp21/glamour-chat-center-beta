@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2, Eye, EyeOff, Copy, QrCode } from 'lucide-react';
 import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
+import { DeleteInstanceModal } from '@/components/modals/DeleteInstanceModal';
 
 interface InstanceManagerProps {
   isDarkMode: boolean;
@@ -27,6 +28,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
   const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<{ instanceName: string; qrCode: string } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; instanceName: string }>({ isOpen: false, instanceName: '' });
 
   const loadInstances = async () => {
     if (!apiConfig.baseUrl || !apiConfig.apiKey) {
@@ -163,7 +165,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       toast({
         title: "Aviso",
         description: `A instância foi selecionada, mas houve um erro ao configurar o webhook: ${error}`,
-        variant: "warning"
+        variant: "destructive"
       });
     }
     
@@ -174,10 +176,6 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
   };
 
   const deleteInstance = async (instanceName: string) => {
-    if (!confirm(`Tem certeza que deseja deletar a instância ${instanceName}?`)) {
-      return;
-    }
-
     try {
       const service = new EvolutionApiService({
         baseUrl: apiConfig.baseUrl,
@@ -205,6 +203,21 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         variant: "destructive"
       });
     }
+  };
+
+  const handleDeleteClick = (instanceName: string) => {
+    setDeleteModal({ isOpen: true, instanceName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deleteModal.instanceName) {
+      await deleteInstance(deleteModal.instanceName);
+      setDeleteModal({ isOpen: false, instanceName: '' });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ isOpen: false, instanceName: '' });
   };
 
   const showQRCode = async (instanceName: string) => {
@@ -404,7 +417,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteInstance(instance.instanceName);
+                      handleDeleteClick(instance.instanceName);
                     }}
                     className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 dark:hover:bg-destructive/20"
                   >
@@ -479,8 +492,15 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      <DeleteInstanceModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        instanceName={deleteModal.instanceName}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };
-
-

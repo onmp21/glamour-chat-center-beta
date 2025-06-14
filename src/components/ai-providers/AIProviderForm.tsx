@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, Eye, EyeOff, TestTube } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { AIProvider, AIProviderFormData, PROVIDER_TYPES, DEFAULT_MODELS } from '@/types/ai-providers';
+import { X } from 'lucide-react';
+import { AIProvider, AIProviderFormData } from '@/types/ai-providers';
 import { useAIProviders } from '@/hooks/useAIProviders';
 import { toast } from 'sonner';
 
@@ -15,7 +16,14 @@ interface AIProviderFormProps {
   onClose: () => void;
 }
 
-export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClose }) => {
+export const AIProviderForm: React.FC<AIProviderFormProps> = ({
+  provider,
+  onClose
+}) => {
+  const { createProvider, updateProvider, testProvider } = useAIProviders();
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  
   const [formData, setFormData] = useState<AIProviderFormData>({
     name: '',
     provider_type: 'openai',
@@ -26,18 +34,12 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
     advanced_settings: {}
   });
 
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const { createProvider, updateProvider, testProvider } = useAIProviders();
-
   useEffect(() => {
     if (provider) {
       setFormData({
         name: provider.name,
         provider_type: provider.provider_type,
-        api_key: provider.api_key,
+        api_key: provider.api_key || '',
         base_url: provider.base_url || '',
         default_model: provider.default_model || '',
         is_active: provider.is_active,
@@ -48,21 +50,26 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setLoading(true);
 
     try {
+      let result;
       if (provider) {
-        await updateProvider(provider.id, formData);
-        toast.success('Provedor atualizado com sucesso!');
+        result = await updateProvider(provider.id, formData);
       } else {
-        await createProvider(formData);
-        toast.success('Provedor criado com sucesso!');
+        result = await createProvider(formData);
       }
-      onClose();
+      
+      if (result.success) {
+        toast.success(result.message || 'Operação realizada com sucesso!');
+        onClose();
+      } else {
+        toast.error(result.message || 'Erro na operação');
+      }
     } catch (error) {
-      toast.error(provider ? 'Erro ao atualizar provedor' : 'Erro ao criar provedor');
+      toast.error('Erro ao salvar provedor');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -82,190 +89,119 @@ export const AIProviderForm: React.FC<AIProviderFormProps> = ({ provider, onClos
     }
   };
 
-  const getDefaultBaseUrl = (providerType: string) => {
-    switch (providerType) {
-      case 'openai':
-        return 'https://api.openai.com/v1';
-      case 'google_gemini':
-        return 'https://generativelanguage.googleapis.com/v1';
-      case 'anthropic_claude':
-        return 'https://api.anthropic.com';
-      default:
-        return '';
-    }
-  };
-
-  const handleProviderTypeChange = (value: string) => {
-    const newFormData = {
-      ...formData,
-      provider_type: value as AIProviderFormData['provider_type'],
-      base_url: getDefaultBaseUrl(value),
-      default_model: DEFAULT_MODELS[value as keyof typeof DEFAULT_MODELS][0] || ''
-    };
-    setFormData(newFormData);
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#212121] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-[#3f3f46]">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#3f3f46]">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {provider ? 'Editar Provedor' : 'Adicionar Provedor'}
-          </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 dark:text-[#a1a1aa] hover:bg-gray-100 dark:hover:bg-[#27272a]">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-gray-900 dark:text-white">Nome do Provedor *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: OpenAI Principal"
-                required
-                className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="provider_type" className="text-gray-900 dark:text-white">Tipo de Provedor *</Label>
-              <Select value={formData.provider_type} onValueChange={handleProviderTypeChange}>
-                <SelectTrigger className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-[#18181b] border-gray-300 dark:border-[#3f3f46]">
-                  {Object.entries(PROVIDER_TYPES).map(([key, label]) => (
-                    <SelectItem key={key} value={key} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-[#27272a]">
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>
+              {provider ? 'Editar Provedor' : 'Novo Provedor'}
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-6 w-6 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
+        </DialogHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="api_key" className="text-gray-900 dark:text-white">Chave de API *</Label>
-            <div className="relative">
-              <Input
-                id="api_key"
-                type={showApiKey ? 'text' : 'password'}
-                value={formData.api_key}
-                onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                placeholder="Sua chave de API"
-                required
-                className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-[#a1a1aa] hover:bg-gray-100 dark:hover:bg-[#27272a]"
-                onClick={() => setShowApiKey(!showApiKey)}
-              >
-                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="base_url" className="text-gray-900 dark:text-white">URL Base</Label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Nome</Label>
             <Input
-              id="base_url"
-              value={formData.base_url}
-              onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-              placeholder="URL da API (opcional para provedores personalizados)"
-              className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white"
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Nome do provedor"
+              required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="default_model" className="text-gray-900 dark:text-white">Modelo Padrão</Label>
-            <Select 
-              value={formData.default_model} 
-              onValueChange={(value) => setFormData({ ...formData, default_model: value })}
+          <div>
+            <Label htmlFor="provider_type">Tipo</Label>
+            <Select
+              value={formData.provider_type}
+              onValueChange={(value: 'openai' | 'anthropic' | 'google' | 'custom') => 
+                setFormData(prev => ({ ...prev, provider_type: value }))
+              }
             >
-              <SelectTrigger className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white">
-                <SelectValue placeholder="Selecione um modelo" />
+              <SelectTrigger>
+                <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-white dark:bg-[#18181b] border-gray-300 dark:border-[#3f3f46]">
-                {DEFAULT_MODELS[formData.provider_type].map((model) => (
-                  <SelectItem key={model} value={model} className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-[#27272a]">
-                    {model}
-                  </SelectItem>
-                ))}
+              <SelectContent>
+                <SelectItem value="openai">OpenAI</SelectItem>
+                <SelectItem value="anthropic">Anthropic</SelectItem>
+                <SelectItem value="google">Google</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="api_key">API Key</Label>
+            <Input
+              id="api_key"
+              type="password"
+              value={formData.api_key}
+              onChange={(e) => setFormData(prev => ({ ...prev, api_key: e.target.value }))}
+              placeholder="Sua API key"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="base_url">URL Base (opcional)</Label>
+            <Input
+              id="base_url"
+              value={formData.base_url}
+              onChange={(e) => setFormData(prev => ({ ...prev, base_url: e.target.value }))}
+              placeholder="https://api.example.com"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="default_model">Modelo Padrão (opcional)</Label>
+            <Input
+              id="default_model"
+              value={formData.default_model}
+              onChange={(e) => setFormData(prev => ({ ...prev, default_model: e.target.value }))}
+              placeholder="gpt-4, claude-3, etc."
+            />
           </div>
 
           <div className="flex items-center space-x-2">
             <Switch
               id="is_active"
               checked={formData.is_active}
-              onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
             />
-            <Label htmlFor="is_active" className="text-gray-900 dark:text-white">Provedor ativo</Label>
+            <Label htmlFor="is_active">Ativo</Label>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="advanced_settings" className="text-gray-900 dark:text-white">Configurações Avançadas (JSON)</Label>
-            <Textarea
-              id="advanced_settings"
-              value={JSON.stringify(formData.advanced_settings, null, 2)}
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  setFormData({ ...formData, advanced_settings: parsed });
-                } catch {
-                  // Ignore invalid JSON while typing
-                }
-              }}
-              placeholder='{"temperature": 0.7, "max_tokens": 1000}'
-              rows={4}
-              className="border-gray-300 dark:border-[#3f3f46] bg-white dark:bg-[#18181b] text-gray-900 dark:text-white"
-            />
-            <p className="text-xs text-gray-500 dark:text-[#a1a1aa]">
-              Configurações específicas do provedor em formato JSON (opcional)
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-[#3f3f46]">
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleTest}
               disabled={testing || !formData.api_key}
-              className="flex items-center space-x-2 border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#27272a]"
+              className="flex-1"
             >
-              <TestTube className="h-4 w-4" />
-              <span>{testing ? 'Testando...' : 'Testar Conexão'}</span>
+              {testing ? 'Testando...' : 'Testar Conexão'}
             </Button>
-
-            <div className="flex space-x-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                className="border-gray-300 dark:border-[#3f3f46] text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#27272a]"
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={saving}
-                className="bg-[#b5103c] hover:bg-[#b5103c]/90 text-white"
-              >
-                {saving ? 'Salvando...' : (provider ? 'Atualizar' : 'Criar')}
-              </Button>
-            </div>
+            
+            <Button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-[#b5103c] hover:bg-[#b5103c]/90"
+            >
+              {loading ? 'Salvando...' : 'Salvar'}
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
-

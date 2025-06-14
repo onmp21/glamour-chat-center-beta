@@ -13,15 +13,21 @@ import {
   Music,
   Video,
   StopCircle,
-  Check
+  Check,
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { EmojiPickerCompact } from './EmojiPickerCompact';
+import { openaiService } from '@/services/openaiService';
+import { ChannelConversation } from '@/types/messages';
 
 interface ChatInputProps {
   isDarkMode: boolean;
   onSendMessage: (message: string) => void;
   onSendFile?: (file: File, caption?: string) => void;
   onSendAudio?: (audioBlob: Blob, duration: number) => void;
+  selectedConv?: ChannelConversation;
+  channelId?: string;
 }
 
 interface FilePreview {
@@ -30,17 +36,29 @@ interface FilePreview {
   type: 'image' | 'video' | 'audio' | 'document';
 }
 
+const QUICK_RESPONSES = [
+  "Olá! Como posso ajudá-lo hoje?",
+  "Obrigado pelo contato. Vou verificar essa informação para você.",
+  "Perfeito! Vou agendar isso para você agora mesmo.",
+  "Entendi sua solicitação. Preciso de alguns dados adicionais.",
+  "Muito obrigado! Seu atendimento foi finalizado com sucesso.",
+  "Vou transferir você para o setor responsável."
+];
+
 export const ChatInput: React.FC<ChatInputProps> = ({ 
   isDarkMode, 
   onSendMessage,
   onSendFile,
-  onSendAudio
+  onSendAudio,
+  selectedConv,
+  channelId
 }) => {
   const [message, setMessage] = useState('');
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showFilePreview, setShowFilePreview] = useState(false);
+  const [showQuickResponses, setShowQuickResponses] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -59,6 +77,44 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onSendMessage(message.trim());
         setMessage("");
       }
+    }
+  };
+
+  const handleQuickResponse = (response: string) => {
+    setMessage(response);
+    setShowQuickResponses(false);
+  };
+
+  const handleAIQuickResponse = async () => {
+    if (!selectedConv || !channelId) {
+      console.error('❌ [AI_QUICK_RESPONSE] Conversa ou canal não selecionado');
+      return;
+    }
+
+    try {
+      console.log('🤖 [AI_QUICK_RESPONSE] Gerando resposta rápida com IA...');
+      
+      const suggestedResponse = await openaiService.generateSuggestedResponse(
+        channelId, 
+        selectedConv.contact_phone
+      );
+      
+      setMessage(suggestedResponse);
+      console.log('✅ [AI_QUICK_RESPONSE] Resposta sugerida gerada:', suggestedResponse);
+      
+    } catch (error) {
+      console.error('❌ [AI_QUICK_RESPONSE] Erro ao gerar resposta:', error);
+      
+      // Fallback para respostas padrão em caso de erro
+      const fallbackResponses = [
+        "Obrigado pelo contato. Como posso ajudá-lo hoje?",
+        "Entendi sua solicitação. Vou verificar isso para você.",
+        "Agradeço sua paciência. Estou analisando sua situação.",
+        "Vou encaminhar sua solicitação para o setor responsável."
+      ];
+      
+      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
+      setMessage(randomResponse);
     }
   };
 
@@ -343,6 +399,44 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         "border-t",
         isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
       )}>
+        {/* Quick Responses */}
+        {showQuickResponses && (
+          <div className={cn(
+            "p-3 border-b",
+            isDarkMode ? "border-[#3f3f46] bg-[#27272a]" : "border-gray-200 bg-gray-50"
+          )}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={cn("text-sm font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                Respostas Rápidas
+              </span>
+              <Button
+                onClick={() => setShowQuickResponses(false)}
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+              >
+                <X size={14} />
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {QUICK_RESPONSES.map((response, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleQuickResponse(response)}
+                  className={cn(
+                    "text-left text-sm p-2 rounded-lg transition-colors",
+                    isDarkMode 
+                      ? "bg-[#3f3f46] text-white hover:bg-[#52525b]" 
+                      : "bg-white text-gray-900 hover:bg-gray-100"
+                  )}
+                >
+                  {response}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* File Preview simples para documentos */}
         {filePreview && filePreview.type === 'document' && (
           <div className={cn(
@@ -392,6 +486,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               </Button>
               
               <EmojiPickerCompact onEmojiSelect={handleEmojiSelect} isDarkMode={isDarkMode} />
+              
+              {/* Botão de Respostas Rápidas */}
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => setShowQuickResponses(!showQuickResponses)}
+                className={cn(
+                  "h-9 w-9",
+                  isDarkMode ? "text-gray-400 hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
+                )}
+              >
+                <Zap size={20} />
+              </Button>
+              
+              {/* Botão de IA para Resposta Rápida */}
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleAIQuickResponse}
+                className={cn(
+                  "h-9 w-9",
+                  isDarkMode ? "text-purple-400 hover:bg-[#27272a]" : "text-purple-600 hover:bg-purple-50"
+                )}
+                title="Gerar resposta com IA"
+              >
+                <Sparkles size={20} />
+              </Button>
             </div>
 
             {/* Message Input */}

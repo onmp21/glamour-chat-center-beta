@@ -38,3 +38,11 @@ export class ConversationService {
   }
 }
 
+export interface ConversationData {
+  id: string;
+  contact_name: string;
+  contact_phone: string;
+  last_message?: string;
+  last_activity?: string;
+  unread_count?: number;
+}

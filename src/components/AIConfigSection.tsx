@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 export function AIConfigSection() {
   const { providers, loading, error, createProvider, updateProvider, deleteProvider, testProvider } = useAIProviders()
   const { user } = useAuth()
-  const [testingProvider, setTestingProvider] = useState<number | null>(null)
+  const [testingProvider, setTestingProvider] = useState<string | null>(null)
 
   if (!user) {
     return (
@@ -27,19 +27,29 @@ export function AIConfigSection() {
   const handleTestProvider = async (provider: any) => {
     try {
       setTestingProvider(provider.id)
-      const result = await testProvider({
-        provider_id: provider.id,
-        provider_type: provider.provider_type,
-        api_key: provider.api_key,
-        base_url: provider.base_url,
-        default_model: provider.default_model
-      })
+      const result = await testProvider(provider.id)
       
       alert(result.message || 'Teste realizado com sucesso!')
     } catch (error) {
-      alert(`Erro no teste: ${error.message}`)
+      alert(`Erro no teste: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
     } finally {
       setTestingProvider(null)
+    }
+  }
+
+  const handleToggleActive = async (provider: any) => {
+    try {
+      await updateProvider(provider.id, {
+        name: provider.name,
+        provider_type: provider.provider_type,
+        api_key: provider.api_key,
+        base_url: provider.base_url,
+        default_model: provider.default_model,
+        is_active: !provider.is_active,
+        advanced_settings: provider.advanced_settings || {}
+      })
+    } catch (error) {
+      alert(`Erro ao atualizar provedor: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
     }
   }
 
@@ -73,7 +83,7 @@ export function AIConfigSection() {
                   </button>
                   
                   <button
-                    onClick={() => updateProvider(provider.id, { is_active: !provider.is_active })}
+                    onClick={() => handleToggleActive(provider)}
                     className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
                   >
                     {provider.is_active ? 'Desativar' : 'Ativar'}
@@ -94,5 +104,3 @@ export function AIConfigSection() {
     </div>
   )
 }
-
-

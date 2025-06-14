@@ -1,71 +1,65 @@
+
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'custom';
+
+export const PROVIDER_TYPES: Record<ProviderType, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic', 
+  google: 'Google',
+  custom: 'Personalizado'
+};
+
 export interface AIProvider {
   id: string;
   name: string;
-  provider_type: 'openai' | 'google_gemini' | 'anthropic_claude' | 'custom';
-  api_key?: string; // Não exposto na resposta da API
+  provider_type: ProviderType;
+  api_key?: string;
   base_url?: string;
-  default_model: string;
+  default_model?: string;
   is_active: boolean;
+  advanced_settings?: Record<string, any>;
   created_at: string;
   updated_at: string;
-  last_tested_at?: string;
-  test_status: 'success' | 'error' | 'not_tested';
-  test_message?: string;
-  advanced_settings: Record<string, any>;
+  user_id?: string;
 }
 
 export interface AIProviderFormData {
   name: string;
-  provider_type: 'openai' | 'google_gemini' | 'anthropic_claude' | 'custom';
+  provider_type: ProviderType;
   api_key: string;
   base_url?: string;
-  default_model: string;
+  default_model?: string;
   is_active: boolean;
   advanced_settings?: Record<string, any>;
 }
 
-export interface TestProviderRequest {
-  provider_type: string;
-  api_key: string;
-  base_url?: string;
-  default_model: string;
-  provider_id?: string;
-}
-
-export interface ReportGenerationRequest {
-  provider_id: string;
-  report_type: 'conversations' | 'channels' | 'custom';
-  data: any;
-  custom_prompt?: string;
-  filters?: Record<string, any>;
-}
-
 export interface ReportResult {
-  report: string;
-  metadata: {
-    report_id: number;
-    generated_at: string;
-    provider_type: string;
-    provider_name: string;
-    model: string;
-    report_type: string;
-    tokens_used: number;
-    generation_time: number;
-    data_summary: any;
-  };
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  provider_id: string;
+  report_content: string;
+  report_type: string;
+  status: string;
 }
 
 export interface ReportHistory {
-  id: number;
-  report_type: string;
+  id: string;
+  title: string;
   prompt: string;
-  generated_report: string;
-  provider_id: number;
-  provider_name?: string;
+  generated_at: string;
+  created_at: string;
+  provider_used: string;
+  provider_id: string;
+  provider_name: string;
   model_used: string;
   tokens_used: number;
   generation_time: number;
-  created_at: string;
   metadata: Record<string, any>;
+  query: string;
+  result: ReportResult;
+  timestamp: string;
+  status: string;
+  report_type: string;
+  generated_report: string;
 }
-

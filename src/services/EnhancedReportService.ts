@@ -55,7 +55,13 @@ export class EnhancedReportService {
 
       // Chamar a função Supabase para gerar o relatório
       const { data, error } = await supabase.functions.invoke('generate-report', {
-        body: { prompt }
+        body: { 
+          provider_id: 'default',
+          report_type: reportData.type,
+          data: reportData.data,
+          custom_prompt: prompt,
+          filters: reportData.filters
+        }
       });
 
       if (error) {
@@ -168,7 +174,13 @@ export class EnhancedReportService {
 
       // Chamar a função Supabase para gerar o relatório
       const { data, error } = await supabase.functions.invoke('generate-report', {
-        body: { prompt }
+        body: { 
+          provider_id: 'default',
+          report_type: 'conversation',
+          data: conversationData,
+          custom_prompt: prompt,
+          filters: { channelId, sessionId, period }
+        }
       });
 
       if (error) {

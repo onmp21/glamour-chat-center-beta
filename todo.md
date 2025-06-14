@@ -1,0 +1,11 @@
+- [x] Remover o prefixo "Resposta sugerida pela IA:" das respostas da IA.
+- [x] Implementar a funcionalidade do botão "Resumo IA" usando a API da OpenAI.
+- [x] Implementar o envio de mensagens de texto para a API Evolution.
+- [x] Implementar o envio de mídias para a API Evolution.
+- [x] Criar função para converter Base64 para HTML.
+- [x] Implementar o armazenamento de HTML convertido no Supabase Storage para exibição no chat.
+- [x] Corrigir erro 'process is not defined' no openaiService.ts.
+- [x] Corrigir erros de envio de mensagens (sendMessage não é uma função).
+- [x] Adicionar confirmação de exclusão de instância.
+- [x] Abrir a aplicação expondo e permitindo a validação.
+

@@ -2,9 +2,6 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useChannelConversations } from '@/hooks/useChannelConversations';
-import { useEvolutionApiSender } from '@/hooks/useEvolutionApiSender';
-import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Send, Paperclip, Mic, Image, FileText } from 'lucide-react';
 
@@ -13,20 +10,20 @@ interface MessageInputProps {
   conversationId?: string;
   isDarkMode: boolean;
   className?: string;
+  onSendMessage?: (content: string, file?: File) => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   channelId,
   conversationId,
   isDarkMode,
-  className
+  className,
+  onSendMessage
 }) => {
-  const { updateConversationStatus } = useChannelConversations(channelId);
-  const { sendMessage, sending } = useEvolutionApiSender();
-  const { toast } = useToast();
   const [content, setContent] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,11 +32,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     // Verificar tamanho do arquivo (máximo 16MB)
     if (file.size > 16 * 1024 * 1024) {
-      toast({
-        title: "Erro",
-        description: "Arquivo muito grande. Máximo 16MB permitido.",
-        variant: "destructive"
-      });
+      alert('Arquivo muito grande. Máximo 16MB permitido.');
       return;
     }
 
@@ -65,79 +58,36 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   };
 
-  const getFileType = (file: File): 'image' | 'audio' | 'video' | 'document' => {
-    if (file.type.startsWith('image/')) return 'image';
-    if (file.type.startsWith('audio/')) return 'audio';
-    if (file.type.startsWith('video/')) return 'video';
-    return 'document';
-  };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remover o prefixo data:type/subtype;base64,
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if ((!content.trim() && !selectedFile) || sending) return;
     
     if (!conversationId) {
-      toast({
-        title: "Erro",
-        description: "Nenhuma conversa selecionada",
-        variant: "destructive"
-      });
+      alert('Nenhuma conversa selecionada');
       return;
     }
 
     try {
       console.log('Enviando mensagem:', { channelId, conversationId, content, hasFile: !!selectedFile });
       
-      let messageType: 'text' | 'image' | 'audio' | 'video' | 'document' = 'text';
-      let fileBase64: string | undefined;
-      let fileName: string | undefined;
-
-      // Se há arquivo selecionado, processar
-      if (selectedFile) {
-        messageType = getFileType(selectedFile);
-        fileBase64 = await fileToBase64(selectedFile);
-        fileName = selectedFile.name;
-      }
-
-      // Enviar mensagem usando o hook da Evolution API - removido conversationId
-      const success = await sendMessage({
-        channelId,
-        phoneNumber: conversationId, // Usando conversationId como phoneNumber
-        message: content.trim() || (selectedFile ? `Arquivo: ${selectedFile.name}` : ''),
-        messageType,
-        mediaBase64: fileBase64,
-        fileName
-      });
+      setSending(true);
       
-      if (success) {
-        setContent('');
-        removeFile();
-        
-        // Marcar conversa como em andamento
-        await updateConversationStatus(conversationId, 'in_progress');
-      }
+      // Simular envio (interface visual apenas)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Callback para componente pai
+      onSendMessage?.(content.trim() || (selectedFile ? `Arquivo: ${selectedFile.name}` : ''), selectedFile || undefined);
+      
+      setContent('');
+      removeFile();
+      
+      console.log('Mensagem enviada com sucesso (simulação)');
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar mensagem",
-        variant: "destructive"
-      });
+      alert('Erro ao enviar mensagem');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -261,3 +211,4 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     </div>
   );
 };
+

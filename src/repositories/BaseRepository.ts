@@ -1,54 +1,58 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { TableName } from '@/utils/channelMapping';
 
 export abstract class BaseRepository<T> {
-  protected tableName: TableName;
+  protected tableName: string;
 
-  constructor(tableName: TableName) {
+  constructor(tableName: string) {
     this.tableName = tableName;
   }
 
-  get tableNamePublic(): string {
+  // Make tableName accessible to subclasses and services
+  public getTableName(): string {
     return this.tableName;
   }
 
-  async findAll(limit?: number, offset?: number): Promise<T[]> {
-    try {
-      console.log(`🔍 [BASE_REPOSITORY] Fetching all from ${this.tableName} with limit ${limit} and offset ${offset}`);
-      
-      let query = supabase
-        .from(this.tableName)
-        .select("*")
-        .order("id", { ascending: true });
+  async findAll(limit?: number): Promise<T[]> {
+    const query = supabase
+      .from(this.tableName as any)
+      .select('*')
+      .order('id', { ascending: false });
 
-      if (limit !== undefined) {
-        query = query.limit(limit);
-      }
-      if (offset !== undefined) {
-        query = query.range(offset, offset + (limit || 100) - 1);
-      }
+    if (limit) {
+      query.limit(limit);
+    }
 
-      const { data, error } = await query;
+    const { data, error } = await query;
 
-      if (error) {
-        console.error(`❌ [BASE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
-        throw error;
-      }
-
-      console.log(`✅ [BASE_REPOSITORY] Found ${data?.length || 0} records in ${this.tableName}`);
-      return data || [];
-    } catch (error) {
-      console.error(`❌ [BASE_REPOSITORY] Error in findAll for ${this.tableName}:`, error);
+    if (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error fetching from ${this.tableName}:`, error);
       throw error;
     }
+
+    return (data || []) as T[];
+  }
+
+  async findById(id: string | number): Promise<T | null> {
+    const { data, error } = await supabase
+      .from(this.tableName as any)
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error fetching by ID from ${this.tableName}:`, error);
+      throw error;
+    }
+
+    return data as T | null;
   }
 
   async create(data: Partial<T>): Promise<T> {
-    const { data: result, error } = await supabase
-      .from(this.tableName)
-      .insert(data as any)
-      .select('*')
+    const { data: created, error } = await supabase
+      .from(this.tableName as any)
+      .insert(data)
+      .select()
       .single();
 
     if (error) {
@@ -56,30 +60,33 @@ export abstract class BaseRepository<T> {
       throw error;
     }
 
-    console.log(`✅ [BASE_REPOSITORY] Created successfully in ${this.tableName}`);
-    return result as T;
+    return created as T;
   }
 
-  createRealtimeChannel(channelSuffix: string = "") {
-    return supabase.channel(`${this.tableName}${channelSuffix}`);
+  async update(id: string | number, data: Partial<T>): Promise<T> {
+    const { data: updated, error } = await supabase
+      .from(this.tableName as any)
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error updating in ${this.tableName}:`, error);
+      throw error;
+    }
+
+    return updated as T;
   }
 
-  async countAll(): Promise<number> {
-    try {
-      console.log(`🔍 [BASE_REPOSITORY] Counting all from ${this.tableName}`);
-      const { count, error } = await supabase
-        .from(this.tableName)
-        .select("count", { count: "exact" });
+  async delete(id: string | number): Promise<void> {
+    const { error } = await supabase
+      .from(this.tableName as any)
+      .delete()
+      .eq('id', id);
 
-      if (error) {
-        console.error(`❌ [BASE_REPOSITORY] Error counting from ${this.tableName}:`, error);
-        throw error;
-      }
-
-      console.log(`✅ [BASE_REPOSITORY] Found ${count || 0} records in ${this.tableName}`);
-      return count || 0;
-    } catch (error) {
-      console.error(`❌ [BASE_REPOSITORY] Error in countAll for ${this.tableName}:`, error);
+    if (error) {
+      console.error(`❌ [BASE_REPOSITORY] Error deleting from ${this.tableName}:`, error);
       throw error;
     }
   }
