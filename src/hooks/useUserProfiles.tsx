@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -91,10 +90,11 @@ export const useUserProfiles = () => {
 
   // Atualiza avatar_url e/ou bio no perfil
   const updateProfile = useCallback(async (updates: Partial<Pick<UserProfile, "avatar_url" | "bio">>) => {
-    if (!user) return null;
+    if (!user?.id) return null;
     setLoading(true);
     try {
-      const payload: Partial<UserProfile> = {
+      // Build payload ensuring id is present and not optional
+      const payload: { id: string; avatar_url?: string | null; bio?: string | null; updated_at: string } = {
         id: user.id,
         ...updates,
         updated_at: new Date().toISOString()
