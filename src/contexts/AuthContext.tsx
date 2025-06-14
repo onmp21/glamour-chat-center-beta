@@ -35,25 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🔐 [AUTH_PROVIDER] Tentando login:', credentials.username);
       
-      // Login demo para testes
-      if (credentials.username === 'demo' && credentials.password === 'demo') {
-        const user: User = {
-          id: 'demo-user',
-          username: 'demo',
-          name: 'Usuário Demonstração',
-          role: 'admin' as UserRole,
-          assignedTabs: [],
-          assignedCities: [],
-          createdAt: new Date().toISOString()
-        };
-
-        setAuthState({ user, isAuthenticated: true });
-        localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('✅ [AUTH_PROVIDER] Login demo realizado com sucesso');
-        return true;
-      }
-      
-      // Login via Supabase
+      // Login via Supabase usando a tabela users
       const { data: userData, error: userError } = await supabase.rpc('verify_user_credentials', {
         input_username: credentials.username,
         input_password: credentials.password
