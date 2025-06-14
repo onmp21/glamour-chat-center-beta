@@ -38,10 +38,14 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+    console.log("🖼️ [MediaRendererFixed] Chamando processAsync para:", { content, messageType, messageId });
     MediaProcessor.processAsync(content, messageType).then(res => {
       if (mounted) {
         setProcessedResult(res);
         setLoading(false);
+        if (res && !res.isProcessed) {
+          console.warn("[MediaRendererFixed] Não processou mídia:", res.error, {content});
+        }
       }
     });
     return () => { mounted = false };
@@ -82,6 +86,7 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   }
 
   if (!processedResult.isProcessed || !processedResult.url) {
+    console.warn("[MediaRendererFixed] Falha ao processar/renderizar mídia para mensagem:", messageId, processedResult);
     return renderError();
   }
 
@@ -89,7 +94,10 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
 
   // Exibir apenas se URL está no storage público.
   const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/');
-  if (!isBucketUrl) return renderError();
+  if (!isBucketUrl) {
+    console.warn("[MediaRendererFixed] URL da mídia NÃO É do storage público:", url);
+    return renderError();
+  }
 
   // Renderizar áudio
   if (type === 'audio') {

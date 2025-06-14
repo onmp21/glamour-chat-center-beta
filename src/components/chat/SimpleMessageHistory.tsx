@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
-import { MediaRenderer } from './MediaRenderer';
+import { MediaRendererFixed } from './MediaRendererFixed';
 import { MediaMigrationService } from '@/services/MediaMigrationService';
 
 interface SimpleMessageHistoryProps {
@@ -144,11 +144,14 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                       : "bg-white text-gray-900 border border-gray-200"
                 )}>
                   {isMedia ? (
-                    <MediaRenderer 
+                    <MediaRendererFixed 
                       content={getMediaContent(message)}
                       messageType={message.mensagemtype || 'text'}
-                      messageId={message.id}
-                      channelId={channelId}
+                      messageId={message.id?.toString?.() || String(message.id)}
+                      fileName={(
+                        message.media_base64 && message.media_base64.startsWith('data:') ? 'Arquivo' 
+                        : (message.message && message.message.length < 60 ? message.message : undefined)
+                      ) || undefined}
                       isDarkMode={isDarkMode}
                       balloonColor={isAgent ? 'sent' : 'received'}
                     />
