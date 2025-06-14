@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -69,119 +68,114 @@ export const SystemSection: React.FC<SystemSectionProps> = ({ isDarkMode }) => {
   }, []);
 
   return (
-    <div className={cn(
-      "space-y-6 p-6 rounded-xl",
-      isDarkMode ? "bg-[#18181b]" : "bg-white border border-gray-200"
+    <Card className={cn(
+      "border",
+      isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
     )}>
-      <Card className={cn(
-        "border",
-        isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
-      )}>
-        <CardHeader className="pb-4">
-          <CardTitle className={cn(
-            "flex items-center gap-3 text-lg",
-            isDarkMode ? "text-card-foreground" : "text-gray-900"
-          )}>
-            Configurações Gerais
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className={cn(
-                "text-base font-medium",
-                isDarkMode ? "text-card-foreground" : "text-gray-900"
-              )}>
-                Notificações
-              </Label>
-              <p className={cn(
-                "text-sm",
-                isDarkMode ? "text-muted-foreground" : "text-gray-600"
-              )}>
-                Receber notificações do sistema
-              </p>
-            </div>
-            <Switch 
-              checked={settings.notifications}
-              onCheckedChange={() => handleToggle('notifications')}
-            />
+      <CardHeader className="pb-4">
+        <CardTitle className={cn(
+          "flex items-center gap-3 text-lg",
+          isDarkMode ? "text-card-foreground" : "text-gray-900"
+        )}>
+          Configurações Gerais
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className={cn(
+              "text-base font-medium",
+              isDarkMode ? "text-card-foreground" : "text-gray-900"
+            )}>
+              Notificações
+            </Label>
+            <p className={cn(
+              "text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Receber notificações do sistema
+            </p>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className={cn(
-                "text-base font-medium",
-                isDarkMode ? "text-card-foreground" : "text-gray-900"
-              )}>
-                Salvamento Automático
-              </Label>
-              <p className={cn(
-                "text-sm",
-                isDarkMode ? "text-muted-foreground" : "text-gray-600"
-              )}>
-                Salvar alterações automaticamente sem confirmação
-              </p>
-            </div>
-            <Switch 
-              checked={settings.autoSave}
-              onCheckedChange={() => handleToggle('autoSave')}
-            />
+          <Switch 
+            checked={settings.notifications}
+            onCheckedChange={() => handleToggle('notifications')}
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className={cn(
+              "text-base font-medium",
+              isDarkMode ? "text-card-foreground" : "text-gray-900"
+            )}>
+              Salvamento Automático
+            </Label>
+            <p className={cn(
+              "text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Salvar alterações automaticamente sem confirmação
+            </p>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className={cn(
-                "text-base font-medium",
-                isDarkMode ? "text-card-foreground" : "text-gray-900"
-              )}>
-                Alertas Sonoros
-              </Label>
-              <p className={cn(
-                "text-sm",
-                isDarkMode ? "text-muted-foreground" : "text-gray-600"
-              )}>
-                Reproduzir sons para alertas e notificações
-              </p>
-            </div>
-            <Switch 
-              checked={settings.soundAlerts}
-              onCheckedChange={() => handleToggle('soundAlerts')}
-            />
+          <Switch 
+            checked={settings.autoSave}
+            onCheckedChange={() => handleToggle('autoSave')}
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className={cn(
+              "text-base font-medium",
+              isDarkMode ? "text-card-foreground" : "text-gray-900"
+            )}>
+              Alertas Sonoros
+            </Label>
+            <p className={cn(
+              "text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Reproduzir sons para alertas e notificações
+            </p>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className={cn(
-                "text-base font-medium",
-                isDarkMode ? "text-card-foreground" : "text-gray-900"
-              )}>
-                Modo Debug
-              </Label>
-              <p className={cn(
-                "text-sm",
-                isDarkMode ? "text-muted-foreground" : "text-gray-600"
-              )}>
-                Exibir informações de debug no console
-              </p>
-            </div>
-            <Switch 
-              checked={settings.debugMode}
-              onCheckedChange={() => handleToggle('debugMode')}
-            />
+          <Switch 
+            checked={settings.soundAlerts}
+            onCheckedChange={() => handleToggle('soundAlerts')}
+          />
+        </div>
+        
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className={cn(
+              "text-base font-medium",
+              isDarkMode ? "text-card-foreground" : "text-gray-900"
+            )}>
+              Modo Debug
+            </Label>
+            <p className={cn(
+              "text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              Exibir informações de debug no console
+            </p>
           </div>
+          <Switch 
+            checked={settings.debugMode}
+            onCheckedChange={() => handleToggle('debugMode')}
+          />
+        </div>
 
-          <div className="pt-6 border-t border-border">
-            <Button 
-              onClick={handleSave}
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 h-11 flex items-center gap-2"
-            >
-              <Save size={16} />
-              {loading ? 'Salvando...' : 'Salvar Configurações'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <div className="pt-6 border-t border-border">
+          <Button 
+            onClick={handleSave}
+            disabled={loading}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 h-11 flex items-center gap-2"
+          >
+            <Save size={16} />
+            {loading ? 'Salvando...' : 'Salvar Configurações'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

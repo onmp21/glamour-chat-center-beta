@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -124,10 +123,7 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
   };
 
   return (
-    <div className={cn(
-      "space-y-6 p-6 rounded-xl",
-      isDarkMode ? "bg-[#18181b]" : "bg-white border border-gray-200"
-    )}>
+    <>
       {/* Seção de Foto de Perfil */}
       <Card className={cn(
         "border mb-6",
@@ -241,6 +237,6 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
           </form>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 };
