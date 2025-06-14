@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Lock, Camera } from 'lucide-react';
 import { ProfilePictureUpload } from './ProfilePictureUpload';
+import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 
 interface CredentialsSectionProps {
   isDarkMode: boolean;
@@ -30,12 +31,19 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const {
+    getAvatarUrl,
+    uploadAvatar,
+    removeAvatar,
+    updateAvatarUrl,
+    loading: avatarLoading,
+  } = useSupabaseAvatar();
+
   useEffect(() => {
     if (user?.id) {
-      const savedImage = localStorage.getItem(`userProfileImage_${user.id}`);
-      setProfileImage(savedImage);
+      getAvatarUrl().then((url) => setProfileImage(url || null));
     }
-  }, [user?.id]);
+  }, [user?.id, getAvatarUrl]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -48,9 +56,9 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     setProfileImage(imageData);
     if (user?.id) {
       if (imageData) {
-        localStorage.setItem(`userProfileImage_${user.id}`, imageData);
+        updateAvatarUrl(imageData);
       } else {
-        localStorage.removeItem(`userProfileImage_${user.id}`);
+        removeAvatar();
       }
     }
   };

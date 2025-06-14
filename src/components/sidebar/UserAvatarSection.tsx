@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,6 +9,7 @@ import { User, Upload, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfiles } from '@/hooks/useUserProfiles';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 
 interface UserAvatarSectionProps {
   isDarkMode: boolean;
@@ -21,12 +21,20 @@ export const UserAvatarSection: React.FC<UserAvatarSectionProps> = ({
   userName
 }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+
   const { user } = useAuth();
   const { getProfileByUserId, updateProfile, loading } = useUserProfiles();
   const { toast } = useToast();
+  const { getAvatarUrl } = useSupabaseAvatar();
 
   const userProfile = user ? getProfileByUserId(user.id) : null;
+
+  useEffect(() => {
+    if (user?.id) {
+      getAvatarUrl().then((url) => setAvatarUrl(url || ""));
+    }
+  }, [user?.id, getAvatarUrl]);
 
   const handleAvatarUpdate = async () => {
     if (!avatarUrl.trim()) {
@@ -88,7 +96,7 @@ export const UserAvatarSection: React.FC<UserAvatarSectionProps> = ({
           <button className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <Avatar className="h-8 w-8 cursor-pointer">
               <AvatarImage 
-                src={userProfile?.avatar_url || undefined} 
+                src={avatarUrl || undefined} 
                 alt={userName}
               />
               <AvatarFallback className={cn(
@@ -131,7 +139,7 @@ export const UserAvatarSection: React.FC<UserAvatarSectionProps> = ({
             <div className="flex justify-center">
               <Avatar className="h-20 w-20">
                 <AvatarImage 
-                  src={userProfile?.avatar_url || undefined} 
+                  src={avatarUrl || undefined} 
                   alt={userName}
                 />
                 <AvatarFallback className={cn(
