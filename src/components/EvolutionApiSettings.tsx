@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X, LogOut } from 'lucide-react';
-import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService';
+import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService.ts';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
 
 interface EvolutionApiSettingsProps {
