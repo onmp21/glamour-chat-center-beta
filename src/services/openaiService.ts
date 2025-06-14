@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { AIProviderService } from './AIProviderService';
 import { DetailedLogger } from './DetailedLogger';
 import { getTableNameForChannel } from '@/utils/channelMapping';
