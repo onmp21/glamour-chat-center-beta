@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import { useUsers } from '@/hooks/useUsers';
 import { useAuditLogger } from '@/hooks/useAuditLogger';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Lock, Camera } from 'lucide-react';
-import { ProfilePictureUpload } from './ProfilePictureUpload';
+import { Lock } from 'lucide-react';
+import { ProfilePicture } from '@/components/ProfilePicture';
 import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 
 interface CredentialsSectionProps {
@@ -21,14 +22,18 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
   const { updateUser } = useUsers();
   const { logCredentialsAction } = useAuditLogger();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState({
     username: user?.username || '',
     oldPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  // State para draft/avatar preview
+  const [avatarDraftFile, setAvatarDraftFile] = useState<File | null>(null);
+  const [avatarDraftUrl, setAvatarDraftUrl] = useState<string | null>(null);
+  const [avatarSaved, setAvatarSaved] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const {
@@ -39,28 +44,29 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
     loading: avatarLoading,
   } = useSupabaseAvatar();
 
+  // Carrega avatar salvo do Supabase ao iniciar
   useEffect(() => {
     if (user?.id) {
-      getAvatarUrl().then((url) => setProfileImage(url || null));
+      getAvatarUrl().then((url) => {
+        setAvatarSaved(url || null);
+        setAvatarDraftFile(null);
+        setAvatarDraftUrl(null);
+      });
     }
   }, [user?.id, getAvatarUrl]);
+
+  // Handler para alterações draft/crop via componente ProfilePicture
+  const handleAvatarChange = (file: File | null, previewUrl: string | null) => {
+    setAvatarDraftFile(file);
+    setAvatarDraftUrl(previewUrl);
+    // Não faz upload agora, só ao salvar!
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
-
-  const handleProfileImageChange = (imageData: string | null) => {
-    setProfileImage(imageData);
-    if (user?.id) {
-      if (imageData) {
-        updateAvatarUrl(imageData);
-      } else {
-        removeAvatar();
-      }
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,6 +94,30 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       setLoading(true);
       const updateData: any = {};
       const changes: string[] = [];
+      // Avatar
+      if (avatarDraftFile && avatarDraftUrl) {
+        // Faz upload agora
+        const publicUrl = await uploadAvatar(avatarDraftFile);
+        if (publicUrl) {
+          await updateAvatarUrl(publicUrl);
+          setAvatarSaved(publicUrl);
+          changes.push('profile_picture');
+        } else {
+          toast({
+            title: "Erro",
+            description: "Erro ao fazer upload da foto de perfil",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
+      } else if (!avatarDraftUrl && avatarSaved) {
+        // Usuário removeu a foto e havia uma antiga salva
+        await removeAvatar();
+        setAvatarSaved(null);
+        changes.push('profile_picture');
+      }
+      // Username/senha
       if (formData.username !== user.username) {
         updateData.username = formData.username;
         changes.push('username');
@@ -98,9 +128,6 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
       }
       if (Object.keys(updateData).length > 0) {
         await updateUser(user.id, updateData);
-      }
-      if (profileImage !== null) {
-        changes.push('profile_picture');
       }
       if (changes.length > 0) {
         await logCredentialsAction('update', {
@@ -119,6 +146,13 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
         newPassword: '',
         confirmPassword: ''
       }));
+      setAvatarDraftFile(null);
+      setAvatarDraftUrl(null);
+      // Garante que reload de preview mostra foto salva, caso tenha mudado
+      if (user?.id) {
+        const novaUrl = await getAvatarUrl();
+        setAvatarSaved(novaUrl || null);
+      }
     } catch (error) {
       toast({
         title: "Erro",
@@ -146,10 +180,11 @@ export const CredentialsSection: React.FC<CredentialsSectionProps> = ({ isDarkMo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ProfilePictureUpload
-            currentImage={profileImage}
-            onImageChange={handleProfileImageChange}
+          <ProfilePicture
             isDarkMode={isDarkMode}
+            userName={user?.name || user?.username || ''}
+            onAvatarChange={handleAvatarChange}
+            externalPreview={avatarDraftUrl !== null ? avatarDraftUrl : avatarSaved}
           />
         </CardContent>
       </Card>
