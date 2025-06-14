@@ -12,6 +12,7 @@ import { ChannelSelectorModal } from './ChannelSelectorModal';
 import { ChatOverlayRefactored } from './chat/ChatOverlayRefactored';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useInternalChannels } from '@/hooks/useInternalChannels';
 
 interface MensagensRefactoredProps {
   isDarkMode: boolean;
@@ -34,19 +35,25 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  const { channels } = useChannels();
+  // Trocar para usar o hook correto: buscar channels com legacyId, recupera do useInternalChannels:
+  const { channels: internalChannels } = useInternalChannels(); // InternalChannel[], cada um tem .legacyId
   const { getAccessibleChannels } = usePermissions();
 
-  // Clean, normalized ID mapping: All channels maintain their canonical ID as in permissions.
+  // Agora, gerar lista de canais disponíveis por legacyId
   const accessibleChannels = getAccessibleChannels();
-  const canaisData = channels
+  // Para debug:
+  // console.log("Legacy ids permitidos:", accessibleChannels);
+
+  // Aplicar filtro corretamente para que legacyId seja usado na comparação com permissões
+  const canaisData = internalChannels
     .filter(channel =>
       channel.isActive &&
       channel.name &&
-      channel.name.toLowerCase() !== 'pedro'
+      channel.name.toLowerCase() !== 'pedro' &&
+      accessibleChannels.includes(channel.legacyId)
     )
     .map(channel => ({
-      id: channel.id, // Use channel.id directly (and permissions logic must match IDs)
+      id: channel.legacyId,      // O id que será usado pelo sistema é o legacyId agora
       nome: channel.name,
       tipo: channel.type === 'general' ? 'IA Assistant' :
             channel.type === 'store' ? 'Loja' :
@@ -54,8 +61,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       status: 'ativo' as const,
       conversasNaoLidas: 0,
       ultimaAtividade: 'Online'
-    }))
-    .filter(channel => accessibleChannels.includes(channel.id));
+    }));
 
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
