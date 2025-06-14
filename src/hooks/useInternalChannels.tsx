@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from "@/integrations/supabase/client";
@@ -108,8 +107,9 @@ export const useInternalChannels = () => {
         description: `Canal ${isActive ? 'ativado' : 'desativado'} com sucesso`,
         variant: "default"
       });
-      // Refaz loading após alteração
-      refetch();
+
+      // Refaz loading após alteração (garante que a UI vai refletir o novo status)
+      await refetch();
     } catch (error) {
       console.error('Erro ao atualizar canal:', error);
       toast({
