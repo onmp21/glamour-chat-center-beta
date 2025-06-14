@@ -38,30 +38,49 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   // Trocar para usar o hook correto: buscar channels com legacyId, recupera do useInternalChannels:
   const { channels: internalChannels } = useInternalChannels(); // InternalChannel[], cada um tem .legacyId
   const { getAccessibleChannels } = usePermissions();
+  const { user } = require('@/contexts/AuthContext').useAuth();
 
-  // Agora, gerar lista de canais disponíveis por legacyId
-  const accessibleChannels = getAccessibleChannels();
-  // Para debug:
-  // console.log("Legacy ids permitidos:", accessibleChannels);
-
-  // Aplicar filtro corretamente para que legacyId seja usado na comparação com permissões
-  const canaisData = internalChannels
-    .filter(channel =>
-      channel.isActive &&
-      channel.name &&
-      channel.name.toLowerCase() !== 'pedro' &&
-      accessibleChannels.includes(channel.legacyId)
-    )
-    .map(channel => ({
-      id: channel.legacyId,      // O id que será usado pelo sistema é o legacyId agora
-      nome: channel.name,
-      tipo: channel.type === 'general' ? 'IA Assistant' :
-            channel.type === 'store' ? 'Loja' :
-            channel.type === 'manager' ? 'Gerente' : 'Canal',
-      status: 'ativo' as const,
-      conversasNaoLidas: 0,
-      ultimaAtividade: 'Online'
-    }));
+  // Montar lista de canais baseada no role:
+  let canaisData = [];
+  if (user?.role === 'admin') {
+    // Admin pode ver todos os ativos, exceto Pedro
+    canaisData = internalChannels
+      .filter(channel =>
+        channel.isActive &&
+        channel.name &&
+        channel.name.toLowerCase() !== 'pedro'
+      )
+      .map(channel => ({
+        id: channel.legacyId,
+        nome: channel.name,
+        tipo: channel.type === 'general' ? 'IA Assistant' :
+              channel.type === 'store' ? 'Loja' :
+              channel.type === 'manager' ? 'Gerente' : 'Canal',
+        status: 'ativo' as const,
+        conversasNaoLidas: 0,
+        ultimaAtividade: 'Online'
+      }));
+  } else {
+    // Usuário comum
+    const accessibleChannels = getAccessibleChannels();
+    canaisData = internalChannels
+      .filter(channel =>
+        channel.isActive &&
+        channel.name &&
+        channel.name.toLowerCase() !== 'pedro' &&
+        accessibleChannels.includes(channel.legacyId)
+      )
+      .map(channel => ({
+        id: channel.legacyId,
+        nome: channel.name,
+        tipo: channel.type === 'general' ? 'IA Assistant' :
+              channel.type === 'store' ? 'Loja' :
+              channel.type === 'manager' ? 'Gerente' : 'Canal',
+        status: 'ativo' as const,
+        conversasNaoLidas: 0,
+        ultimaAtividade: 'Online'
+      }));
+  }
 
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
