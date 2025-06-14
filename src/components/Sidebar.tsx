@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -60,6 +59,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [user, userProfile?.avatar_url]);
 
+  // Navega para alterar credenciais ao clicar no avatar
+  const handleProfileClick = () => {
+    onSectionChange('credentials');
+  };
+
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: BarChart3 },
     { id: 'mensagens', label: 'Mensagens', icon: MessageSquare },
@@ -84,10 +88,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
-
-  const handleUserProfileClick = () => {
-    onSectionChange('settings');
   };
 
   return (
@@ -191,9 +191,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Avatar Colapsado */}
           {isCollapsed && user && (
             <div className="flex flex-col items-center space-y-3 mb-4">
-              <button onClick={handleUserProfileClick}>
+              <button onClick={handleProfileClick}>
                 <Avatar className="w-12 h-12 hover:ring-2 hover:ring-[#b5103c]/50 transition-all">
-                  <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
+                  <AvatarImage
+                    src={userProfile?.avatar_url || undefined}
+                    alt={user.name}
+                    onError={(e) => (e.currentTarget.src = undefined)}
+                  />
                   <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
                     {getInitials(user.name)}
                   </AvatarFallback>
@@ -204,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Avatar + dados igual ao mock */}
           {!isCollapsed && user && (
             <button 
-              onClick={handleUserProfileClick}
+              onClick={handleProfileClick}
               className={cn(
                 "flex items-center px-4 py-3 rounded-xl w-full mb-4 border transition-all duration-200",
                 isDarkMode
@@ -216,9 +220,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ? "0 0 0 1.5px #b5103c22"
                   : "0 0 0 1.5px #b5103c22"
               }}
+              aria-label="Alterar foto e credenciais"
             >
               <Avatar className="w-10 h-10 mr-3">
-                <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
+                <AvatarImage
+                  src={userProfile?.avatar_url || undefined}
+                  alt={user.name}
+                  onError={(e) => (e.currentTarget.src = undefined)}
+                  style={{ objectFit: "cover", background: "transparent" }}
+                />
                 <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
                   {getInitials(user.name)}
                 </AvatarFallback>
