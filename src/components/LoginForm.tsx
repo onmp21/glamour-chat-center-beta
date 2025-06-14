@@ -83,16 +83,18 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div
-      className="w-full min-h-screen flex items-stretch"
+      className="w-full min-h-screen flex items-center justify-start"
       style={{
         background: `url('/lovable-uploads/9bab2598-2237-46f1-a400-ec745a53f7fc.png') center center / cover no-repeat`,
       }}
     >
       <div
-        className="flex items-center justify-center w-full md:w-[450px] bg-[#fdfcfc] dark:bg-[#18181b] p-8 md:p-14 min-h-screen"
+        className="w-full max-w-md md:max-w-xl lg:max-w-lg px-4 md:px-0 py-12 md:py-0 flex"
+        style={{ minHeight: '100vh' }}
       >
-        <div className="w-full max-w-sm space-y-8">
-          <div className="flex flex-col items-center text-center">
+        <div className="bg-white dark:bg-[#18181b] rounded-2xl shadow-2xl w-full p-8 md:p-10 flex flex-col justify-center"
+          style={{ minHeight: '480px', maxWidth: '410px' }}>
+          <div className="flex flex-col items-center text-center mb-6">
             <img
               src="/lovable-uploads/ea397861-5fcd-451b-872e-727208c03a67.png"
               alt="Villa Glamour Logo"
@@ -182,8 +184,6 @@ export const LoginForm: React.FC = () => {
           </Card>
         </div>
       </div>
-      {/* Espaço vazio à direita - deixa a imagem aparecendo totalmente */}
-      <div className="flex-1 hidden md:block" />
     </div>
   );
 };
