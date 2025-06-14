@@ -35,8 +35,8 @@ export const ChannelApiMappingManager: React.FC = () => {
 
     try {
       // Chamada real ao EvolutionApiService.setWebhook
-      const result = await instance
-        ? new EvolutionApiService({
+      const result = instance
+        ? await new EvolutionApiService({
             baseUrl: instance.base_url,
             apiKey: instance.api_key,
             instanceName: instance.instance_name,
