@@ -15,7 +15,7 @@ interface ChannelManagementCompactProps {
 }
 
 export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> = ({ isDarkMode }) => {
-  const { channels, loading, updateChannelStatus } = useChannels();
+  const { channels, loading, updateChannelStatus, refetch } = useChannels();
   const [searchTerm, setSearchTerm] = useState('');
 
   const getChannelIcon = (channelName: string) => {
@@ -47,6 +47,7 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
   const handleToggleChannel = async (channelId: string, isActive: boolean) => {
     try {
       await updateChannelStatus(channelId, isActive);
+      await refetch(); // Garante atualização na UI
       toast({
         title: 'Sucesso',
         description: `Canal ${isActive ? 'ativado' : 'desativado'} com sucesso.`
