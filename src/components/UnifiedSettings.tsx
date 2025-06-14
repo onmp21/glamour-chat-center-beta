@@ -27,6 +27,17 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<string>('main');
 
+  // Listagem das principais seções da aba configurações:
+  // 1. credentials: Alterar Credenciais
+  // 2. notifications: Configurações de Notificação
+  // 3. users: Gerenciamento de Usuários
+  // 4. channels: Gerenciar Canais
+  // 5. audit: Histórico de Auditoria
+  // 6. ai: Configurações de IA
+  // 7. evolution: API Evolution
+  // 8. system: Sistema
+  // 9. backup: Backup e Dados
+
   const handleBack = () => {
     if (activeSection === 'main') {
       return;
@@ -85,9 +96,15 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   };
 
   return (
-    <div className={cn("h-full flex flex-col", isDarkMode ? "bg-background" : "bg-gray-50")}>
+    <div className={cn(
+      "h-full flex flex-col",
+      isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+    )}>
       {/* Header - apenas quando não está na seção principal */}
-      <div className={cn("flex items-center gap-4 p-6 mb-6", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+      <div className={cn(
+        "flex items-center gap-4 p-6 mb-6",
+        isDarkMode ? "text-[#ffffff]" : "text-gray-900"
+      )}>
         {activeSection !== 'main' && (
           <Button 
             variant="ghost" 
@@ -95,7 +112,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
             onClick={handleBack} 
             className={cn(
               "rounded-full", 
-              isDarkMode ? "text-muted-foreground hover:bg-accent" : "text-gray-600 hover:bg-gray-100"
+              isDarkMode ? "text-[#9ca3af] hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
             )}
           >
             <ArrowLeft size={20} />
@@ -103,20 +120,25 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
         )}
         
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-full bg-primary/10">
-            <Settings className="h-6 w-6 text-primary" />
+          <div className="p-3 rounded-full bg-[#b5103c]/10">
+            <Settings className="h-6 w-6 text-[#b5103c]" />
           </div>
           <div>
-            <h1 className={cn("text-3xl font-bold", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+            <h1 className={cn(
+              "text-3xl font-bold",
+              isDarkMode ? "text-[#ffffff]" : "text-gray-900"
+            )}>
               {getSectionTitle()}
             </h1>
-            <p className={cn("text-lg", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+            <p className={cn(
+              "text-lg",
+              isDarkMode ? "text-[#9ca3af]" : "text-gray-600"
+            )}>
               {activeSection === 'main' ? 'Gerencie suas preferências e configurações do sistema' : 'Configure e personalize suas opções'}
             </p>
           </div>
         </div>
       </div>
-
       {/* Conteúdo principal */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         {renderSection()}
