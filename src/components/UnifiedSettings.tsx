@@ -72,6 +72,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   const renderSection = () => {
     switch (activeSection) {
       case 'users':
+        // Use apenas o componente compacto padronizado (sem títulos internos)
         return <UserManagementCompact isDarkMode={isDarkMode} />;
       case 'audit':
         return <AuditHistoryCompact isDarkMode={isDarkMode} />;
@@ -99,7 +100,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
       "h-full flex flex-col min-h-screen w-full",
       isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
     )}>
-      {/* Header - apenas quando não está na seção principal */}
+      {/* Header único */}
       <div className={cn(
         "flex items-center gap-4 p-6 mb-6 border-b",
         isDarkMode ? "text-[#ffffff] border-[#18181b] bg-[#09090b]" : "text-gray-900 border-gray-200 bg-gray-50"

@@ -24,13 +24,15 @@ export const useUsers = () => {
 
       console.log('Dados recebidos do Supabase:', data);
 
+      // Adaptar para consumir tanto assigned_channels (moderno) quanto assigned_cities (legado)
       const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => ({
         id: user.id,
         username: user.username,
         name: user.name,
         role: user.role as UserRole,
         assignedTabs: user.assigned_tabs || [],
-        assignedCities: user.assigned_cities || [],
+        assignedChannels: (user as any).assigned_channels || user.assigned_cities || [], // novo > legado
+        assignedCities: user.assigned_cities || [], // mantém para transição
         createdAt: user.created_at
       }));
 
@@ -47,13 +49,14 @@ export const useUsers = () => {
     loadUsers();
   }, []);
 
+  // Novo formato: Salva assignedChannels no lugar de assignedCities (compatível com backend atual)
   const createUser = async (userData: {
     username: string;
     password: string;
     name: string;
     role: UserRole;
     assignedTabs: string[];
-    assignedCities: string[];
+    assignedChannels: string[];
   }) => {
     try {
       console.log('Criando usuário:', userData);
@@ -63,7 +66,7 @@ export const useUsers = () => {
         p_name: userData.name,
         p_role: userData.role as any,
         p_assigned_tabs: userData.assignedTabs,
-        p_assigned_cities: userData.assignedCities
+        p_assigned_cities: userData.assignedChannels // Mapeia canais para o campo cities (até migrar banco)
       });
 
       if (error) {
@@ -72,7 +75,6 @@ export const useUsers = () => {
       }
 
       console.log('Usuário criado com sucesso:', data);
-      // Forçar recarregamento da lista
       await loadUsers();
       return data;
     } catch (error) {
@@ -81,11 +83,10 @@ export const useUsers = () => {
     }
   };
 
+  // Atualizar campo assignedChannels ao salvar usuário
   const updateUser = async (userId: string, userData: Partial<User & { password?: string }>) => {
     try {
       console.log('Atualizando usuário:', userId, userData);
-      
-      // Se uma senha foi fornecida, usar a função update_user_with_hash
       if (userData.password && userData.password.trim()) {
         const { error } = await supabase.rpc('update_user_with_hash', {
           p_user_id: userId,
@@ -94,7 +95,7 @@ export const useUsers = () => {
           p_name: userData.name || null,
           p_role: userData.role as any || null,
           p_assigned_tabs: userData.assignedTabs || null,
-          p_assigned_cities: userData.assignedCities || null
+          p_assigned_cities: userData.assignedChannels || null // Só assumimos canais
         });
 
         if (error) {
@@ -102,14 +103,13 @@ export const useUsers = () => {
           throw error;
         }
       } else {
-        // Se não há senha, usar UPDATE normal (sem alterar password_hash)
         const updateData: any = {};
-        
+
         if (userData.username) updateData.username = userData.username;
         if (userData.name) updateData.name = userData.name;
         if (userData.role) updateData.role = userData.role;
         if (userData.assignedTabs) updateData.assigned_tabs = userData.assignedTabs;
-        if (userData.assignedCities) updateData.assigned_cities = userData.assignedCities;
+        if (userData.assignedChannels) updateData.assigned_cities = userData.assignedChannels; // assumimos canais
 
         const { error } = await supabase
           .from('users')
@@ -123,7 +123,7 @@ export const useUsers = () => {
       }
 
       console.log('Usuário atualizado com sucesso');
-      await loadUsers(); // Recarregar lista
+      await loadUsers();
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       throw error;

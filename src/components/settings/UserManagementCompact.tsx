@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Users, Shield, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -58,6 +57,16 @@ const CITY_PERMISSIONS: Record<UserRole, string[]> = {
   manager: AVAILABLE_CITIES
 };
 
+const CHANNEL_OPTIONS = [
+  { key: 'canarana', label: 'Canarana' },
+  { key: 'souto-soares', label: 'Souto Soares' },
+  { key: 'joao-dourado', label: 'João Dourado' },
+  { key: 'america-dourada', label: 'América Dourada' },
+  { key: 'gerente-lojas', label: 'Gerente Lojas' },
+  { key: 'gerente-externo', label: 'Gerente Externo' },
+  { key: 'chat', label: 'Chat Geral' }
+];
+
 export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ isDarkMode }) => {
   const { users, loading, createUser, updateUser, deleteUser } = useUsers();
   const { toast } = useToast();
@@ -74,42 +83,37 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
     name: '',
     role: 'salesperson' as UserRole,
     assignedTabs: [] as string[],
-    assignedCities: [] as string[]
+    assignedChannels: [] as string[]
   });
 
   useEffect(() => {
     if (editingUser) {
       setFormData({
         username: editingUser.username,
-        password: '', // Don't pre-fill password for security
+        password: '',
         name: editingUser.name,
         role: editingUser.role,
         assignedTabs: editingUser.assignedTabs || [],
-        assignedCities: editingUser.assignedCities || []
+        assignedChannels: editingUser.assignedChannels || []
       });
     } else {
-      const defaultTabs = TAB_PERMISSIONS['salesperson'] || [];
-      const defaultCities = CITY_PERMISSIONS['salesperson'] || [];
       setFormData({
         username: '',
         password: '',
         name: '',
         role: 'salesperson',
-        assignedTabs: defaultTabs,
-        assignedCities: defaultCities
+        assignedTabs: TAB_PERMISSIONS['salesperson'] || [],
+        assignedChannels: []
       });
     }
   }, [editingUser]);
 
   const handleRoleChange = (newRole: UserRole) => {
-    const defaultTabs = TAB_PERMISSIONS[newRole] || [];
-    const defaultCities = CITY_PERMISSIONS[newRole] || [];
-    
     setFormData(prev => ({
       ...prev,
       role: newRole,
-      assignedTabs: defaultTabs,
-      assignedCities: defaultCities
+      assignedTabs: TAB_PERMISSIONS[newRole] || [],
+      assignedChannels: [] // Limpa canais ao trocar
     }));
   };
 
@@ -122,12 +126,12 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
     }));
   };
 
-  const handleCityChange = (city: string, checked: boolean) => {
+  const handleChannelChange = (channel: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assignedCities: checked 
-        ? [...prev.assignedCities, city]
-        : prev.assignedCities.filter(c => c !== city)
+      assignedChannels: checked 
+        ? [...prev.assignedChannels, channel]
+        : prev.assignedChannels.filter(c => c !== channel)
     }));
   };
 
@@ -145,26 +149,23 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
 
     try {
       if (editingUser) {
-        // For updates, only include password if it's provided
         const updateData: any = {
           username: formData.username,
           name: formData.name,
           role: formData.role,
           assignedTabs: formData.assignedTabs,
-          assignedCities: formData.assignedCities
+          assignedChannels: formData.assignedChannels
         };
-        
         if (formData.password.trim()) {
           updateData.password = formData.password;
         }
-        
         await updateUser(editingUser.id, updateData);
         toast({
           title: "Sucesso",
           description: "Usuário atualizado com sucesso"
         });
       } else {
-        await createUser(formData);
+        await createUser({ ...formData }); // assignedChannels agora é o padrão
         toast({
           title: "Sucesso", 
           description: "Usuário criado com sucesso"
@@ -179,7 +180,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
         name: '',
         role: 'salesperson',
         assignedTabs: TAB_PERMISSIONS['salesperson'] || [],
-        assignedCities: CITY_PERMISSIONS['salesperson'] || []
+        assignedChannels: []
       });
     } catch (error) {
       toast({
@@ -240,22 +241,34 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
   }
 
   return (
-    <Card className={cn("border shadow-lg", isDarkMode ? "bg-[#1a1a1a] border-[#333333]" : "bg-white border-gray-200")}>
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-[#2a2a2a]" : "bg-gray-100")}>
-              <Users size={24} className="text-[#b5103c]" />
-            </div>
-            <div>
-              <CardTitle className={cn("text-xl font-bold", isDarkMode ? "text-white" : "text-gray-900")}>
-                Gerenciamento de Usuários
-              </CardTitle>
-              <CardDescription className={cn("text-sm", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                Gerencie usuários e suas permissões ({users.length} usuários)
-              </CardDescription>
-            </div>
-          </div>
+    <div className={cn(
+      "space-y-6 p-6 rounded-xl",
+      isDarkMode ? "bg-[#18181b] border-[#27272a] text-white" : "bg-white border-gray-200"
+    )}>
+      {/* Filtros */}
+      <div className="flex flex-col md:flex-row gap-4 md:items-end">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por nome ou usuário..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}
+          />
+        </div>
+        <div className="w-full md:w-60">
+          <Select value={selectedRole} onValueChange={(value: any) => setSelectedRole(value)}>
+            <SelectTrigger className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className={cn(isDarkMode ? "bg-[#1a1a1a] border-[#333333] text-white" : "bg-white text-gray-900")}>
+              <SelectItem value="all">Todos os papéis</SelectItem>
+              {Object.entries(ROLE_LABELS).map(([role, label]) => (
+                <SelectItem key={role} value={role}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
           <Button 
             onClick={() => {
               setEditingUser(null);
@@ -267,144 +280,83 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
             Novo Usuário
           </Button>
         </div>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <Input
-              placeholder="Buscar por nome ou usuário..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}
-            />
-          </div>
-          <div className="w-full sm:w-48">
-            <Select value={selectedRole} onValueChange={(value: any) => setSelectedRole(value)}>
-              <SelectTrigger className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className={cn(isDarkMode ? "bg-[#1a1a1a] border-[#333333] text-white" : "bg-white text-gray-900")}>
-                <SelectItem value="all">Todos os papéis</SelectItem>
-                {Object.entries(ROLE_LABELS).map(([role, label]) => (
-                  <SelectItem key={role} value={role}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      </div>
+      {/* Lista de Usuários */}
+      {filteredUsers.length === 0 ? (
+        <div className="text-center py-8">
+          <Users className={cn("h-12 w-12 mx-auto mb-4", isDarkMode ? "text-gray-400" : "text-gray-400")} />
+          <p className={cn("text-lg", isDarkMode ? "text-gray-300" : "text-gray-600")}>
+            {searchTerm || selectedRole !== 'all' ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado.'}
+          </p>
         </div>
-
-        {/* Users List */}
-        {filteredUsers.length === 0 ? (
-          <div className="text-center py-8">
-            <Users className={cn("h-12 w-12 mx-auto mb-4", isDarkMode ? "text-gray-400" : "text-gray-400")} />
-            <p className={cn("text-lg", isDarkMode ? "text-gray-300" : "text-gray-600")}>
-              {searchTerm || selectedRole !== 'all' ? 'Nenhum usuário encontrado.' : 'Nenhum usuário cadastrado.'}
-            </p>
-            {!searchTerm && selectedRole === 'all' && (
-              <Button 
-                onClick={() => {
-                  setEditingUser(null);
-                  setShowForm(true);
-                }}
-                className="mt-4 bg-[#b5103c] hover:bg-[#9a0e35] text-white"
-              >
-                Criar Primeiro Usuário
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {filteredUsers.map((user) => (
-              <Card key={user.id} className={cn(
-                "border transition-all duration-200 hover:shadow-md",
-                isDarkMode ? "bg-[#2a2a2a] border-[#333333] hover:bg-[#333333]" : "bg-gray-50 border-gray-200 hover:bg-white"
-              )}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h4 className={cn("font-semibold text-lg", isDarkMode ? "text-white" : "text-gray-900")}>
-                          {user.name}
-                        </h4>
-                        <Badge className={getRoleBadgeColor(user.role)}>
-                          {ROLE_LABELS[user.role]}
-                        </Badge>
-                      </div>
-                      
-                      <div className="space-y-2 text-sm">
-                        <div>
-                          <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>Usuário:</span>
-                          <span className={cn("ml-2", isDarkMode ? "text-gray-400" : "text-gray-500")}>
-                            {user.username}
-                          </span>
-                        </div>
-                        
-                        {user.assignedTabs && user.assignedTabs.length > 0 && (
-                          <div>
-                            <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>Abas:</span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {user.assignedTabs.map(tab => (
-                                <Badge key={tab} variant="outline" className={cn(
-                                  "text-xs",
-                                  isDarkMode ? "border-[#444444] text-gray-300" : "border-gray-300"
-                                )}>
-                                  {tab}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {user.assignedCities && user.assignedCities.length > 0 && (
-                          <div>
-                            <span className={cn("font-medium", isDarkMode ? "text-gray-300" : "text-gray-600")}>Cidades:</span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {user.assignedCities.map(city => (
-                                <Badge key={city} variant="outline" className={cn(
-                                  "text-xs",
-                                  isDarkMode ? "border-[#444444] text-gray-300" : "border-gray-300"
-                                )}>
-                                  {city}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleEdit(user)}
-                        className={cn(
-                          "transition-colors duration-200",
-                          isDarkMode ? "border-[#333333] hover:bg-[#333333] text-white" : "border-gray-300 hover:bg-gray-100"
-                        )}
-                      >
-                        <Edit size={16} />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDelete(user.id)}
-                        className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredUsers.map((user) => (
+            <div key={user.id} className={cn(
+              "p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between shadow-sm",
+              isDarkMode ? "bg-[#232327] border-[#27272a]" : "bg-gray-50 border-gray-200"
+            )}>
+              <div>
+                <div className="flex items-center space-x-3 mb-2">
+                  <h4 className={cn("font-semibold text-lg", isDarkMode ? "text-white" : "text-gray-900")}>
+                    {user.name}
+                  </h4>
+                  <Badge className={getRoleBadgeColor(user.role)}>
+                    {ROLE_LABELS[user.role]}
+                  </Badge>
+                </div>
+                <div className="text-xs text-gray-400">{user.username}</div>
+                {user.assignedTabs && user.assignedTabs.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {user.assignedTabs.map(tab => (
+                      <Badge key={tab} variant="outline" className={cn(
+                        "text-xs",
+                        isDarkMode ? "border-[#444444] text-gray-300" : "border-gray-300"
+                      )}>
+                        {tab}
+                      </Badge>
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </CardContent>
-
-      {/* Create/Edit Form */}
+                )}
+                {user.assignedChannels && user.assignedChannels.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {user.assignedChannels.map(channel => (
+                      <Badge key={channel} variant="outline" className={cn(
+                        "text-xs",
+                        isDarkMode ? "border-[#8f1440] text-[#f376aa]" : "border-gray-300"
+                      )}>
+                        {CHANNEL_OPTIONS.find(c => c.key === channel)?.label || channel}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex space-x-2 mt-4 md:mt-0">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEdit(user)}
+                  className={cn(
+                    "transition-colors duration-200",
+                    isDarkMode ? "border-[#333333] hover:bg-[#333333] text-white" : "border-gray-300 hover:bg-gray-100"
+                  )}
+                >
+                  <Edit size={16} />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleDelete(user.id)}
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 transition-colors duration-200"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Modal de Criação/Edição */}
       {showForm && (
         <Dialog open={showForm} onOpenChange={setShowForm}>
           <DialogContent className={cn("sm:max-w-md", isDarkMode ? "bg-[#1a1a1a] border-[#333333] text-white" : "bg-white text-gray-900")}>
@@ -420,25 +372,23 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Nome completo do usuário"
                   required
                   className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}
                 />
               </div>
-
               <div>
                 <Label htmlFor="username" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Nome de Usuário</Label>
                 <Input
                   id="username"
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   placeholder="username"
                   required
                   className={cn(isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}
                 />
               </div>
-
               <div>
                 <Label htmlFor="password" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>
                   {editingUser ? 'Nova Senha (deixe em branco para manter)' : 'Senha'}
@@ -448,13 +398,10 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder={editingUser ? "Nova senha (opcional)" : "Senha do usuário"}
                     required={!editingUser}
-                    className={cn(
-                      "pr-10",
-                      isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300"
-                    )}
+                    className={cn("pr-10", isDarkMode ? "bg-[#2a2a2a] border-[#333333] text-white" : "bg-white border-gray-300")}
                   />
                   <Button
                     type="button"
@@ -467,7 +414,6 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
                   </Button>
                 </div>
               </div>
-
               <div>
                 <Label htmlFor="role" className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Papel do Usuário</Label>
                 <Select value={formData.role} onValueChange={handleRoleChange}>
@@ -488,8 +434,7 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Tabs Permissions */}
+              {/* Abas */}
               <div>
                 <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Abas Permitidas</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
@@ -511,30 +456,28 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
                   ))}
                 </div>
               </div>
-
-              {/* Cities Permissions */}
+              {/* Canais atribuídos */}
               <div>
-                <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Cidades Atribuídas</Label>
+                <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Canais Atribuídos</Label>
                 <div className="grid grid-cols-2 gap-2 mt-2">
-                  {AVAILABLE_CITIES.map(city => (
-                    <div key={city} className="flex items-center space-x-2">
+                  {CHANNEL_OPTIONS.map(chan => (
+                    <div key={chan.key} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`city-${city}`}
-                        checked={formData.assignedCities.includes(city)}
-                        onCheckedChange={(checked) => handleCityChange(city, !!checked)}
-                        className={cn(isDarkMode ? "border-[#444444]" : "border-gray-300")}
+                        id={`channel-${chan.key}`}
+                        checked={formData.assignedChannels.includes(chan.key)}
+                        onCheckedChange={(checked) => handleChannelChange(chan.key, !!checked)}
+                        className={cn(isDarkMode ? "border-[#8f1440]" : "border-gray-300")}
                       />
                       <Label 
-                        htmlFor={`city-${city}`} 
+                        htmlFor={`channel-${chan.key}`} 
                         className={cn("text-sm", isDarkMode ? "text-gray-300" : "text-gray-700")}
                       >
-                        {city}
+                        {chan.label}
                       </Label>
                     </div>
                   ))}
                 </div>
               </div>
-
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
                   type="button" 
@@ -552,6 +495,6 @@ export const UserManagementCompact: React.FC<UserManagementCompactProps> = ({ is
           </DialogContent>
         </Dialog>
       )}
-    </Card>
+    </div>
   );
 };
