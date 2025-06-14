@@ -3,15 +3,15 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Manual UserProfile type for runtime checks
+// UserProfile type for new table
 type UserProfile = {
   id: string;
   avatar_url: string | null;
   bio?: string | null;
+  created_at?: string;
   updated_at?: string;
 };
 
-// Exporta tudo relacionado ao avatar do usuário no Supabase Storage/banco.
 export function useSupabaseAvatar() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -20,8 +20,7 @@ export function useSupabaseAvatar() {
   const getAvatarUrl = useCallback(async (): Promise<string | null> => {
     if (!user) return null;
 
-    // Use 'any' to bypass TS typechecking, since user_profiles is not in generated types
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("user_profiles")
       .select("avatar_url")
       .eq("id", user.id)
@@ -34,11 +33,15 @@ export function useSupabaseAvatar() {
   // Atualiza o avatar_url (quando faz upload)
   const updateAvatarUrl = useCallback(async (avatarUrl: string | null) => {
     if (!user) return;
-    // upsert (se não existe, cria, se existe, atualiza)
-    await (supabase as any)
+    // Faz upsert na nova tabela
+    await supabase
       .from("user_profiles")
       .upsert(
-        { id: user.id, avatar_url: avatarUrl || null, updated_at: new Date().toISOString() },
+        {
+          id: user.id,
+          avatar_url: avatarUrl || null,
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: "id" }
       );
   }, [user]);
@@ -77,7 +80,7 @@ export function useSupabaseAvatar() {
     }
   };
 
-  // Remove a foto do perfil (apenas zera o campo no banco)
+  // Remove a foto do perfil (zera campo no banco)
   const removeAvatar = async () => {
     await updateAvatarUrl(null);
   };
