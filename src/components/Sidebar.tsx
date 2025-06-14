@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -53,6 +52,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const userProfile = user ? getProfileByUserId(user.id) : null;
+
+  // Log para debug de avatar_url e nome do usuário
+  React.useEffect(() => {
+    if (user) {
+      console.log("👤 [SIDEBAR] userProfile.avatar_url:", userProfile?.avatar_url, "| user:", user);
+    }
+  }, [user, userProfile?.avatar_url]);
 
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: BarChart3 },
