@@ -6,8 +6,13 @@ export interface ChannelInstanceMapping {
   id?: string;
   channel_id: string;
   instance_id: string;
+  channel_name: string;
+  instance_name: string;
+  base_url: string;
+  api_key: string;
   created_at?: string;
   updated_at?: string;
+  is_active?: boolean;
 }
 
 export function useChannelApiMappings() {
@@ -39,38 +44,66 @@ export function useChannelApiMappings() {
     }
   };
 
+  /**
+   * When upserting, fetch all required data columns beforehand.
+   */
   const upsertMapping = async (channelId: string, instanceId: string) => {
     try {
+      // Get channel object with name
+      const { data: channelData, error: channelError } = await supabase
+        .from('channels')
+        .select('id, name')
+        .eq('id', channelId)
+        .maybeSingle();
+
+      if (channelError || !channelData) throw channelError || new Error("Canal não encontrado");
+
+      // Get instance object with all required fields
+      const { data: instanceData, error: instanceError } = await supabase
+        .from('api_instances')
+        .select('id, instance_name, base_url, api_key')
+        .eq('id', instanceId)
+        .maybeSingle();
+
+      if (instanceError || !instanceData) throw instanceError || new Error("Instância não encontrada");
+
       // First check if mapping exists
       const { data: existing } = await supabase
         .from('channel_instance_mappings')
         .select('*')
         .eq('channel_id', channelId)
-        .single();
+        .maybeSingle();
 
+      const mappingPayload = {
+        channel_id: channelId,
+        channel_name: channelData.name,
+        instance_id: instanceId,
+        instance_name: instanceData.instance_name,
+        base_url: instanceData.base_url,
+        api_key: instanceData.api_key,
+        is_active: true,
+      };
+
+      let data, error;
       if (existing) {
-        // Update existing
-        const { data, error } = await supabase
+        // Update existing (all columns for simplicity)
+        ({ data, error } = await supabase
           .from('channel_instance_mappings')
-          .update({ instance_id: instanceId })
+          .update(mappingPayload)
           .eq('channel_id', channelId)
           .select()
-          .single();
-
+          .maybeSingle());
         if (error) throw error;
-        
-        setMappings(prev => prev.map(m => m.channel_id === channelId ? data : m));
+        setMappings(prev => prev.map(m => m.channel_id === channelId ? { ...m, ...data } : m));
         return data;
       } else {
-        // Create new
-        const { data, error } = await supabase
+        // Insert full mapping row
+        ({ data, error } = await supabase
           .from('channel_instance_mappings')
-          .insert([{ channel_id: channelId, instance_id: instanceId }])
+          .insert([mappingPayload])
           .select()
-          .single();
-
+          .maybeSingle());
         if (error) throw error;
-
         setMappings(prev => [data, ...prev]);
         return data;
       }
