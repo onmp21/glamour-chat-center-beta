@@ -419,7 +419,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 <Zap size={20} />
               </Button>
               
-              <Button variant="ghost" size="icon" onClick={handleAIQuickResponse} title="Gerar resposta com IA" className="text-yellow-700 bg-black/0 rounded-full">
+              <Button variant="ghost" size="icon" onClick={handleAIQuickResponse} title="Gerar resposta com IA" className="text-yellow-700 bg-black/0 rounded-none py-0 px-0 text-7xl">
                 <Sparkles size={20} />
               </Button>
             </div>
