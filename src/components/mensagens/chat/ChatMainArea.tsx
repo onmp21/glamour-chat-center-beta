@@ -1,10 +1,13 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
 import { openaiService } from '@/services/openaiService';
+
+// NOVO IMPORT: Hook para buscar mensagens (inclui realtime)
+import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 
 interface Message {
   id: string;
@@ -26,35 +29,58 @@ interface Conversation {
 export interface ChatMainAreaProps {
   selectedConv?: ChannelConversation;
   conversationForHeader?: Conversation | null;
-  messages: Message[];
-  messagesLoading: boolean;
+  // Remover mensagem props, pois agora será carregado via hook!
+  // messages: Message[];
+  // messagesLoading: boolean;
   isSidebarOpen: boolean;
   isDarkMode: boolean;
   channelId: string;
   onSidebarToggle: (open: boolean) => void;
   onMarkAsResolved: () => void;
-  onSendMessage: (message: string) => Promise<void>;
-  onSendFile: (file: File, caption?: string) => Promise<void>;
-  onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
+  // Remover os handlers não mais necessários
+  // onSendMessage: (message: string) => Promise<void>;
+  // onSendFile: (file: File, caption?: string) => Promise<void>;
+  // onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
 }
 
 export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   selectedConv,
   conversationForHeader,
-  messages,
-  messagesLoading,
+  // messages,
+  // messagesLoading,
   isSidebarOpen,
   isDarkMode,
   channelId,
   onSidebarToggle,
   onMarkAsResolved,
-  onSendMessage,
-  onSendFile,
-  onSendAudio
+  // onSendMessage,
+  // onSendFile,
+  // onSendAudio
 }) => {
   console.log("🐛 [ChatMainArea] Renderizando. selectedConv:", selectedConv, "conversationForHeader:", conversationForHeader);
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [summaryContent, setSummaryContent] = useState<string | null>(null);
+  // NOVO: Chave de sessão da conversa, depende do selectedConv!
+  const sessionId = selectedConv?.contact_phone || selectedConv?.id || null;
+  // Usar o hook para buscar mensagens (vai usar realtime, loading e erro)
+  const { messages: rawMessages, loading: messagesLoading, error, refreshMessages } = useSimpleMessages(channelId, sessionId);
+
+  // Mapeia para o tipo Message usado localmente, convertendo tipos e nomes conforme esperado
+  const messages: Message[] = useMemo(() => {
+    if (!rawMessages) return [];
+    return rawMessages.map((m) => ({
+      id: m.id,
+      content: m.mensagemtype === 'image' || m.mensagemtype === 'video' || m.mensagemtype === 'audio'
+        ? m.message || `[${m.mensagemtype?.charAt(0).toUpperCase() + m.mensagemtype?.slice(1)}]`
+        : m.message,
+      timestamp: m.read_at || "",
+      sender: m.tipo_remetente === "USUARIO_INTERNO" ? "agent" : "customer",
+      tipo_remetente: m.tipo_remetente,
+      type: (m.mensagemtype as any) || "text",
+      read: true,
+      Nome_do_contato: m.nome_do_contato,
+      mensagemtype: m.mensagemtype,
+      // Pode ser extendido para media no futuro
+    }));
+  }, [rawMessages]);
 
   // ==== SCROLL AUTOMÁTICO ROBUSTO ====
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -182,15 +208,27 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
               const contactName =
-                (message as any).Nome_do_contato ||
-                (message as any).nome_do_contato ||
+                message.Nome_do_contato ||
+                message.nome_do_contato ||
                 message.sender ||
                 "Cliente";
-              const nomeExibido = truncateName(contactName);
-              const canalNome = getChannelDisplayName(channelId);
-              const hora = (message as any).read_at
-                ? formatHour((message as any).read_at)
-                : formatHour(message.timestamp || new Date().toISOString());
+              const nomeExibido = contactName.split(" ").slice(0, 2).join(" ") || "Cliente";
+              const canalNome = channelId;
+              const hora = message.timestamp
+                ? (() => {
+                    try {
+                      const date = new Date(message.timestamp);
+                      return date.toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                        timeZone: 'America/Sao_Paulo'
+                      });
+                    } catch {
+                      return '--:--';
+                    }
+                  })()
+                : "--:--";
 
               return (
                 <div
@@ -246,7 +284,11 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           maxHeight: 96,
         }}
       >
-        <ChatInput isDarkMode={isDarkMode} onSendMessage={onSendMessage} onSendFile={onSendFile} onSendAudio={onSendAudio} selectedConv={selectedConv} channelId={channelId} />
+        <ChatInput 
+          isDarkMode={isDarkMode} 
+          selectedConv={selectedConv} 
+          channelId={channelId} 
+        />
       </div>
     </div>
   );
