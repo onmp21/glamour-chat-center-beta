@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
@@ -84,6 +83,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       }
 
       const messageService = new MessageService(channelId);
+      // Só cria o canal, não chame .subscribe() novamente!
       const channel = messageService.createRealtimeSubscription(
         (payload) => {
           DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
@@ -93,6 +93,9 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         },
         channelSuffix
       );
+
+      // NÃO chame channel.subscribe() - já está inscrito!
+      // channel.subscribe(...) REMOVIDO
 
       subscriptionInstanceRef.current = channel;
 

@@ -1,4 +1,5 @@
 
+
 import { useEffect, useState } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { RawMessage } from '@/types/messages';
@@ -13,6 +14,7 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
     let channel: any = null;
 
     try {
+      // Apenas crie a subscription, NÃO chame subscribe() aqui novamente!
       channel = messageService.createRealtimeSubscription((payload) => {
         console.log('New realtime message:', payload);
         if (payload.new && onNewMessage) {
@@ -20,9 +22,11 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
         }
       });
 
-      channel.subscribe((status: string) => {
-        setIsConnected(status === 'SUBSCRIBED');
-      });
+      // NÃO chame channel.subscribe() aqui - já está inscrito!
+      // channel.subscribe((status: string) => {
+      //   setIsConnected(status === 'SUBSCRIBED');
+      // });
+      setIsConnected(true);
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);
     }
@@ -39,3 +43,4 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
 
   return { isConnected };
 };
+
