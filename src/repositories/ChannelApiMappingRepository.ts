@@ -1,13 +1,20 @@
 
 import { supabase } from '../integrations/supabase/client';
-import { ChannelApiMapping } from '../types/domain/api/ChannelApiMapping';
+
+export interface ChannelInstanceMapping {
+  id?: string;
+  channel_id: string;
+  instance_id: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export class ChannelApiMappingRepository {
-  async getAll(): Promise<ChannelApiMapping[]> {
+  async getAll(): Promise<ChannelInstanceMapping[]> {
     try {
       const { data, error } = await supabase
-        .from('channel_api_mappings')
-        .select('*')
+        .from('channel_instance_mappings')
+        .select('id, channel_id, instance_id, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -22,16 +29,16 @@ export class ChannelApiMappingRepository {
     }
   }
 
-  async getByChannelId(channelId: string): Promise<ChannelApiMapping | null> {
+  async getByChannelId(channelId: string): Promise<ChannelInstanceMapping | null> {
     try {
       const { data, error } = await supabase
-        .from('channel_api_mappings')
-        .select('*')
+        .from('channel_instance_mappings')
+        .select('id, channel_id, instance_id, created_at, updated_at')
         .eq('channel_id', channelId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
+        if ((error as any)?.code === 'PGRST116') {
           return null; // Nenhum registro encontrado
         }
         console.error(`Erro ao buscar mapeamento para canal ${channelId}:`, error);
@@ -45,71 +52,71 @@ export class ChannelApiMappingRepository {
     }
   }
 
-  async create(mapping: ChannelApiMapping): Promise<ChannelApiMapping> {
+  async create(mapping: ChannelInstanceMapping): Promise<ChannelInstanceMapping> {
     try {
       const { data, error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .insert({
           channel_id: mapping.channel_id,
-          api_instance_id: mapping.api_instance_id
+          instance_id: mapping.instance_id,
         })
-        .select()
-        .single();
+        .select('id, channel_id, instance_id, created_at, updated_at')
+        .maybeSingle();
 
       if (error) {
         console.error('Erro ao criar mapeamento:', error);
         throw error;
       }
 
-      return data;
+      return data!;
     } catch (error) {
       console.error('Erro ao criar mapeamento:', error);
       throw error;
     }
   }
 
-  async update(id: string, mapping: Partial<ChannelApiMapping>): Promise<ChannelApiMapping> {
+  async update(id: string, mapping: Partial<ChannelInstanceMapping>): Promise<ChannelInstanceMapping> {
     try {
       const { data, error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .update({
-          api_instance_id: mapping.api_instance_id
+          ...(mapping.instance_id && { instance_id: mapping.instance_id }),
         })
         .eq('id', id)
-        .select()
-        .single();
+        .select('id, channel_id, instance_id, created_at, updated_at')
+        .maybeSingle();
 
       if (error) {
         console.error(`Erro ao atualizar mapeamento ${id}:`, error);
         throw error;
       }
 
-      return data;
+      return data!;
     } catch (error) {
       console.error(`Erro ao atualizar mapeamento ${id}:`, error);
       throw error;
     }
   }
 
-  async upsertByChannelId(channelId: string, apiInstanceId: string): Promise<ChannelApiMapping> {
+  async upsertByChannelId(channelId: string, instanceId: string): Promise<ChannelInstanceMapping> {
     try {
       const { data, error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .upsert({
           channel_id: channelId,
-          api_instance_id: apiInstanceId
+          instance_id: instanceId,
         }, {
           onConflict: 'channel_id'
         })
-        .select()
-        .single();
+        .select('id, channel_id, instance_id, created_at, updated_at')
+        .maybeSingle();
 
       if (error) {
         console.error(`Erro ao upsert mapeamento para canal ${channelId}:`, error);
         throw error;
       }
 
-      return data;
+      return data!;
     } catch (error) {
       console.error(`Erro ao upsert mapeamento para canal ${channelId}:`, error);
       throw error;
@@ -119,7 +126,7 @@ export class ChannelApiMappingRepository {
   async delete(id: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .delete()
         .eq('id', id);
 
@@ -136,7 +143,7 @@ export class ChannelApiMappingRepository {
   async deleteByChannelId(channelId: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .delete()
         .eq('channel_id', channelId);
 
