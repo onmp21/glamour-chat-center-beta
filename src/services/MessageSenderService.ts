@@ -106,7 +106,6 @@ export class MessageSenderService {
   }
 
   async sendTextMessage(channelId: string, to: string, text: string): Promise<RawMessage> {
-    // NOVO: converter channelId legacy para UUID real
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
@@ -119,7 +118,6 @@ export class MessageSenderService {
             apiInstance.api_key, 
             apiInstance.instance_name
           );
-          
           if (!reconnected) {
             throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
           }
@@ -133,7 +131,6 @@ export class MessageSenderService {
       }
       const formattedNumber = this.formatPhoneNumber(to);
 
-      // Payload conforme documentação Evolution API v2
       const payload = {
         number: formattedNumber,
         text: text
@@ -166,28 +163,28 @@ export class MessageSenderService {
       const result = await response.json();
       this.logger.debug('Resposta da API Evolution', { result });
 
-      let senderName: string;
-      if (channelId === 'yelena') {
-        senderName = 'Yelena-ai';
-      } else if (channelId === 'gerente externo' || channelId === 'gerente lojas') {
-        senderName = 'USUARIO_INTERNO';
-      } else {
-        senderName = 'USUARIO_INTERNO';
-      }
-
+      // Sempre usar valores válidos para data e nome_do_contato (minúsculo)
+      const nowIso = new Date().toISOString();
       const messageData: RawMessage = {
         session_id: formattedNumber,
         message: text,
-        read_at: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-        Nome_do_contato: formattedNumber,
+        read_at: nowIso, // Corrigido para ISO 8601 (suportado pelo PG)
+        nome_do_contato: formattedNumber,
         mensagemtype: 'conversation',
-        tipo_remetente: senderName,
+        tipo_remetente: 'USUARIO_INTERNO',
         id: result.key?.id || result.messageId || Date.now().toString(),
         sender: 'agent',
-        timestamp: new Date().toISOString(),
-        content: text
+        timestamp: nowIso,
+        content: text,
+        media_base64: null // sempre null em texto
       };
 
+      // Log de validação
+      this.logger.debug('Salvando mensagem no canal', {
+        realChannelId, table: '...', messageData
+      });
+
+      // Tenta salvar a mensagem e lança erro se falhar
       await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
 
       this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.key?.id });
@@ -229,7 +226,6 @@ export class MessageSenderService {
   }
 
   async sendMediaMessage(channelId: string, to: string, mediaUrl: string, caption: string, mediaType: 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
-    // NOVO: converter channelId legacy para UUID real
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
@@ -243,7 +239,6 @@ export class MessageSenderService {
             apiInstance.api_key, 
             apiInstance.instance_name
           );
-          
           if (!reconnected) {
             throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
           }
@@ -253,7 +248,6 @@ export class MessageSenderService {
       }
 
       const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
-      
       if (!apiInstance) {
         throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
       }
@@ -304,20 +298,19 @@ export class MessageSenderService {
 
       const endpoint = `/message/sendMedia/${apiInstance.instance_name}`;
       
-      // Payload conforme documentação Evolution API v2
       const payload = {
         number: formattedNumber,
-        mediatype: mediaType, // Usar tipo simples: 'image', 'audio', 'video', 'document'
+        mediatype: mediaType,
         mimetype: mimeType,
         caption: caption || "",
-        media: `data:${mimeType};base64,${base64Content}`, // Data URL completa
+        media: `data:${mimeType};base64,${base64Content}`,
         fileName: `media_${Date.now()}.${fileExtension}`
       };
 
       this.logger.debug('Enviando mídia para API Evolution', { 
         endpoint: `${apiInstance.base_url}${endpoint}`, 
         mediaType,
-        payload: { ...payload, media: '[BASE64_DATA]' } // Log sem o base64 completo
+        payload: { ...payload, media: '[BASE64_DATA]' }
       });
 
       const response = await fetch(`${apiInstance.base_url}${endpoint}`, {
@@ -342,27 +335,27 @@ export class MessageSenderService {
       const result = await response.json();
       this.logger.debug('Resposta da API Evolution para mídia', { result });
 
-      let senderName: string;
-      if (channelId === 'yelena') {
-        senderName = 'Yelena-ai';
-      } else if (channelId === 'gerente externo' || channelId === 'gerente lojas') {
-        senderName = 'USUARIO_INTERNO';
-      } else {
-        senderName = 'USUARIO_INTERNO';
-      }
+      // Data padrão
+      const nowIso = new Date().toISOString();
 
       const messageData: RawMessage = {
         session_id: formattedNumber,
-        message: `data:${mimeType};base64,${base64Content}`, // Salvar data URL completa
-        read_at: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-        Nome_do_contato: formattedNumber,
-        mensagemtype: mediaType, // Usar tipo simples
-        tipo_remetente: senderName,
+        message: `data:${mimeType};base64,${base64Content}`,
+        read_at: nowIso,
+        nome_do_contato: formattedNumber,
+        mensagemtype: mediaType,
+        tipo_remetente: 'USUARIO_INTERNO',
         id: result.key?.id || result.messageId || Date.now().toString(),
         sender: 'agent',
-        timestamp: new Date().toISOString(),
-        content: `data:${mimeType};base64,${base64Content}`
+        timestamp: nowIso,
+        content: `data:${mimeType};base64,${base64Content}`,
+        media_base64: `data:${mimeType};base64,${base64Content}`,
       };
+
+      // Log de validação
+      this.logger.debug('Salvando mensagem de mídia no canal', {
+        realChannelId, table: '...', messageData
+      });
 
       await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
 
