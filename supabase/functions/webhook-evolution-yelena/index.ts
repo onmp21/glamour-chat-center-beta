@@ -126,29 +126,22 @@ async function processMessage(supabase, messageData, tableName, instance) {
     const sessionId = phone;
     const messageContent = getMessageContent(messageData);
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
-    const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    // Corrigir: Detectar base64 em qualquer campo e atualizar corretamente
-    let realMensagemType = mensagemType;
+    // NOVO uso: pega type/placeholder/url
+    const { type: mensagemType, placeholder, mediaUrl } = getMediaSaveDetails(messageData);
     let realMessageContent = messageContent;
     let mediaBase64 = null;
 
     if (mediaUrl && isDataUrl(mediaUrl)) {
-      // Salvar o base64 em media_base64
       mediaBase64 = mediaUrl;
-      // Ajustar tipo e placeholder
-      if (mensagemType === 'image') realMessageContent = '[Imagem]';
-      else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
-      else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
-      else if (mensagemType === 'document') realMessageContent = '[Documento]';
-      else realMessageContent = '[Mídia]';
+      realMessageContent = placeholder || '[Mídia]';
     }
 
     const insertData = {
       session_id: sessionId,
       message: realMessageContent,
       read_at: new Date().toISOString(),
-      mensagemtype: realMensagemType,
+      mensagemtype: mensagemType,
       tipo_remetente: tipoRemetente,
       nome_do_contato: name,
       is_read: false,

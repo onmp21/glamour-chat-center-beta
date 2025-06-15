@@ -1,6 +1,6 @@
-
 import { MessageService } from './MessageService';
 import { getChannelDisplayName } from '@/utils/channelMapping';
+import { groupContactsByPhone } from './contactUtils';
 
 export interface OptimizedContact {
   id: string;
@@ -89,36 +89,8 @@ export class OptimizedContactService {
       const channelResults = await Promise.all(channelPromises);
       const allContacts = channelResults.flat();
 
-      // #### NOVA LÓGICA de agrupamento: unifica canais, soma todos!
-      const contactsMap = new Map<string, OptimizedContact>();
-
-      allContacts.forEach(contact => {
-        if (!contact) return;
-        const key = contact.telefone;
-        const existing = contactsMap.get(key);
-
-        if (existing) {
-          // Adicionar canais sem duplicidade, inclusive se conversa no mesmo canal varias vezes
-          contact.canais.forEach(c => {
-            if (!existing.canais.includes(c)) {
-              existing.canais.push(c);
-            }
-          });
-          // Atualizar info se esta mensagem é mais recente
-          if (contact.lastMessageTime > existing.lastMessageTime) {
-            existing.ultimaMensagem = contact.ultimaMensagem;
-            existing.tempo = contact.tempo;
-            existing.status = contact.status;
-            existing.lastMessageTime = contact.lastMessageTime;
-          }
-        } else {
-          contactsMap.set(key, { ...contact, canais: [...contact.canais] }); // garantir que canais é array novo
-        }
-      });
-
-      // Converter para array e ordenar por última mensagem
-      const sortedContacts = Array.from(contactsMap.values())
-        .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
+      // Usar função refatorada para agrupar contatos
+      const sortedContacts = groupContactsByPhone(allContacts);
 
       // Salvar no cache
       this.cache.set(cacheKey, {
