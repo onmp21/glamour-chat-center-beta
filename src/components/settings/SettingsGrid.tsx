@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Users, History, Settings, Folder, Shield, Bell, Palette, Database, Sun, Moon, LogOut, Brain, MessageSquare } from 'lucide-react';
@@ -154,9 +153,9 @@ export const SettingsGrid: React.FC<SettingsGridProps> = ({
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Main settings cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
         {visibleMainItems.map((item) => (
           <SettingsCard
             key={item.id}
