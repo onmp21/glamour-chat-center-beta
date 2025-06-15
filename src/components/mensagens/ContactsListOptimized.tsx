@@ -62,6 +62,7 @@ const ContactItem = memo<{
     return labels[status] || 'Desconhecido';
   };
 
+  // Agora limita a última mensagem a 35 caracteres no máximo
   const truncateWithEllipsis = (text: string, maxLength: number): string => {
     if (!text) return '';
     return text.length > maxLength ? text.slice(0, maxLength - 3) + '...' : text;
@@ -104,7 +105,7 @@ const ContactItem = memo<{
                 ))}
               </div>
               <p className={cn("text-xs truncate mb-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                {truncateWithEllipsis(contact.ultimaMensagem, 50)}
+                {truncateWithEllipsis(contact.ultimaMensagem, 35)}
               </p>
               <p className={cn("text-xs", isDarkMode ? "text-gray-500" : "text-gray-500")}>
                 {contact.telefone}
