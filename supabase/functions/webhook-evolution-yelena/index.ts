@@ -15,6 +15,40 @@ function isDataUrl(str) {
   return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
 }
 
+function isRawBase64(str: string) {
+  // 80+ chars, sem 'data:', e só base64 chars
+  if (typeof str !== 'string' || str.length < 32) return false;
+  if (str.startsWith('data:')) return false;
+  return /^[A-Za-z0-9+/=\s]+$/.test(str) && /[A-Za-z0-9+/]{20,}/.test(str);
+}
+
+function detectMimeTypeFromBase64(base64: string): string {
+  if (base64.startsWith('iVBORw')) return 'image/png';
+  if (base64.startsWith('/9j/')) return 'image/jpeg';
+  if (base64.startsWith('R0lGO')) return 'image/gif';
+  if (base64.startsWith('UklGR')) return 'image/webp';
+  if (base64.startsWith('Qk0') || base64.startsWith('Qk1')) return 'image/bmp';
+  if (base64.startsWith('JVBERi')) return 'application/pdf';
+  if (base64.startsWith('SUQz') || base64.startsWith('//uQ') || base64.startsWith('//sw')) return 'audio/mpeg';
+  if (base64.startsWith('T2dn')) return 'audio/ogg';
+  if (base64.startsWith('AAAAGG') || base64.startsWith('AAAAFG') || base64.startsWith('AAAAHG')) return 'video/mp4';
+  return 'application/octet-stream';
+}
+
+function toDataUrlIfBase64(mediaUrl: string | undefined): string | undefined {
+  if (!mediaUrl) return undefined;
+  if (typeof mediaUrl !== 'string') return undefined;
+  if (mediaUrl.startsWith('data:')) return mediaUrl;
+  // Possível base64 puro
+  if (isRawBase64(mediaUrl)) {
+    const cleanBase64 = mediaUrl.replace(/\s/g, '');
+    const mimeType = detectMimeTypeFromBase64(cleanBase64);
+    const dataUrl = `data:${mimeType};base64,${cleanBase64}`;
+    return dataUrl;
+  }
+  return mediaUrl;
+}
+
 function cleanPhoneFromSessionId(sessionId) {
   if (typeof sessionId !== 'string') return '';
   const match = sessionId.match(/(\d{10,15})/);
@@ -175,12 +209,26 @@ async function processMessage(supabase, messageData, tableName, instance) {
 
     // Aqui, agora está usando a função importada corretamente
     const { type: mensagemType, placeholder, mediaUrl } = getMediaSaveDetails(messageData);
+
     let realMessageContent = messageContent;
     let mediaBase64 = null;
 
-    if (mediaUrl && isDataUrl(mediaUrl)) {
-      mediaBase64 = mediaUrl;
+    // Sempre forçar para DataURL se base64 puro
+    let checkedMediaUrl = toDataUrlIfBase64(mediaUrl);
+    let usedMediaUrl = checkedMediaUrl && isDataUrl(checkedMediaUrl) ? checkedMediaUrl : null;
+
+    if (usedMediaUrl) {
+      mediaBase64 = usedMediaUrl;
       realMessageContent = placeholder || '[Mídia]';
+      console.log('[Webhook-Yelena] Salva mídia como DataURL:', (mediaBase64+"").substring(0,60),'...');
+    } else if (mediaUrl) {
+      // fallback - mantém compatibilidade se for url http(s) ou vazio
+      mediaBase64 = null;
+      if (mensagemType === 'image') realMessageContent = '[Imagem]';
+      else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
+      else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
+      else if (mensagemType === 'document') realMessageContent = '[Documento]';
+      else realMessageContent = '[Mídia]';
     }
 
     const insertData = {
