@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -14,14 +13,27 @@ function isDataUrl(str) {
   return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
 }
 
-function extractPhoneAndName(sessionId) {
-  if (!sessionId) return { phone: '', name: 'Cliente' };
-  const parts = sessionId.split('-');
-  if (parts.length > 1 && /^\d{10,15}$/.test(parts[0])) {
-    return { phone: parts[0], name: parts.slice(1).join('-') || 'Cliente' };
+function cleanPhoneFromSessionId(sessionId) {
+  // Remove sufixo @s.whatsapp.net e retorna apenas os números
+  if (typeof sessionId !== 'string') return '';
+  // Tenta capturar só os dígitos principais
+  const match = sessionId.match(/(\d{10,15})/);
+  return match ? match[1] : sessionId.replace(/@.*$/, '');
+}
+
+function extractPhoneAndName(messageData) {
+  const sessionId = messageData?.key?.remoteJid || '';
+  const phone = cleanPhoneFromSessionId(sessionId);
+
+  // Tenta captar nome da mensagem (pushName) ou fallback
+  let name = 'Cliente';
+  if (typeof messageData?.pushName === 'string' && messageData.pushName.trim()) {
+    name = messageData.pushName.trim();
+  } else if (messageData?.key?.fromMe && messageData?.agentName) {
+    // fallback para nome do usuário interno (se disponível)
+    name = messageData.agentName;
   }
-  const phoneMatch = sessionId.match(/(\d{10,15})/);
-  return { phone: phoneMatch ? phoneMatch[1] : sessionId, name: 'Cliente' };
+  return { phone, name };
 }
 
 function getMessageContent(messageData) {
@@ -113,8 +125,11 @@ async function processMessage(supabase, messageData, tableName, instance) {
   try {
     // Log full messageData for contextual debugging
     console.log('[Webhook-Yelena] processMessage data:', JSON.stringify(messageData, null, 2));
-    const sessionId = messageData.key?.remoteJid || '';
-    const { phone, name } = extractPhoneAndName(sessionId);
+    const { phone, name } = extractPhoneAndName(messageData);
+
+    // Força a session_id a ser APENAS o número
+    const sessionId = phone;
+
     const messageContent = getMessageContent(messageData);
 
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';

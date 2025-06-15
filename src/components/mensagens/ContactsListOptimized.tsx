@@ -1,4 +1,3 @@
-
 import React, { useState, memo } from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,6 +62,11 @@ const ContactItem = memo<{
     return labels[status] || 'Desconhecido';
   };
 
+  const truncateWithEllipsis = (text: string, maxLength: number): string => {
+    if (!text) return '';
+    return text.length > maxLength ? text.slice(0, maxLength - 3) + '...' : text;
+  };
+
   return (
     <Card 
       className={cn(
@@ -100,7 +104,7 @@ const ContactItem = memo<{
                 ))}
               </div>
               <p className={cn("text-xs truncate mb-1", isDarkMode ? "text-gray-400" : "text-gray-600")}>
-                {contact.ultimaMensagem}
+                {truncateWithEllipsis(contact.ultimaMensagem, 50)}
               </p>
               <p className={cn("text-xs", isDarkMode ? "text-gray-500" : "text-gray-500")}>
                 {contact.telefone}

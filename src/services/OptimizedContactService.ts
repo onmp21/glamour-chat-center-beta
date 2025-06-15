@@ -1,4 +1,3 @@
-
 import { MessageService } from './MessageService';
 import { getChannelDisplayName } from '@/utils/channelMapping';
 
@@ -37,7 +36,13 @@ export class OptimizedContactService {
           const conversations = await messageService.getConversations();
           
           return conversations.map(conversation => {
-            const contactPhone = conversation.contact_phone || '';
+            // NEW: sempre extrai telefone limpo
+            let contactPhone = conversation.contact_phone || '';
+            if (contactPhone.endsWith('@s.whatsapp.net')) {
+              const match = contactPhone.match(/(\d{10,15})/);
+              contactPhone = match ? match[1] : contactPhone.replace(/@.*$/, '');
+            }
+
             if (!contactPhone) return null;
             
             const contactName = conversation.contact_name || `Cliente ${contactPhone.slice(-4)}`;
