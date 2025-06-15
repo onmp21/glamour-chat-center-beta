@@ -67,7 +67,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
 
-  // Mapeia para o tipo Message usado localmente, convertendo tipos e nomes conforme esperado
+  // Corrigir o mapeamento: Nome_do_contato deve ser preenchido com nome_do_contato do SimpleMessage
   const messages: Message[] = useMemo(() => {
     if (!rawMessages) return [];
     return rawMessages.map((m) => ({
@@ -80,9 +80,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       tipo_remetente: m.tipo_remetente,
       type: (m.mensagemtype as any) || "text",
       read: true,
-      Nome_do_contato: m.Nome_do_contato,
+      Nome_do_contato: m.nome_do_contato, // <-- Consertado: usar minúsculo do raw para preencher maiúsculo no Message
       mensagemtype: m.mensagemtype,
-      nome_do_contato: m.nome_do_contato, // Adicionado: para evitar erro do próximo acesso
+      nome_do_contato: undefined, // não usar aqui, interface Message não tem esse campo
     }));
   }, [rawMessages]);
 
@@ -213,7 +213,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 message.sender === "agent";
               // Acesso seguro ao nome_do_contato (corrige TS2551)
               const contactName =
-                message.nome_do_contato ||
                 message.Nome_do_contato ||
                 message.sender ||
                 "Cliente";
