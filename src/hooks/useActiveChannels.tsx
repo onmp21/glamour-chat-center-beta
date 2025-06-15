@@ -15,7 +15,20 @@ export function useActiveChannels() {
         .select("*")
         .eq("is_active", true);
 
-      if (!error && data) setChannels(data as DomainChannel[]);
+      if (!error && data) {
+        // Map supabase response to DomainChannel shape
+        setChannels(
+          data.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            displayName: c.name, // supabase doesn't have displayName: fallback to name
+            isActive: c.is_active,
+            tableName: c.type ? `${c.name.toLowerCase()}_conversas` : "",
+            description: "", // Optionally fill if available
+            icon: ""
+          }))
+        );
+      }
       setLoading(false);
     }
 

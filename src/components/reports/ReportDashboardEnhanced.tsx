@@ -21,7 +21,7 @@ interface ReportFilters {
   status?: string;
   date_from?: string;
   date_to?: string;
-  report_type: 'conversations' | 'channels' | 'custom';
+  report_type: 'conversations' | 'channels' | 'exams' | 'custom'; // include 'exams'
   custom_prompt?: string;
 }
 
@@ -49,8 +49,8 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   // Função utilitária para formatar segundos em mm:ss
   function formatSeconds(seconds: number): string {
     if (!seconds || isNaN(seconds)) return "0s";
-    const min = Math.floor(seconds);
-    const sec = Math.round((seconds - min) * 60);
+    const min = Math.floor(seconds / 60);
+    const sec = Math.round(seconds % 60);
     if (min > 0) {
       return `${min}m ${sec.toString().padStart(2, "0")}s`;
     }
@@ -261,10 +261,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       {/* Stats Section */}
       <ReportStatsSection 
         isDarkMode={isDarkMode}
-        stats={{
-          ...stats,
-          averageGenerationTimeFormatted: formatSeconds(stats.averageGenerationTime)
-        }}
+        stats={stats}
         providers={providers}
       />
 

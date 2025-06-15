@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ interface ReportFilters {
   status?: string;
   date_from?: string;
   date_to?: string;
-  report_type: 'conversations' | 'channels' | 'custom';
+  report_type: 'conversations' | 'channels' | 'exams' | 'custom'; // PATCH: add exams
   custom_prompt?: string;
 }
 
