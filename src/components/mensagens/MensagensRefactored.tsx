@@ -36,22 +36,22 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  const { channels: internalChannels } = useInternalChannels(); // InternalChannel[], cada um tem .legacyId
+  // Agora usamos diretamente do contexto padronizado para legacyId!
+  const { channels: contextChannels } = useChannels();
   const { getAccessibleChannels } = usePermissions();
-  const { user } = useAuth(); // ✅ Use hook properly
+  const { user } = useAuth();
 
   // Montar lista de canais baseada no role:
   let canaisData = [];
   if (user?.role === 'admin') {
-    // Admin pode ver todos os ativos, exceto Pedro
-    canaisData = internalChannels
+    canaisData = contextChannels
       .filter(channel =>
         channel.isActive &&
         channel.name &&
         channel.name.toLowerCase() !== 'pedro'
       )
       .map(channel => ({
-        id: channel.legacyId,
+        id: channel.id,     // Já é legacyId!
         nome: channel.name,
         tipo: channel.type === 'general' ? 'IA Assistant' :
               channel.type === 'store' ? 'Loja' :
@@ -61,17 +61,16 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         ultimaAtividade: 'Online'
       }));
   } else {
-    // Usuário comum
     const accessibleChannels = getAccessibleChannels();
-    canaisData = internalChannels
+    canaisData = contextChannels
       .filter(channel =>
         channel.isActive &&
         channel.name &&
         channel.name.toLowerCase() !== 'pedro' &&
-        accessibleChannels.includes(channel.legacyId)
+        accessibleChannels.includes(channel.id) // Aqui, .id já é legacyId!
       )
       .map(channel => ({
-        id: channel.legacyId,
+        id: channel.id,
         nome: channel.name,
         tipo: channel.type === 'general' ? 'IA Assistant' :
               channel.type === 'store' ? 'Loja' :
@@ -86,9 +85,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
     
     if (initialChannel && initialPhone) {
-      const mappedInitialChannel = initialChannel; // Mapear o initialChannel
-      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
-      setSelectedChannel(mappedInitialChannel);
+      setSelectedChannel(initialChannel);
     }
   }, [initialChannel, initialPhone]);
 
