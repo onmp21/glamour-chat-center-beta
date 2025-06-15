@@ -1,8 +1,9 @@
 
-import React from 'react';
-import { cn } from '@/lib/utils';
-import { MediaMessageRenderer } from './MediaMessageRenderer';
+import React from "react";
+import { cn } from "@/lib/utils";
+import { MediaMessageRenderer } from "./MediaMessageRenderer";
 
+// Adequa props igual ao YelenaMessageDisplay
 interface JoaoDouradoMessageDisplayProps {
   message: {
     id: string;
@@ -24,21 +25,21 @@ interface JoaoDouradoMessageDisplayProps {
 export const JoaoDouradoMessageDisplay: React.FC<JoaoDouradoMessageDisplayProps> = ({
   message,
   isDarkMode,
-  channelName = 'João Dourado',
+  channelName = "João Dourado",
   userName
 }) => {
   const isAgent =
-    message.tipo_remetente === 'USUARIO_INTERNO' ||
-    message.tipo_remetente === 'Joao-Dourado' ||
-    message.sender === 'agent' ||
+    message.tipo_remetente === "USUARIO_INTERNO" ||
+    message.tipo_remetente === "Yelena-ai" ||
+    message.sender === "agent" || 
     message.isOwn;
 
   const displayName = isAgent
-    ? (message.agentName || 'João Dourado')
-    : (message.Nome_do_contato || message.nome_do_contato || message.sender || 'Cliente');
+    ? (message.agentName || "Agente")
+    : (message.Nome_do_contato || message.nome_do_contato || message.sender || "Cliente");
 
   const renderMessageContent = () => {
-    const isMediaMessage = message.mensagemtype && message.mensagemtype !== 'text';
+    const isMediaMessage = message.mensagemtype && message.mensagemtype !== "text";
     if (isMediaMessage) {
       return (
         <MediaMessageRenderer
@@ -46,7 +47,7 @@ export const JoaoDouradoMessageDisplay: React.FC<JoaoDouradoMessageDisplayProps>
           messageType={message.mensagemtype}
           messageId={message.id}
           isDarkMode={isDarkMode}
-          balloonColor={isAgent ? 'sent' : 'received'}
+          balloonColor={isAgent ? "sent" : "received"}
         />
       );
     }

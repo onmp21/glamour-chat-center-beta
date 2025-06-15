@@ -1,4 +1,3 @@
-
 // src/utils/channelMapping.ts
 export const getTableNameForChannel = (channelId: string): string => {
   const mapping: Record<string, string> = {
@@ -43,4 +42,3 @@ export const getChannelDisplayName = (channelId: string): string => {
   };
   return mapping[channelId] || channelId; // Fallback to channelId if no display name found
 };
-

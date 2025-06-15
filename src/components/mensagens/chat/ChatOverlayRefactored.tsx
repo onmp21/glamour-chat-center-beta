@@ -1,278 +1,253 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { ChatSidebar } from './ChatSidebar';
-import { ChatMainArea } from './ChatMainArea';
-// import { useSimpleConversations, SimpleConversation } from '@/hooks/useSimpleConversations'; // Original import
-// import { useSimpleMessages, SimpleMessage } from '@/hooks/useSimpleMessages'; // Original import
-import { useSimpleConversations } from '@/hooks/useSimpleConversations';
-import { useSimpleMessages } from '@/hooks/useSimpleMessages';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Phone, Video, Bell, BellOff, MoreVertical } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
+import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChannelConversation } from '@/types/messages'; // Corrected path if needed
+import { useChannel } from '@/contexts/ChannelContext';
+import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
+import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
+import { RawMessage } from '@/types/messages';
+import { ChatMessage } from '@/components/chat/ChatMessage';
+import { Input } from '@/components/ui/input';
+import { ChatInput } from '@/components/mensagens/ChatInput';
+import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
+import { getChannelDisplayName } from '@/utils/channelMapping';
+import { ChatMainArea } from '@/components/mensagens/chat/ChatMainArea';
+import { YelenaMessageDisplay } from "@/components/chat/YelenaMessageDisplay";
+import { JoaoDouradoMessageDisplay } from "@/components/chat/JoaoDouradoMessageDisplay";
+import { AmericaDouradaMessageDisplay } from "@/components/chat/AmericaDouradaMessageDisplay";
+import { GerenteLojasMessageDisplay } from "@/components/chat/GerenteLojasMessageDisplay";
+import { GerenteExternoMessageDisplay } from "@/components/chat/GerenteExternoMessageDisplay";
+import { MessageBubble } from "@/components/chat/message/MessageBubble";
+import { MessageContent } from "@/components/chat/message/MessageContent";
 
-interface ChatOverlayRefactoredProps {
+interface ChatOverlayProps {
   channelId: string;
   isDarkMode: boolean;
   onClose: () => void;
-  // onSendFile and onSendAudio are passed to ChatMainArea.
-  // These props are for ChatMainArea, not directly used by ChatOverlayRefactored for sending.
-  onSendFile?: (file: File, caption?: string) => Promise<void>;
-  onSendAudio?: (audioBlob: Blob, duration: number) => Promise<void>;
+  onSendFile: (file: File, caption?: string) => Promise<void>;
+  onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
 }
 
-// Placeholder type definition for SimpleConversation as it's not exported from the hook
-// and the hook file is not in the allowed list to modify.
-export interface SimpleConversation {
-  id: string;
-  contact_name: string;
-  contact_phone: string;
-  last_message: string;
-  last_message_time: string;
-  status: 'unread' | 'in_progress' | 'resolved';
-  unread_count: number;
-  updated_at: string;
-  // Add any other properties that useSimpleConversations might return for a conversation
-}
-
-// Placeholder type definition for SimpleMessage
-export interface SimpleMessage {
-  id: string;
-  message: string;
-  tipo_remetente?: string; // e.g., 'USUARIO_INTERNO', 'CONTATO_EXTERNO'
-  created_at?: string; // Timestamp
-  read_at?: string; // Timestamp for read status
-  mensagemtype?: string; // e.g., 'text', 'image', 'audio'
-  media_url?: string;
-  media_caption?: string;
-  is_read?: boolean;
-  nome_do_contato?: string;
-  // Add other properties returned by useSimpleMessages for a message
-}
-
-
-// Unified type for compatibility, if still needed
-interface UnifiedConversation {
-  id: string;
-  contact_name: string;
-  contact_phone: string;
-  last_message: string;
-  last_message_time: string;
-  status: 'unread' | 'in_progress' | 'resolved';
-  unread_count: number;
-  updated_at: string;
-}
-
-// Type for messages displayed in ChatMainArea
-interface DisplayMessage {
-  id: string;
-  content: string;
-  timestamp: string;
-  sender: 'customer' | 'agent';
-  tipo_remetente?: string;
-  type: 'text' | 'image' | 'audio' | 'video' | 'file';
-  fileUrl?: string;
-  fileName?: string;
-  read: boolean;
-  nome_do_contato?: string;
-  mensagemtype?: string;
-}
-
-interface ConversationForHeader {
-  contactName: string;
-  contactNumber: string;
-}
-
-export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
+export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
   channelId,
   isDarkMode,
   onClose,
-  onSendFile: onSendFileProp, 
-  onSendAudio: onSendAudioProp
+  onSendFile,
+  onSendAudio
 }) => {
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { isAuthenticated, user } = useAuth();
-
-  const {
-    conversations: simpleConversations, // This is SimpleConversation[]
-    loading: conversationsLoading,
-    refreshConversations
-  } = useSimpleConversations(channelId);
-  
-  // The useSimpleMessages hook provides messages, loading, error, and refreshMessages.
-  // It does NOT provide sendMessage, sendFile, sendAudio, or refetch directly based on previous errors.
-  // Those sending actions are expected to be passed to ChatMainArea or handled by ChatInput via useMessageActions.
-  const {
-    messages: simpleMessagesFromHook, // This is SimpleMessage[]
-    loading: messagesLoading,
-    refreshMessages 
-  } = useSimpleMessages(channelId, selectedConversation);
-
-  console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
-    channelId,
-    selectedConversation,
-    conversationsCount: simpleConversations.length,
-    messagesCount: simpleMessagesFromHook.length,
-    conversationsLoading,
-    messagesLoading,
-    isAuthenticated,
-    user: user?.name
-  });
-
-  // Cast simpleConversations to UnifiedConversation[] if structure matches.
-  // Ensure SimpleConversation has all needed fields for UnifiedConversation.
-  const conversations: UnifiedConversation[] = simpleConversations.map((conv: SimpleConversation) => ({
-    id: conv.id,
-    contact_name: conv.contact_name,
-    contact_phone: conv.contact_phone,
-    last_message: conv.last_message,
-    last_message_time: conv.last_message_time,
-    status: conv.status,
-    unread_count: conv.unread_count,
-    updated_at: conv.updated_at
-  }));
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { updateChannelNotification } = useChannel();
+  const [isMuted, setIsMuted] = useState(false);
+  const [channelName, setChannelName] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { messages, loading: messagesLoading, error: messagesError, addMessage, updateMessage, refreshMessages } = useLazyChannelMessages(channelId, conversationId);
+  const { sendMessage, sending } = useMessageSenderExtended();
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryContent, setSummaryContent] = useState<string | null>(null);
 
   useEffect(() => {
-    if (conversations.length > 0 && !selectedConversation) {
-      const firstConversation = conversations[0];
-      console.log('🎯 [CHAT_OVERLAY] Auto-selecting first conversation:', firstConversation.id);
-      setSelectedConversation(firstConversation.id);
-    }
-  }, [conversations, selectedConversation]);
-
-  const handleConversationSelect = (conversationId: string) => {
-    console.log('📱 [CHAT_OVERLAY] Conversation selected:', conversationId);
-    setSelectedConversation(conversationId);
-  };
-
-  // Message sending is typically handled by ChatInput via useMessageActions or passed directly to ChatMainArea.
-  // These handlers here are illustrative if ChatOverlayRefactored itself were to send messages,
-  // but based on the setup, ChatMainArea / ChatInput handle sends.
-  const handleSendMessage = async (message: string) => {
-    console.log('💬 [CHAT_OVERLAY] Attempting to send message:', message);
-    if (selectedConversation) {
-      // This component relies on ChatInput/useMessageActions for sending.
-      // This function is passed to ChatMainArea, which might pass it to its ChatInput.
-      // If `useSimpleMessages` were to provide `sendMessage`, it would be called here.
-      console.warn("ChatOverlayRefactored.handleSendMessage: Sending logic should be in ChatInput or via a dedicated sending hook.");
-      if (refreshMessages) {
-        await refreshMessages(); // Refresh after send attempt (actual send is elsewhere)
-      }
-    }
-  };
-
-  const handleSendFile = async (file: File, caption?: string) => {
-    console.log('📎 [CHAT_OVERLAY] Attempting to send file:', file.name);
-     if (selectedConversation) {
-      console.warn("ChatOverlayRefactored.handleSendFile: Sending logic should be in ChatInput or via a dedicated sending hook.");
-      if (refreshMessages) {
-        await refreshMessages();
-      }
-    }
-  };
-
-  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
-    console.log('🎵 [CHAT_OVERLAY] Attempting to send audio:', duration);
-    if (selectedConversation) {
-      console.warn("ChatOverlayRefactored.handleSendAudio: Sending logic should be in ChatInput or via a dedicated sending hook.");
-      if (refreshMessages) {
-        await refreshMessages();
-      }
-    }
-  };
-
-  const selectedConvData: SimpleConversation | undefined = simpleConversations.find(c => c.id === selectedConversation);
-  
-  // Map SimpleConversation to ChannelConversation for ChatMainArea
-  const selectedConvForMainArea: ChannelConversation | undefined = selectedConvData ? {
-    id: selectedConvData.id,
-    contact_name: selectedConvData.contact_name,
-    contact_phone: selectedConvData.contact_phone,
-    last_message: selectedConvData.last_message,
-    last_message_time: selectedConvData.last_message_time,
-    status: selectedConvData.status,
-    updated_at: selectedConvData.updated_at,
-    unread_count: selectedConvData.unread_count,
-    // Ensure other required fields for ChannelConversation are added if not in SimpleConversation
-    // For example, if ChannelConversation requires these:
-    // is_pinned: false, // Removed as it caused an error; add to type if needed
-    // tags: [], 
-    // notes: '', 
-    // name: selectedConvData.contact_name, 
-    // lastMessage: selectedConvData.last_message, 
-    // lastMessageTimestamp: selectedConvData.last_message_time, 
-    // avatarUrl: '', 
-    // type: 'whatsapp', 
-  } : undefined;
-
-
-  // Convert SimpleMessage from hook to DisplayMessage for ChatMainArea
-  const displayMessages: DisplayMessage[] = simpleMessagesFromHook.map((msg: SimpleMessage) => {
-    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
-    
-    return {
-      id: msg.id,
-      content: msg.message || '',
-      timestamp: msg.created_at || msg.read_at || new Date().toISOString(), // Use created_at or read_at
-      sender: isAgent ? 'agent' : 'customer', // This assumes SimpleMessage has a way to determine sender
-      tipo_remetente: msg.tipo_remetente,
-      type: msg.mensagemtype === 'image' ? 'image' :
-            msg.mensagemtype === 'audio' ? 'audio' :
-            msg.mensagemtype === 'video' ? 'video' :
-            msg.mensagemtype === 'document' || msg.mensagemtype === 'file' ? 'file' : 'text', // Added 'file' for document
-      fileUrl: msg.media_url || undefined,
-      fileName: msg.media_caption || msg.message || undefined,
-      read: typeof msg.is_read === 'boolean' ? msg.is_read : true,
-      nome_do_contato: msg.nome_do_contato,
-      mensagemtype: msg.mensagemtype
+    const fetchChannelName = async () => {
+      const name = getChannelDisplayName(channelId);
+      setChannelName(name);
     };
-  });
+    fetchChannelName();
+  }, [channelId]);
 
-  const conversationForHeader: ConversationForHeader | null = selectedConvData ? {
-    contactName: selectedConvData.contact_name,
-    contactNumber: selectedConvData.contact_phone
-  } : null;
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialPhone = urlParams.get('phone');
+    if (initialPhone) {
+      setConversationId(initialPhone);
+    }
+  }, []);
 
-  if (conversationsLoading && conversations.length === 0) {
-    return <div className={cn("fixed inset-0 z-50 flex items-center justify-center", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
-        <div className="text-center space-y-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
-        </div>
-      </div>;
+  const handleSendMessage = async (content: string) => {
+    if (!conversationId) {
+      toast({
+        title: "Erro",
+        description: "Selecione ou crie uma conversa antes de enviar mensagens.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newMessageData = {
+      conversationId: conversationId,
+      channelId: channelId,
+      content: content,
+      sender: 'agent',
+      agentName: user?.name,
+      messageType: 'text' as const
+    };
+
+    const success = await sendMessage(newMessageData, addMessage);
+    if (success) {
+      console.log('✅ [CHAT_OVERLAY] Mensagem enviada com sucesso:', content);
+    } else {
+      console.error('❌ [CHAT_OVERLAY] Falha ao enviar mensagem:', content);
+    }
+  };
+
+  const handleMarkAsResolved = () => {
+    toast({
+      title: "Sucesso",
+      description: "Conversa marcada como resolvida."
+    });
+    onClose();
+  };
+
+  const handleSidebarToggle = (open: boolean) => {
+    console.log(`[CHAT_OVERLAY] Toggling sidebar: ${open ? 'open' : 'closed'}`);
+  };
+
+  const handleMuteToggle = async () => {
+    setIsMuted(!isMuted);
+    if (updateChannelNotification) {
+      try {
+        await updateChannelNotification(channelId, !isMuted);
+        toast({
+          title: "Sucesso",
+          description: `Notificações ${isMuted ? 'ativadas' : 'desativadas'} para este canal.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Falha ao atualizar as configurações de notificação.",
+          variant: "destructive"
+        });
+        setIsMuted(isMuted);
+      }
+    }
+  };
+
+  const getConversationForHeader = () => {
+    return {
+      contactName: 'Nome do Contato',
+      contactNumber: conversationId || 'Número Desconhecido'
+    };
+  };
+
+  function getMessageDisplayComponent(channelId: string) {
+    switch (channelId) {
+      case "chat":
+      case "af1e5797-edc6-4ba3-a57a-25cf7297c4d6":
+        return YelenaMessageDisplay;
+      case "joao-dourado":
+      case "621abb21-60b2-4ff2-a0a6-172a94b4b65c":
+        return JoaoDouradoMessageDisplay;
+      case "america-dourada":
+      case "64d8acad-c645-4544-a1e6-2f0825fae00b":
+        return AmericaDouradaMessageDisplay;
+      case "gerente-lojas":
+      case "d8087e7b-5b06-4e26-aa05-6fc51fd4cdce":
+        return GerenteLojasMessageDisplay;
+      case "gerente-externo":
+      case "d2892900-ca8f-4b08-a73f-6b7aa5866ff7":
+        return GerenteExternoMessageDisplay;
+      default:
+        return MessageBubble;
+    }
   }
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
-      <ChatSidebar 
-        channelId={channelId} 
-        conversations={conversations} // This is UnifiedConversation[]
-        selectedConversation={selectedConversation} 
-        isSidebarOpen={isSidebarOpen} 
-        isDarkMode={isDarkMode} 
-        onClose={onClose} 
-        onConversationSelect={handleConversationSelect}
-        onSidebarToggle={setIsSidebarOpen} 
-        onRefresh={refreshConversations} 
-      />
+    <div className={cn(
+      "fixed inset-0 z-50 flex items-center justify-center p-4",
+      isDarkMode ? "bg-black/80" : "bg-white/80"
+    )}>
+      <div className={cn(
+        "relative w-full max-w-4xl h-full max-h-[90vh] rounded-lg shadow-lg flex flex-col overflow-hidden",
+        isDarkMode ? "bg-[#18181b] text-white" : "bg-white text-gray-900"
+      )}>
+        {/* Header */}
+        <div className={cn(
+          "p-4 border-b flex items-center justify-between h-[74px] min-h-[64px] max-h-[96px]",
+          isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white"
+        )}>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" />
+              <AvatarFallback>CN</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <h2 className={cn("font-semibold", isDarkMode ? "text-white" : "text-gray-900")}>
+                {getConversationForHeader()?.contactName || channelName}
+              </h2>
+              <span className={cn("text-sm", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+                {getConversationForHeader()?.contactNumber || 'Número Desconhecido'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm">
+              <Phone className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <Video className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleMuteToggle}>
+              {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menu</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  Ver detalhes
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  Arquivar conversa
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  Silenciar notificações
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-red-600 focus:text-red-600">
+                  Excluir conversa
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
 
-      <div className="flex-1 flex flex-col">
-        <ChatMainArea 
-          selectedConv={selectedConvForMainArea} 
-          conversationForHeader={conversationForHeader} 
-          messages={displayMessages} 
-          messagesLoading={messagesLoading} 
-          isSidebarOpen={isSidebarOpen} 
-          isDarkMode={isDarkMode} 
-          channelId={channelId} 
-          onSidebarToggle={setIsSidebarOpen} 
-          onMarkAsResolved={() => { console.log('Mark as resolved clicked'); }}
-          // Pass the corrected handlers or the props if they are meant for ChatMainArea
-          onSendMessage={handleSendMessage} 
-          onSendFile={onSendFileProp || handleSendFile} 
-          onSendAudio={onSendAudioProp || handleSendAudio} 
+        {/* Chat Main Area */}
+        <ChatMainArea
+          selectedConv={{
+            id: conversationId || 'default',
+            contact_name: getConversationForHeader()?.contactName || 'Nome Desconhecido',
+            contact_phone: conversationId || 'Número Desconhecido',
+            last_message: '',
+            last_message_time: new Date().toISOString(),
+            status: 'unread',
+            updated_at: new Date().toISOString()
+          }}
+          conversationForHeader={getConversationForHeader()}
+          messages={messages}
+          messagesLoading={messagesLoading}
+          isSidebarOpen={false}
+          isDarkMode={isDarkMode}
+          channelId={channelId}
+          onSidebarToggle={handleSidebarToggle}
+          onMarkAsResolved={handleMarkAsResolved}
+          onSendMessage={handleSendMessage}
+          onSendFile={onSendFile}
+          onSendAudio={onSendAudio}
         />
       </div>
     </div>
   );
 };
-
