@@ -211,7 +211,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 message.tipo_remetente === "USUARIO_INTERNO" ||
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
-              // Acesso seguro ao nome_do_contato (corrige TS2551)
+              // Acesso seguro ao nome do contato (só existe Nome_do_contato!)
               const contactName =
                 message.Nome_do_contato ||
                 message.sender ||
@@ -258,9 +258,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                           <span>
                             {canalNome}
                           </span>
-                          {message.tipo_remetente === "USUARIO_INTERNO" && !!(message.Nome_do_contato || message.nome_do_contato) && (
+                          {message.tipo_remetente === "USUARIO_INTERNO" && !!(message.Nome_do_contato) && (
                             <span className="font-semibold">
-                              {message.Nome_do_contato || message.nome_do_contato}
+                              {message.Nome_do_contato}
                             </span>
                           )}
                         </>
