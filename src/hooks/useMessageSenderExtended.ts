@@ -67,26 +67,6 @@ export const useMessageSenderExtended = () => {
         console.log('[useMessageSenderExtended] Resultado de sendTextMessage:', resultMessage);
       }
 
-      if (addMessageToState && resultMessage) {
-        addMessageToState(resultMessage);
-        console.log('[useMessageSenderExtended] Mensagem adicionada ao estado.');
-      }
-
-      const messageType = messageData.messageType || "text";
-      const typeMessages: Record<string, string> = {
-        text: "Mensagem enviada",
-        file: "Arquivo enviado",
-        audio: "Áudio enviado",
-        image: "Imagem enviada",
-        video: "Vídeo enviado"
-      };
-
-      toast({
-        title: "Sucesso",
-        description: typeMessages[messageType] + " com sucesso",
-      });
-      console.log('[useMessageSenderExtended] Toast de sucesso exibido.');
-
       return true;
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);

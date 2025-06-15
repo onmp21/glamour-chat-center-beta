@@ -120,13 +120,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       fileType === 'file' ? 'file' : 'text'
     ) : 'text';
 
-    // Mensagem que será exibida imediatamente
-    const tempMessage = customCaption || message.trim() || (filePreview ? filePreview.file.name : '');
-
-    // CHAMA callback local para exibição instantânea
-    onSendMessage?.(tempMessage);
-
-    await sendMessage({
+    const success = await sendMessage({
       conversationId,
       channelId,
       content: customCaption !== undefined ? customCaption : (message.trim() || (filePreview ? filePreview.file.name : "")),
@@ -136,10 +130,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       fileData: fileData || undefined
     });
 
-    setMessage('');
-    setFilePreview(null);
-    setShowFilePreviewModal(false);
-    setRecordingTime(0);
+    if (success) {
+      setMessage('');
+      setFilePreview(null);
+      setShowFilePreviewModal(false);
+      setRecordingTime(0);
+    }
     setSendingLocal(false);
   };
 
