@@ -29,11 +29,15 @@ export const useMessageSenderExtended = () => {
     
     try {
       let phoneNumber = messageData.conversationId;
+      console.log('[useMessageSenderExtended] conversationId original:', messageData.conversationId);
+
       if (phoneNumber.includes("_")) {
         phoneNumber = phoneNumber.split("_")[0];
+        console.log('[useMessageSenderExtended] phoneNumber após extração:', phoneNumber);
       }
+
       const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
-      console.log('[useMessageSenderExtended] channelId processado:', messageData.channelId, '-> UUID:', processedChannelId);
+      console.log('[useMessageSenderExtended] channelId processado para UUID:', processedChannelId);
 
       let resultMessage: RawMessage;
 
@@ -67,25 +71,25 @@ export const useMessageSenderExtended = () => {
         console.log('[useMessageSenderExtended] Resultado de sendTextMessage:', resultMessage);
       }
 
-      if (addMessageToState && resultMessage) {
-        addMessageToState(resultMessage);
-        console.log('[useMessageSenderExtended] Mensagem adicionada ao estado.');
+      // Salvamento real na tabela (atualizado)
+      try {
+        await ChannelApiMappingService.saveMessageToChannel(
+          processedChannelId || messageData.channelId,
+          resultMessage
+        );
+        console.log('[useMessageSenderExtended] Mensagem realmente salva no canal.');
+      } catch (saveError) {
+        console.error('[useMessageSenderExtended] Falha ao salvar mensagem:', saveError);
+        throw saveError;
       }
 
-      const messageType = messageData.messageType || "text";
-      const typeMessages: Record<string, string> = {
-        text: "Mensagem enviada",
-        file: "Arquivo enviado",
-        audio: "Áudio enviado",
-        image: "Imagem enviada",
-        video: "Vídeo enviado"
-      };
+      // Opcional: chamada de callback local para UI/estado local (não faz nada se não passado)
+      if (addMessageToState && resultMessage) {
+        addMessageToState(resultMessage);
+        console.log('[useMessageSenderExtended] Mensagem adicionada ao estado local.');
+      }
 
-      toast({
-        title: "Sucesso",
-        description: typeMessages[messageType] + " com sucesso",
-      });
-      console.log('[useMessageSenderExtended] Toast de sucesso exibido.');
+      // Não faz toast de sucesso (UI deve mostrar na tela via realtime, não via optimistic UI)
 
       return true;
     } catch (error) {

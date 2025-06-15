@@ -4,10 +4,14 @@ import { RawMessage } from '@/types/messageTypes';
 type ChannelApiMapping = {
   id: string;
   channel_id: string;
-  api_instance_id: string;
+  instance_id: string;
+  channel_name?: string;
+  instance_name?: string;
+  base_url?: string;
+  api_key?: string;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
-  api_instance_uuid?: string;
 };
 
 export class ChannelApiMappingService {
@@ -29,17 +33,17 @@ export class ChannelApiMappingService {
     this.fetchPromise = new Promise(async (resolve) => {
       try {
         const { data, error } = await supabase
-          .from('channel_api_mappings')
+          .from('channel_instance_mappings')
           .select('*');
         if (error) {
-          console.error("Error fetching channel API mappings:", error);
+          console.error("Error fetching channel instance mappings:", error);
           resolve(null);
         } else {
           this.mappings = data;
           resolve(data);
         }
       } catch (err) {
-        console.error("Unexpected error fetching channel API mappings:", err);
+        console.error("Unexpected error fetching channel instance mappings:", err);
         resolve(null);
       } finally {
         this.isFetching = false;
@@ -123,19 +127,13 @@ export class ChannelApiMappingService {
       return null;
     }
 
-    // Get API instance details
-    const { data: apiInstance, error } = await supabase
-      .from('api_instances')
-      .select('*')
-      .eq('id', mapping.api_instance_id)
-      .single();
-
-    if (error || !apiInstance) {
-      console.error("Error fetching API instance:", error);
-      return null;
-    }
-
-    return apiInstance;
+    // The mapping contains all required data for API instance
+    return {
+      base_url: mapping.base_url,
+      api_key: mapping.api_key,
+      instance_name: mapping.instance_name,
+      id: mapping.instance_id,
+    };
   }
 
   static async sendMessageViaEvolution(
@@ -174,9 +172,19 @@ export class ChannelApiMappingService {
   }
 
   static async saveMessageToChannel(channelId: string, message: RawMessage): Promise<void> {
-    // Get table name for channel
+    // Atualizado: mapeamento com UUIDs e legacy, e campo nome_do_contato minúsculo
     const tableMapping: Record<string, string> = {
+      // UUIDs padrão dos canais (ajuste para seus UUIDs se necessário)
+      'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
+      '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas',
+      'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas',
+      '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'joao_dourado_conversas',
+      '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas',
+      'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas',
+      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas',
+      // Nomes legados e nomes "amigáveis"
       'yelena': 'yelena_ai_conversas',
+      'chat': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
       'souto-soares': 'souto_soares_conversas',
       'joao-dourado': 'joao_dourado_conversas',
@@ -185,30 +193,34 @@ export class ChannelApiMappingService {
       'gerente-externo': 'gerente_externo_conversas'
     };
 
-    const tableName = tableMapping[channelId];
+    const tableName = tableMapping[channelId] || tableMapping[await this.getChannelUuid(channelId) || ''] || 'yelena_ai_conversas';
+
     if (!tableName) {
-      console.error(`No table mapping found for channel: ${channelId}`);
-      return;
+      console.error(`[saveMessageToChannel] No table mapping found for channel: ${channelId}`);
+      throw new Error('Canal não encontrado para salvar mensagens');
     }
 
-    // Convert RawMessage to database format
+    // Garantir nome_do_contato e campo correto
     const dbMessage = {
       session_id: message.session_id,
       message: message.message,
       read_at: message.read_at,
-      Nome_do_contato: message.Nome_do_contato,
+      nome_do_contato: message.nome_do_contato || message.Nome_do_contato || "Atendente",
       mensagemtype: message.mensagemtype || 'text',
       tipo_remetente: message.tipo_remetente,
       media_base64: message.media_base64
     };
 
-    // Use dynamic query with type assertion
+    // Debug log
+    console.log(`[saveMessageToChannel] Salvando mensagem em '${tableName}':`, dbMessage);
+
+    // Inserção robusta: verifica sucesso antes de confirmar
     const { error } = await (supabase as any)
       .from(tableName)
       .insert(dbMessage);
 
     if (error) {
-      console.error(`Error saving message to ${tableName}:`, error);
+      console.error(`[saveMessageToChannel] Error saving message to ${tableName}:`, error);
       throw error;
     }
   }
