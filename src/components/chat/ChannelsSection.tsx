@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { useChannels } from '@/contexts/ChannelContext';
@@ -16,19 +17,40 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   activeChannel,
   onChannelSelect
 }) => {
-  // Usa canais do contexto, agora padronizados com .id == legacyId!
   const { channels } = useChannels();
   const { getAccessibleChannels } = usePermissions();
 
-  // NÃO precisa mais mapear manualmente: context já padroniza .id = legacyId
+  const getChannelLegacyId = (channel: any) => {
+    const nameToId: Record<string, string> = {
+      'Yelena-AI': 'chat',
+      'Canarana': 'canarana',
+      'Souto Soares': 'souto-soares',
+      'João Dourado': 'joao-dourado',
+      'América Dourada': 'america-dourada',
+      'Gerente das Lojas': 'gerente-lojas', // CORRETO
+      'Andressa Gerente Externo': 'gerente-externo'
+    };
+    return nameToId[channel.name] || channel.id;
+  };
+
+  const getChannelDisplayName = (channelName: string) => {
+    const nameMappings: Record<string, string> = {
+      'Yelena-AI': 'Óticas Villa Glamour',
+      'Gerente das Lojas': 'Gustavo', // Mostra "Gustavo" para o usuário
+      'Andressa Gerente Externo': 'Andressa'
+    };
+    return nameMappings[channelName] || channelName;
+  };
+
   const accessibleChannels = getAccessibleChannels();
   const availableChannels = channels
     .filter(channel => channel.isActive)
     .map(channel => ({
       ...channel,
-      displayName: channel.name // Poderia customizar para nomes bonitos se desejar
+      legacyId: getChannelLegacyId(channel),
+      displayName: getChannelDisplayName(channel.name)
     }))
-    .filter(channel => accessibleChannels.includes(channel.id)); // .id já é legacyId
+    .filter(channel => accessibleChannels.includes(channel.legacyId));
 
   const getChannelIcon = (channelName: string) => {
     if (channelName.includes('Yelena') || channelName.includes('AI')) {
@@ -48,12 +70,12 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
 
   const ChannelItem: React.FC<{ channel: any }> = ({ channel }) => {
     const IconComponent = getChannelIcon(channel.name);
-    const isActive = activeChannel === channel.id;
-    const { counts } = useChannelConversationCounts(channel.id);
+    const isActive = activeChannel === channel.legacyId;
+    const { counts } = useChannelConversationCounts(channel.legacyId);
     
     return (
       <button 
-        onClick={() => onChannelSelect(channel.id)} 
+        onClick={() => onChannelSelect(channel.legacyId)} 
         className={cn(
           "w-full p-4 rounded-xl transition-all duration-300 text-left flex items-center space-x-4 hover:scale-[1.02]",
           isActive 

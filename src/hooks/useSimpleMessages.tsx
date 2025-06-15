@@ -76,15 +76,6 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       if (rawData && rawData.length > 0) {
         console.log(`📋 [SIMPLE_MESSAGES] Primeira mensagem exemplo:`, rawData[0]);
       }
-
-      // [💡 ADICIONADO]: debug para checagem dos nome_do_contato
-      if (rawData && rawData.length > 0) {
-        rawData.forEach((m: any, idx: number) => {
-          if (!m.nome_do_contato) {
-            console.warn('⚠️ [SIMPLE_MESSAGES] Mensagem sem nome_do_contato - índice:', idx, m);
-          }
-        });
-      }
       
       const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
         id: row.id?.toString() || '',

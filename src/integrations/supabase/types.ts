@@ -222,6 +222,45 @@ export type Database = {
         }
         Relationships: []
       }
+      channel_api_mappings: {
+        Row: {
+          api_instance_id: string
+          channel_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          api_instance_id: string
+          channel_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          api_instance_id?: string
+          channel_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_api_mappings_api_instance_id_fkey"
+            columns: ["api_instance_id"]
+            isOneToOne: false
+            referencedRelation: "api_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_api_mappings_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: true
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_instance_mappings: {
         Row: {
           api_key: string

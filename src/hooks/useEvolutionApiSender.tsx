@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { EvolutionApiService } from '@/services/EvolutionApiService';
@@ -19,26 +20,24 @@ export const useEvolutionApiSender = () => {
     try {
       console.log('🚀 [EVOLUTION_API_SENDER] Enviando mensagem:', messageData);
 
-      // Use correct table and property
+      // Get channel mapping from database
       const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
+        .from('channel_api_mappings')
+        .select(`
+          *,
+          api_instances(*)
+        `)
         .eq('channel_id', messageData.channelId)
-        .maybeSingle();
+        .single();
 
       if (mappingError || !mapping) {
         console.error('❌ [EVOLUTION_API_SENDER] Mapping não encontrado para canal:', messageData.channelId);
         return false;
       }
 
-      // Fetch instance fields directly; mapping row contains them per migration
-      const apiInstance = {
-        base_url: mapping.base_url,
-        api_key: mapping.api_key,
-        instance_name: mapping.instance_name,
-      };
-      if (!apiInstance.base_url || !apiInstance.api_key || !apiInstance.instance_name) {
-        console.error('❌ [EVOLUTION_API_SENDER] Instância da API incompleta');
+      const apiInstance = mapping.api_instances;
+      if (!apiInstance) {
+        console.error('❌ [EVOLUTION_API_SENDER] Instância da API não encontrada');
         return false;
       }
 
@@ -72,22 +71,21 @@ export const useEvolutionApiSender = () => {
       console.log('🔄 [EVOLUTION_API_SENDER] Gerando QR Code para canal:', channelId);
 
       const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
+        .from('channel_api_mappings')
+        .select(`
+          *,
+          api_instances(*)
+        `)
         .eq('channel_id', channelId)
-        .maybeSingle();
+        .single();
 
       if (mappingError || !mapping) {
         throw new Error('Mapping não encontrado para o canal');
       }
 
-      const apiInstance = {
-        base_url: mapping.base_url,
-        api_key: mapping.api_key,
-        instance_name: mapping.instance_name,
-      };
-      if (!apiInstance.base_url || !apiInstance.api_key || !apiInstance.instance_name) {
-        throw new Error('Instância da API incompleta');
+      const apiInstance = mapping.api_instances;
+      if (!apiInstance) {
+        throw new Error('Instância da API não encontrada');
       }
 
       const service = new EvolutionApiService({
@@ -106,21 +104,20 @@ export const useEvolutionApiSender = () => {
   const checkConnectionStatus = async (channelId: string): Promise<any> => {
     try {
       const { data: mapping, error: mappingError } = await supabase
-        .from('channel_instance_mappings')
-        .select('*')
+        .from('channel_api_mappings')
+        .select(`
+          *,
+          api_instances(*)
+        `)
         .eq('channel_id', channelId)
-        .maybeSingle();
+        .single();
 
       if (mappingError || !mapping) {
         return { connected: false, error: 'Mapping não encontrado' };
       }
 
-      const apiInstance = {
-        base_url: mapping.base_url,
-        api_key: mapping.api_key,
-        instance_name: mapping.instance_name,
-      };
-      if (!apiInstance.base_url || !apiInstance.api_key || !apiInstance.instance_name) {
+      const apiInstance = mapping.api_instances;
+      if (!apiInstance) {
         return { connected: false, error: 'Instância não encontrada' };
       }
 

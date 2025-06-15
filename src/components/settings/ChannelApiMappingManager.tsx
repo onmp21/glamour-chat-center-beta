@@ -102,7 +102,7 @@ export const ChannelApiMappingManager: React.FC = () => {
       
       const mapping = mappings.find(m => m.channel_id === channelId);
       if (mapping) {
-        const instance = instances.find(inst => inst.id === mapping.instance_id);
+        const instance = instances.find(inst => inst.id === mapping.api_instance_id);
         const channel = activeChannels.find(ch => ch.id === channelId);
 
         await deleteMapping(channelId);
@@ -148,7 +148,7 @@ export const ChannelApiMappingManager: React.FC = () => {
   React.useEffect(() => {
     // Checar status para canais mapeados
     mappings.forEach((mapping) => {
-      const instance = instances.find(i => i.id === mapping.instance_id);
+      const instance = instances.find(i => i.id === mapping.api_instance_id);
       if (instance) {
         checkWebhookForInstance(instance, mapping.channel_id);
       }
@@ -170,7 +170,7 @@ export const ChannelApiMappingManager: React.FC = () => {
               // Força nova configuração
               const mapping = mappings.find(m => m.channel_id === channelId);
               if (mapping) {
-                const instance = instances.find(i => i.id === mapping.instance_id);
+                const instance = instances.find(i => i.id === mapping.api_instance_id);
                 await configureEvolutionWebhook(instance);
                 setTimeout(() => checkWebhookForInstance(instance, channelId), 1500);
               }
@@ -290,7 +290,7 @@ export const ChannelApiMappingManager: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
                                 <span className="text-sm font-medium">
-                                  {getInstanceName(mapping.instance_id)}
+                                  {getInstanceName(mapping.api_instance_id)}
                                 </span>
                               </div>
                               {getWebhookStatusBadge(channel.id)}
