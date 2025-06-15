@@ -59,19 +59,28 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
     let unsubscribed = false;
 
+    // Defensive: always cleanup first (it works for first run, but extra safe)
+    if (subscriptionInstanceRef.current) {
+      try {
+        DetailedLogger.info("useChannelConversationsRefactored", "Initial cleanup: Unsubscribing previous instance before mounting new.");
+        if (subscriptionInstanceRef.current.unsubscribe) {
+          subscriptionInstanceRef.current.unsubscribe();
+        }
+      } catch (_e) {}
+      subscriptionInstanceRef.current = null;
+    }
+
     if (channelId) {
-      // Gere o sufixo UMA vez só por ciclo de hook/canal
+      // Only generate suffix once per channel run
       if (!channelSuffixRef.current) {
         channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
       }
       const channelSuffix = channelSuffixRef.current;
 
-      // Limpa qualquer canal anterior ANTES de criar outro
-      if (subscriptionInstanceRef.current && subscriptionInstanceRef.current.unsubscribe) {
-        try {
-          DetailedLogger.info("useChannelConversationsRefactored", "Cleanup: Unsubscribing previous channel instance before creating a new one");
-          subscriptionInstanceRef.current.unsubscribe();
-        } catch (_e) {}
+      // Extra guard: REFUSE to create a new subscription if one exists
+      if (subscriptionInstanceRef.current) {
+        DetailedLogger.warn("useChannelConversationsRefactored", "Tried to create a duplicate channel subscription, preventing duplicate subscribe. Subscription already exists for this channelId, skipping new instance.");
+        return () => { /* no cleanup needed if not created */ };
       }
 
       const messageService = new MessageService(channelId);
@@ -81,7 +90,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
           if (!unsubscribed) {
             loadConversations();
           }
-        }, 
+        },
         channelSuffix
       );
 
@@ -98,13 +107,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         const repository = messageService['getRepository']();
         const tableName = repository.getTableName();
         MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
-        // Também tenta chamar unsubscribe no objeto se existir
+        // Also call unsubscribe if available
         if (subscriptionInstanceRef.current.unsubscribe) {
           try {
             subscriptionInstanceRef.current.unsubscribe();
           } catch (_e) {}
         }
-        channelSuffixRef.current = undefined; // Libera o ref para nova inscrição futura
+        channelSuffixRef.current = undefined; // Allow for new subscription in the future
         subscriptionInstanceRef.current = null;
       }
     };
