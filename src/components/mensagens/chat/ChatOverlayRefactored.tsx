@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -8,11 +7,9 @@ import { ArrowLeft, Phone, Video, Bell, BellOff, MoreVertical } from 'lucide-rea
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-// FIX 1: Correct import for ThemeProvider
-import { useTheme } from '@/components/theme-provider'; 
-// FIX 2: Correct usage for ChannelContext
-import { useChannels } from '@/contexts/ChannelContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChannel } from '@/contexts/ChannelContext';
 import { useLazyChannelMessages } from '@/hooks/useLazyChannelMessages';
 import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
 import { RawMessage } from '@/types/messages';
@@ -48,9 +45,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // FIX 2: useChannels instead of useChannel, for now we do not use updateChannelNotification
-  // const { updateChannelNotification } = useChannel();
-  const { channels } = useChannels();
+  const { updateChannelNotification } = useChannel();
   const [isMuted, setIsMuted] = useState(false);
   const [channelName, setChannelName] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -85,12 +80,11 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
       return;
     }
 
-    // FIX 3: Use correct literal type for sender
     const newMessageData = {
       conversationId: conversationId,
       channelId: channelId,
       content: content,
-      sender: "agent" as const, // instead of string
+      sender: 'agent',
       agentName: user?.name,
       messageType: 'text' as const
     };
@@ -115,8 +109,25 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
     console.log(`[CHAT_OVERLAY] Toggling sidebar: ${open ? 'open' : 'closed'}`);
   };
 
-  // Mute logic - disabled since useChannels doesn't expose updateChannelNotification
-  // const handleMuteToggle = async () => { ... }
+  const handleMuteToggle = async () => {
+    setIsMuted(!isMuted);
+    if (updateChannelNotification) {
+      try {
+        await updateChannelNotification(channelId, !isMuted);
+        toast({
+          title: "Sucesso",
+          description: `Notificações ${isMuted ? 'ativadas' : 'desativadas'} para este canal.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Falha ao atualizar as configurações de notificação.",
+          variant: "destructive"
+        });
+        setIsMuted(isMuted);
+      }
+    }
+  };
 
   const getConversationForHeader = () => {
     return {
@@ -185,7 +196,9 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
             <Button variant="ghost" size="sm">
               <Video className="h-5 w-5" />
             </Button>
-            {/* MuteButton removed for now due to lack of updateChannelNotification in useChannels */}
+            <Button variant="ghost" size="sm" onClick={handleMuteToggle}>
+              {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -212,7 +225,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
         </div>
 
         {/* Chat Main Area */}
-        {/* FIX 4: Pass RawMessage[] and fix type errors, assuming ChatMainArea can accept RawMessage[] */}
         <ChatMainArea
           selectedConv={{
             id: conversationId || 'default',
@@ -224,8 +236,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayProps> = ({
             updated_at: new Date().toISOString()
           }}
           conversationForHeader={getConversationForHeader()}
-          // Here, pass as any to bypass type error for now.
-          messages={messages as any}
+          messages={messages}
           messagesLoading={messagesLoading}
           isSidebarOpen={false}
           isDarkMode={isDarkMode}
