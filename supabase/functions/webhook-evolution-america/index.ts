@@ -9,21 +9,32 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-function isDataUrl(str) {
+function isDataUrl(str: string) {
   return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
 }
 
-function extractPhoneAndName(sessionId) {
-  if (!sessionId) return { phone: '', name: 'Cliente' };
-  const parts = sessionId.split('-');
-  if (parts.length > 1 && /^\d{10,15}$/.test(parts[0])) {
-    return { phone: parts[0], name: parts.slice(1).join('-') || 'Cliente' };
-  }
-  const phoneMatch = sessionId.match(/(\d{10,15})/);
-  return { phone: phoneMatch ? phoneMatch[1] : sessionId, name: 'Cliente' };
+function cleanPhoneFromSessionId(sessionId: string) {
+  if (typeof sessionId !== 'string') return '';
+  const match = sessionId.match(/(\d{10,15})/);
+  return match ? match[1] : sessionId.replace(/@.*$/, '');
 }
 
-function getMessageContent(messageData) {
+function extractPhoneAndName(messageData: any) {
+  const sessionId = messageData?.key?.remoteJid || '';
+  const phone = cleanPhoneFromSessionId(sessionId);
+
+  let name = 'Cliente';
+  if (typeof messageData?.pushName === 'string' && messageData.pushName.trim() && !messageData?.key?.fromMe) {
+    name = messageData.pushName.trim();
+  } else if (messageData?.key?.fromMe) {
+    name = typeof messageData.agentName === 'string'
+        ? messageData.agentName.trim() || 'America'
+        : 'America';
+  }
+  return { phone, name };
+}
+
+function getMessageContent(messageData: any) {
   return messageData.message?.conversation ||
     messageData.message?.extendedTextMessage?.text ||
     messageData.message?.imageMessage?.caption ||
@@ -33,7 +44,7 @@ function getMessageContent(messageData) {
     '[Mídia]';
 }
 
-function getMessageType(messageData) {
+function getMessageType(messageData: any) {
   if (messageData.message?.imageMessage) {
     return { type: 'image', mediaUrl: messageData.message.imageMessage.url };
   } else if (messageData.message?.audioMessage) {
@@ -47,6 +58,7 @@ function getMessageType(messageData) {
 }
 
 const TABLE_NAME = "america_dourada_conversas";
+const LOG_PREFIX = "[Webhook-America]";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -54,9 +66,12 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const webhookData = await req.json();
+
+    console.log(`${LOG_PREFIX} Received webhook data:`, JSON.stringify(webhookData, null, 2));
     const { event, instance, data } = webhookData;
 
     if (!event || !instance) {
+      console.error(`${LOG_PREFIX} Missing required fields: event or instance`);
       return new Response(JSON.stringify({
         error: 'Missing required fields: event or instance'
       }), {
@@ -70,6 +85,7 @@ serve(async (req) => {
       case 'messages_upsert':
       case 'messagesupsert':
         if (!data) {
+          console.error(`${LOG_PREFIX} No message data received`);
           return new Response(JSON.stringify({
             error: 'No message data'
           }), {
@@ -78,8 +94,8 @@ serve(async (req) => {
           });
         }
         return await processMessage(supabase, data, TABLE_NAME, instance);
-
       default:
+        console.warn(`${LOG_PREFIX} Event ${event} received but not processed`);
         return new Response(JSON.stringify({
           success: true,
           message: `Event ${event} received but not processed`,
@@ -88,11 +104,11 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
-
   } catch (error) {
+    console.error(`${LOG_PREFIX} Internal server error:`, error);
     return new Response(JSON.stringify({
       error: 'Internal server error',
-      details: error.message || 'Unknown error'
+      details: error && (error.message || error.toString())
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -100,16 +116,16 @@ serve(async (req) => {
   }
 });
 
-async function processMessage(supabase, messageData, tableName, instance) {
+async function processMessage(supabase: any, messageData: any, tableName: string, instance: string) {
   try {
-    const sessionId = messageData.key?.remoteJid || '';
-    const { phone, name } = extractPhoneAndName(sessionId);
+    console.log(`${LOG_PREFIX} processMessage data:`, JSON.stringify(messageData, null, 2));
+    const { phone, name } = extractPhoneAndName(messageData);
+    const sessionId = phone;
     const messageContent = getMessageContent(messageData);
-
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    const insertData = {
+    const insertData: any = {
       session_id: sessionId,
       message: messageContent,
       read_at: new Date().toISOString(),
@@ -128,22 +144,26 @@ async function processMessage(supabase, messageData, tableName, instance) {
       else insertData.message = '[Mídia]';
     }
 
+    console.log(`${LOG_PREFIX} Attempting to insert message into table:`, tableName, "with payload:", JSON.stringify(insertData, null, 2));
     const { data: insertResult, error: insertError } = await supabase
       .from(tableName)
       .insert([insertData])
       .select();
 
     if (insertError) {
+      console.error(`${LOG_PREFIX} Database error on insert:`, insertError.message, "Table:", tableName, "Insert data:", JSON.stringify(insertData, null, 2));
       return new Response(JSON.stringify({
         error: 'Database error',
         details: insertError.message,
-        tableName
+        tableName,
+        insertData
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
+    console.log(`${LOG_PREFIX} Message successfully inserted! Result:`, JSON.stringify(insertResult, null, 2));
     return new Response(JSON.stringify({
       success: true,
       tableName,
@@ -154,9 +174,10 @@ async function processMessage(supabase, messageData, tableName, instance) {
     });
 
   } catch (error) {
+    console.error(`${LOG_PREFIX} Message processing failed:`, error, "Insert payload:", messageData);
     return new Response(JSON.stringify({
       error: 'Message processing failed',
-      details: error.message || 'Unknown error',
+      details: error && (error.message || error.toString()),
       tableName
     }), {
       status: 500,

@@ -47,6 +47,7 @@ function getMessageType(messageData) {
 }
 
 const TABLE_NAME = "joao_dourado_conversas";
+const LOG_PREFIX = "[Webhook-Joao]";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
