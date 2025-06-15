@@ -14,6 +14,7 @@ export class ChannelApiMappingService {
   private static mappings: ChannelApiMapping[] | null = null;
   private static isFetching: boolean = false;
   private static fetchPromise: Promise<ChannelApiMapping[] | null> | null = null;
+  private static legacyIdToUuidCache: Record<string, string> = {};
 
   constructor() {}
 
@@ -21,18 +22,15 @@ export class ChannelApiMappingService {
     if (this.mappings !== null) {
       return this.mappings;
     }
-
     if (this.isFetching) {
       return this.fetchPromise || null;
     }
-
     this.isFetching = true;
     this.fetchPromise = new Promise(async (resolve) => {
       try {
         const { data, error } = await supabase
           .from('channel_api_mappings')
           .select('*');
-
         if (error) {
           console.error("Error fetching channel API mappings:", error);
           resolve(null);
@@ -48,44 +46,30 @@ export class ChannelApiMappingService {
         this.fetchPromise = null;
       }
     });
-
     return this.fetchPromise;
   }
 
   static async getMappings(): Promise<ChannelApiMapping[] | null> {
     if (this.mappings === null) {
-      return await this.fetchMappings();
+      await this.fetchMappings();
     }
     return this.mappings;
   }
 
   /**
-   * Novo método para obter o UUID real do canal a partir de seu legacyId.
-   * Busca no Supabase caso ainda não esteja em cache.
+   * Mapeamento robusto de legacyId → UUID, focado em garantir que
+   * canais como 'chat', 'canarana', 'gerente-lojas', etc. sejam resolvidos para UUID.
    */
   static async getChannelUuid(legacyId: string): Promise<string | null> {
-    // Tenta buscar todos os mapeamentos do Supabase só uma vez
-    if (!this.mappings) {
-      await this.fetchMappings();
-    }
-    const allChannels = this.mappings;
-
-    // Buscar na coluna legacyId, se existir
-    // Prioriza busca exata pelo canal (caso a tabela 'channels' contenha este campo futuro)
-    // Aqui mantemos compatibilidade buscando por legacyId conhecido e depois pelo próprio UUID
-    const legacyToUuid: Record<string, string> = {};
-    // Monta um dicionário legacyId → UUID
-    if (allChannels) {
-      for (const mapping of allChannels) {
-        legacyToUuid[mapping.channel_id] = mapping.channel_id; // assume UUID coincidente
-      }
-    }
-    // Se está usando um UUID, devolve como está
+    // Permitir UUID direto (validação simples de UUID v4)
     if (/^[0-9a-fA-F-]{36}$/.test(legacyId)) {
       return legacyId;
     }
-
-    // Adicionar aliases conhecidos usados na aplicação:
+    // Usar cache para performance
+    if (ChannelApiMappingService.legacyIdToUuidCache[legacyId]) {
+      return ChannelApiMappingService.legacyIdToUuidCache[legacyId];
+    }
+    // Alias conhecidos (garante legacy compatibility)
     const aliasToName: Record<string, string> = {
       "chat": "Yelena-AI",
       "canarana": "Canarana",
@@ -93,22 +77,38 @@ export class ChannelApiMappingService {
       "joao-dourado": "João Dourado",
       "america-dourada": "América Dourada",
       "gerente-lojas": "Gerente das Lojas",
-      "gerente-externo": "Andressa Gerente Externo",
+      "gerente-externo": "Andressa Gerente Externo"
     };
-
-    const channelsTable = await supabase.from('channels').select('id, name');
-    if (channelsTable.error) {
-      console.warn("[ChannelApiMappingService] Falha ao buscar canais:", channelsTable.error.message);
-    } else if (channelsTable.data) {
-      for (const ch of channelsTable.data) {
-        // Mapeia tanto pelo nome quanto pelos aliases
-        legacyToUuid[aliasToName[ch.name] || ch.name] = ch.id;
-        legacyToUuid[ch.id] = ch.id;
-        legacyToUuid[ch.name] = ch.id;
+    // Buscar canais do supabase (precisa garantir UUID correto!)
+    try {
+      const { data, error } = await supabase.from('channels').select('id, name');
+      if (error) {
+        console.warn("[ChannelApiMappingService] Falha ao buscar canais:", error.message);
+        return null;
       }
+      if (data) {
+        // Preencher o cache
+        data.forEach((ch: { id: string; name: string }) => {
+          // Mapear tanto pelo legacy quanto pelo name/UUID
+          Object.entries(aliasToName).forEach(([legacy, canonical]) => {
+            if (ch.name === canonical) {
+              ChannelApiMappingService.legacyIdToUuidCache[legacy] = ch.id;
+              ChannelApiMappingService.legacyIdToUuidCache[ch.name] = ch.id;
+            }
+          });
+          // Garantir pelo próprio name
+          ChannelApiMappingService.legacyIdToUuidCache[ch.name] = ch.id;
+          ChannelApiMappingService.legacyIdToUuidCache[ch.id] = ch.id;
+        });
+        // Resultado final
+        const uuid = ChannelApiMappingService.legacyIdToUuidCache[legacyId] || null;
+        console.log(`[ChannelApiMappingService:getChannelUuid] legacyId='${legacyId}' ⇒ uuid='${uuid}'`);
+        return uuid;
+      }
+    } catch (e) {
+      console.error("[ChannelApiMappingService] Erro inesperado:", e);
     }
-
-    return legacyToUuid[legacyId] || null;
+    return null;
   }
 
   static async getApiInstanceForChannel(channelId: string) {
