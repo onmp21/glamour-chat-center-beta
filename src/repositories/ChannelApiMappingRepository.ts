@@ -5,8 +5,13 @@ export interface ChannelInstanceMapping {
   id?: string;
   channel_id: string;
   instance_id: string;
+  channel_name?: string;
+  instance_name?: string;
+  base_url?: string;
+  api_key?: string;
   created_at?: string;
   updated_at?: string;
+  is_active?: boolean;
 }
 
 export class ChannelApiMappingRepository {
@@ -14,7 +19,7 @@ export class ChannelApiMappingRepository {
     try {
       const { data, error } = await supabase
         .from('channel_instance_mappings')
-        .select('id, channel_id, instance_id, created_at, updated_at')
+        .select('id, channel_id, instance_id, channel_name, instance_name, base_url, api_key, is_active, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -33,7 +38,7 @@ export class ChannelApiMappingRepository {
     try {
       const { data, error } = await supabase
         .from('channel_instance_mappings')
-        .select('id, channel_id, instance_id, created_at, updated_at')
+        .select('id, channel_id, instance_id, channel_name, instance_name, base_url, api_key, is_active, created_at, updated_at')
         .eq('channel_id', channelId)
         .maybeSingle();
 
@@ -58,9 +63,14 @@ export class ChannelApiMappingRepository {
         .from('channel_instance_mappings')
         .insert({
           channel_id: mapping.channel_id,
+          channel_name: mapping.channel_name,
           instance_id: mapping.instance_id,
+          instance_name: mapping.instance_name,
+          base_url: mapping.base_url,
+          api_key: mapping.api_key,
+          is_active: mapping.is_active ?? true
         })
-        .select('id, channel_id, instance_id, created_at, updated_at')
+        .select('id, channel_id, instance_id, channel_name, instance_name, base_url, api_key, is_active, created_at, updated_at')
         .maybeSingle();
 
       if (error) {
@@ -81,9 +91,14 @@ export class ChannelApiMappingRepository {
         .from('channel_instance_mappings')
         .update({
           ...(mapping.instance_id && { instance_id: mapping.instance_id }),
+          ...(mapping.channel_name && { channel_name: mapping.channel_name }),
+          ...(mapping.instance_name && { instance_name: mapping.instance_name }),
+          ...(mapping.base_url && { base_url: mapping.base_url }),
+          ...(mapping.api_key && { api_key: mapping.api_key }),
+          ...(typeof mapping.is_active !== 'undefined' && { is_active: mapping.is_active }),
         })
         .eq('id', id)
-        .select('id, channel_id, instance_id, created_at, updated_at')
+        .select('id, channel_id, instance_id, channel_name, instance_name, base_url, api_key, is_active, created_at, updated_at')
         .maybeSingle();
 
       if (error) {
@@ -98,17 +113,40 @@ export class ChannelApiMappingRepository {
     }
   }
 
+  /**
+   * Upsert mapping by channel ID, requires all required fields.
+   * This method requires fetching channel and instance details prior to upsert.
+   */
   async upsertByChannelId(channelId: string, instanceId: string): Promise<ChannelInstanceMapping> {
     try {
-      const { data, error } = await supabase
-        .from('channel_instance_mappings')
+      // Fetch channel details
+      const { data: channel } = await supabase
+        .from('channels')
+        .select('id, name')
+        .eq('id', channelId)
+        .maybeSingle();
+      if (!channel) throw new Error('Canal não encontrado');
+
+      // Fetch instance details
+      const { data: instance } = await supabase
+        .from('api_instances')
+        .select('id, instance_name, base_url, api_key')
+        .eq('id', instanceId)
+        .maybeSingle();
+      if (!instance) throw new Error('Instância não encontrada');
+
+      // Upsert the full row
+      const { data, error } = await supabase.from('channel_instance_mappings')
         .upsert({
-          channel_id: channelId,
-          instance_id: instanceId,
-        }, {
-          onConflict: 'channel_id'
-        })
-        .select('id, channel_id, instance_id, created_at, updated_at')
+          channel_id: channel.id,
+          channel_name: channel.name,
+          instance_id: instance.id,
+          instance_name: instance.instance_name,
+          base_url: instance.base_url,
+          api_key: instance.api_key,
+          is_active: true,
+        }, { onConflict: 'channel_id' })
+        .select('id, channel_id, instance_id, channel_name, instance_name, base_url, api_key, is_active, created_at, updated_at')
         .maybeSingle();
 
       if (error) {

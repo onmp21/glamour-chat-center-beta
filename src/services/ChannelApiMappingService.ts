@@ -4,10 +4,14 @@ import { RawMessage } from '@/types/messageTypes';
 type ChannelApiMapping = {
   id: string;
   channel_id: string;
-  api_instance_id: string;
+  instance_id: string;
+  channel_name?: string;
+  instance_name?: string;
+  base_url?: string;
+  api_key?: string;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
-  api_instance_uuid?: string;
 };
 
 export class ChannelApiMappingService {
@@ -29,17 +33,17 @@ export class ChannelApiMappingService {
     this.fetchPromise = new Promise(async (resolve) => {
       try {
         const { data, error } = await supabase
-          .from('channel_api_mappings')
+          .from('channel_instance_mappings')
           .select('*');
         if (error) {
-          console.error("Error fetching channel API mappings:", error);
+          console.error("Error fetching channel instance mappings:", error);
           resolve(null);
         } else {
           this.mappings = data;
           resolve(data);
         }
       } catch (err) {
-        console.error("Unexpected error fetching channel API mappings:", err);
+        console.error("Unexpected error fetching channel instance mappings:", err);
         resolve(null);
       } finally {
         this.isFetching = false;
@@ -123,19 +127,13 @@ export class ChannelApiMappingService {
       return null;
     }
 
-    // Get API instance details
-    const { data: apiInstance, error } = await supabase
-      .from('api_instances')
-      .select('*')
-      .eq('id', mapping.api_instance_id)
-      .single();
-
-    if (error || !apiInstance) {
-      console.error("Error fetching API instance:", error);
-      return null;
-    }
-
-    return apiInstance;
+    // The mapping contains all required data for API instance
+    return {
+      base_url: mapping.base_url,
+      api_key: mapping.api_key,
+      instance_name: mapping.instance_name,
+      id: mapping.instance_id,
+    };
   }
 
   static async sendMessageViaEvolution(
