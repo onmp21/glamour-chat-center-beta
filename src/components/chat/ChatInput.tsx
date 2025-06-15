@@ -7,7 +7,8 @@ import { MessageTextArea } from './input/MessageTextArea';
 import { SendButton } from './input/SendButton';
 import { FilePreviewModal } from './input/FilePreviewModal';
 import { AudioRecorder } from './input/AudioRecorder';
-import { useMessageActions } from '@/hooks/useMessageActions';
+import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
+import { useAuth } from '@/contexts/AuthContext';
 import { FileData, RawMessage } from '@/types/messageTypes';
 import { openaiService } from '@/services/openaiService';
 import { Button } from '@/components/ui/button';
@@ -45,23 +46,38 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
 
-  const {
-    message,
-    setMessage,
-    fileData,
-    setFileData,
-    isRecording,
-    setIsRecording,
-    sending,
-    handleSend,
-    handleKeyPress
-  } = useMessageActions(channelId, conversationId, addMessageToState);
+  // --- NEW: Use backend sender ---
+  const { sendMessage, sending } = useMessageSenderExtended();
+  const { user } = useAuth();
+
+  const [message, setMessage] = useState('');
+  const [fileData, setFileData] = useState<FileData | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   const handleSendMessage = async (caption?: string) => {
-    console.log('[ChatInput] handleSendMessage foi chamado.');
-    console.log('[ChatInput] Chamando handleSend com fileData:', fileData);
-    const success = await handleSend(caption);
-    if (success) {
+    if ((!message.trim() && !fileData) || sending || !user) return;
+    // Build out full message data for sender
+    const payload = {
+      conversationId,
+      channelId,
+      content: caption || message.trim(),
+      sender: 'agent' as const,
+      agentName: user?.name,
+      messageType: fileData ? (fileData.mimeType.startsWith('image')
+        ? 'image'
+        : fileData.mimeType.startsWith('audio')
+        ? 'audio'
+        : fileData.mimeType.startsWith('video')
+        ? 'video'
+        : fileData.mimeType === 'application/pdf' || fileData.mimeType.startsWith('application/')
+        ? 'file'
+        : 'text') as any : 'text' as any,
+      fileData: fileData || undefined
+    };
+    const ok = await sendMessage(payload, addMessageToState);
+    if (ok) {
+      setMessage('');
+      setFileData(null);
       setShowFilePreview(false);
       setSuggestedReply(null);
       if (onMessageSent) onMessageSent();
@@ -73,7 +89,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleFileSelect = (selectedFileData: FileData) => {
-    console.log('[ChatInput] Arquivo selecionado:', selectedFileData);
     setFileData(selectedFileData);
     setShowFilePreview(true);
     setError(null);
@@ -85,7 +100,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleAudioReady = (audioData: FileData) => {
-    console.log('[ChatInput] Áudio pronto:', audioData);
     setFileData(audioData);
     setIsRecording(false);
     setShowFilePreview(true);
@@ -109,6 +123,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       fetchSuggestedReply();
     }
   }, [conversationId, channelId]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (fileData) {
+        setShowFilePreview(true);
+      } else {
+        handleSendMessage();
+      }
+    }
+  };
+
+  const handleStartRecording = () => setIsRecording(true);
 
   if (isRecording) {
     return (
@@ -195,7 +222,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <SendButton
               hasContent={message.trim() !== '' || fileData !== null}
               onSend={() => fileData ? setShowFilePreview(true) : handleSendMessage()}
-              onStartRecording={() => setIsRecording(true)}
+              onStartRecording={handleStartRecording}
               sending={sending}
               isDarkMode={isDarkMode}
             />
