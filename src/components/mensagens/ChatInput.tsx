@@ -42,6 +42,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingStartTimeRef = useRef<number>(0);
+  const [sendingAudio, setSendingAudio] = useState(false); // NOVO: Loading áudio
 
   // NOVO: para envio real via Evolution API
   const {
@@ -244,6 +245,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         });
 
         setSendingLocal(true);
+        setSendingAudio(true); // NOVO: inicia loading áudio
+
         // Converte corretamente
         let convertedBase64 = '';
         try {
@@ -251,6 +254,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         } catch {
           alert('Erro ao codificar áudio');
           setSendingLocal(false);
+          setSendingAudio(false);
           return;
         }
         await sendMessage({
@@ -266,9 +270,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             mimeType: audioFile.type,
             size: audioFile.size
           }
-          // NUNCA manda nome_do_contato!
         });
         setSendingLocal(false);
+        setSendingAudio(false);
         setIsRecording(false);
         setRecordingTime(0);
         if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
@@ -374,23 +378,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   // RENDERIZA botão mic (pressionar e segurar/push-to-talk)
-  if (isRecording) {
+  if (isRecording || sendingAudio) {
     return <div className={cn("p-4 border-t", isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white")}>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-3">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className={cn("text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
-              Gravando áudio... {formatTime(recordingTime)}
-            </span>
-          </div>
-          <Button onPointerUp={handleRecordCancel} variant="ghost" size="icon" className="text-red-500 hover:bg-red-100">
-            <X size={18} />
-          </Button>
-          <Button onPointerUp={handleRecordStop} className="bg-[#b5103c] hover:bg-[#9d0e34] text-white">
-            <Check size={18} />
-          </Button>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 flex items-center gap-3">
+          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+          <span className={cn("text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
+            {sendingAudio ?
+              <>
+                <span className="animate-spin inline-block mr-2 rounded-full h-4 w-4 border-b-2 border-white align-middle"></span>
+                Enviando áudio...
+              </>
+              : <>Gravando áudio... {formatTime(recordingTime)}</>
+            }
+          </span>
         </div>
-      </div>;
+        {!sendingAudio && (
+          <>
+            <Button onPointerUp={handleRecordCancel} variant="ghost" size="icon" className="text-red-500 hover:bg-red-100">
+              <X size={18} />
+            </Button>
+            <Button onPointerUp={handleRecordStop} className="bg-[#b5103c] hover:bg-[#9d0e34] text-white">
+              <Check size={18} />
+            </Button>
+          </>
+        )}
+      </div>
+    </div>;
   }
   return <>
       <div className={cn("border-t", isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white")}>

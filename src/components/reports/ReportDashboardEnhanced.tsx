@@ -44,6 +44,17 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     averageGenerationTime: 0
   });
 
+  // Função utilitária para formatar segundos em mm:ss
+  function formatSeconds(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return "0s";
+    const min = Math.floor(seconds / 60);
+    const sec = Math.round(seconds % 60);
+    if (min > 0) {
+      return `${min}m ${sec}s`;
+    }
+    return `${sec}s`;
+  }
+
   useEffect(() => {
     loadProviders();
     loadRecentReports();
@@ -216,7 +227,10 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       {/* Stats Section */}
       <ReportStatsSection 
         isDarkMode={isDarkMode}
-        stats={stats}
+        stats={{
+          ...stats,
+          averageGenerationTimeFormatted: formatSeconds(stats.averageGenerationTime)
+        }}
         providers={providers}
       />
 
