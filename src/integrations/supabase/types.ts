@@ -703,6 +703,7 @@ export type Database = {
       yelena_ai_conversas: {
         Row: {
           id: number
+          is_read: boolean | null
           media_base64: string | null
           mensagemtype: string | null
           message: string
@@ -713,6 +714,7 @@ export type Database = {
         }
         Insert: {
           id?: number
+          is_read?: boolean | null
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
@@ -723,6 +725,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          is_read?: boolean | null
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string

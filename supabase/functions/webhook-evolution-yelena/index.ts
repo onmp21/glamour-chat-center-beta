@@ -55,9 +55,14 @@ serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const webhookData = await req.json();
+
+    // Log all incoming webhook data for debugging
+    console.log("[Webhook-Yelena] Received webhook data:", JSON.stringify(webhookData, null, 2));
+
     const { event, instance, data } = webhookData;
 
     if (!event || !instance) {
+      console.error("[Webhook-Yelena] Missing required fields: event or instance");
       return new Response(JSON.stringify({
         error: 'Missing required fields: event or instance'
       }), {
@@ -71,6 +76,7 @@ serve(async (req) => {
       case 'messages_upsert':
       case 'messagesupsert':
         if (!data) {
+          console.error("[Webhook-Yelena] No message data received");
           return new Response(JSON.stringify({
             error: 'No message data'
           }), {
@@ -81,6 +87,7 @@ serve(async (req) => {
         return await processMessage(supabase, data, TABLE_NAME, instance);
 
       default:
+        console.warn(`[Webhook-Yelena] Event ${event} received but not processed`);
         return new Response(JSON.stringify({
           success: true,
           message: `Event ${event} received but not processed`,
@@ -91,9 +98,10 @@ serve(async (req) => {
     }
 
   } catch (error) {
+    console.error("[Webhook-Yelena] Internal server error:", error);
     return new Response(JSON.stringify({
       error: 'Internal server error',
-      details: error.message || 'Unknown error'
+      details: error && (error.message || error.toString())
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -103,6 +111,8 @@ serve(async (req) => {
 
 async function processMessage(supabase, messageData, tableName, instance) {
   try {
+    // Log full messageData for contextual debugging
+    console.log('[Webhook-Yelena] processMessage data:', JSON.stringify(messageData, null, 2));
     const sessionId = messageData.key?.remoteJid || '';
     const { phone, name } = extractPhoneAndName(sessionId);
     const messageContent = getMessageContent(messageData);
@@ -110,14 +120,14 @@ async function processMessage(supabase, messageData, tableName, instance) {
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    const insertData = {
+    const insertData: any = {
       session_id: sessionId,
       message: messageContent,
       read_at: new Date().toISOString(),
       mensagemtype: mensagemType,
       tipo_remetente: tipoRemetente,
       nome_do_contato: name,
-      is_read: false
+      is_read: false // Now guaranteed to exist in table
     };
 
     if (mediaUrl && isDataUrl(mediaUrl)) {
@@ -129,22 +139,26 @@ async function processMessage(supabase, messageData, tableName, instance) {
       else insertData.message = '[Mídia]';
     }
 
+    console.log("[Webhook-Yelena] Attempting to insert message into table:", tableName, "with payload:", JSON.stringify(insertData, null, 2));
     const { data: insertResult, error: insertError } = await supabase
       .from(tableName)
       .insert([insertData])
       .select();
 
     if (insertError) {
+      console.error("[Webhook-Yelena] Database error on insert:", insertError.message, "Table:", tableName, "Insert data:", JSON.stringify(insertData, null, 2));
       return new Response(JSON.stringify({
         error: 'Database error',
         details: insertError.message,
-        tableName
+        tableName,
+        insertData
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
+    console.log("[Webhook-Yelena] Message successfully inserted! Result:", JSON.stringify(insertResult, null, 2));
     return new Response(JSON.stringify({
       success: true,
       tableName,
@@ -155,9 +169,10 @@ async function processMessage(supabase, messageData, tableName, instance) {
     });
 
   } catch (error) {
+    console.error("[Webhook-Yelena] Message processing failed:", error, "Insert payload:", messageData);
     return new Response(JSON.stringify({
       error: 'Message processing failed',
-      details: error.message || 'Unknown error',
+      details: error && (error.message || error.toString()),
       tableName
     }), {
       status: 500,
