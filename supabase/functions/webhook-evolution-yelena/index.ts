@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -14,9 +15,7 @@ function isDataUrl(str) {
 }
 
 function cleanPhoneFromSessionId(sessionId) {
-  // Remove sufixo @s.whatsapp.net e retorna apenas os números
   if (typeof sessionId !== 'string') return '';
-  // Tenta capturar só os dígitos principais
   const match = sessionId.match(/(\d{10,15})/);
   return match ? match[1] : sessionId.replace(/@.*$/, '');
 }
@@ -25,13 +24,16 @@ function extractPhoneAndName(messageData) {
   const sessionId = messageData?.key?.remoteJid || '';
   const phone = cleanPhoneFromSessionId(sessionId);
 
-  // Tenta captar nome da mensagem (pushName) ou fallback
   let name = 'Cliente';
-  if (typeof messageData?.pushName === 'string' && messageData.pushName.trim()) {
+
+  // Corrigido: USUARIO_INTERNO (fromMe: true) usa agentName (se houver), senão 'Yelena' (mas NUNCA 'Cliente')
+  if (typeof messageData?.pushName === 'string' && messageData.pushName.trim() && !messageData?.key?.fromMe) {
     name = messageData.pushName.trim();
-  } else if (messageData?.key?.fromMe && messageData?.agentName) {
-    // fallback para nome do usuário interno (se disponível)
-    name = messageData.agentName;
+  } else if (messageData?.key?.fromMe) {
+    // Se fromMe=true, pega o agentName ou 'Yelena' default (NUNCA 'Cliente')
+    name = typeof messageData.agentName === 'string'
+        ? messageData.agentName.trim() || 'Yelena'
+        : 'Yelena';
   }
   return { phone, name };
 }
@@ -68,9 +70,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const webhookData = await req.json();
 
-    // Log all incoming webhook data for debugging
     console.log("[Webhook-Yelena] Received webhook data:", JSON.stringify(webhookData, null, 2));
-
     const { event, instance, data } = webhookData;
 
     if (!event || !instance) {
@@ -108,7 +108,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
-
   } catch (error) {
     console.error("[Webhook-Yelena] Internal server error:", error);
     return new Response(JSON.stringify({
@@ -123,26 +122,21 @@ serve(async (req) => {
 
 async function processMessage(supabase, messageData, tableName, instance) {
   try {
-    // Log full messageData for contextual debugging
     console.log('[Webhook-Yelena] processMessage data:', JSON.stringify(messageData, null, 2));
     const { phone, name } = extractPhoneAndName(messageData);
-
-    // Força a session_id a ser APENAS o número
     const sessionId = phone;
-
     const messageContent = getMessageContent(messageData);
-
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    const insertData: any = {
+    const insertData = {
       session_id: sessionId,
       message: messageContent,
       read_at: new Date().toISOString(),
       mensagemtype: mensagemType,
       tipo_remetente: tipoRemetente,
       nome_do_contato: name,
-      is_read: false // Now guaranteed to exist in table
+      is_read: false
     };
 
     if (mediaUrl && isDataUrl(mediaUrl)) {

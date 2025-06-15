@@ -101,6 +101,49 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   };
 
   useEffect(() => {
+    let realtimeChannel: any = null;
+
+    if (channelId && sessionId && isAuthenticated) {
+      loadMessages();
+      const tableName = getTableName(channelId);
+
+      realtimeChannel = supabase
+        .channel(`public:${tableName}:${sessionId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: tableName, filter: `session_id=eq.${sessionId}` },
+          (payload) => {
+            if (payload && payload.new) {
+              const novo = payload.new;
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === (novo.id?.toString() || ''))) return prev;
+                return [...prev, {
+                  id: novo.id?.toString() || '',
+                  session_id: novo.session_id || '',
+                  message: novo.message || '',
+                  read_at: novo.read_at || new Date().toISOString(),
+                  tipo_remetente: novo.tipo_remetente,
+                  nome_do_contato: novo.nome_do_contato,
+                  mensagemtype: novo.mensagemtype,
+                  media_base64: novo.media_base64
+                }];
+              });
+            }
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          }
+        });
+    }
+
+    return () => {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
+  }, [channelId, sessionId, isAuthenticated, user?.name]);
+
+  useEffect(() => {
     console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado:`, {
       channelId,
       sessionId,
