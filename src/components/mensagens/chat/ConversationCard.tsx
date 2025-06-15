@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +25,12 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
   getStatusColor,
   getStatusLabel
 }) => {
+  // Truncar mensagem recente para 35 caracteres
+  const truncateMessage = (msg: string, max = 35) => {
+    if (!msg) return '';
+    return msg.length > max ? msg.slice(0, max - 3) + "..." : msg;
+  };
+
   return (
     <Card
       key={conversation.id}
@@ -61,7 +66,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
           "text-xs truncate mb-2",
           isDarkMode ? "text-gray-400" : "text-gray-600"
         )}>
-          {conversation.last_message}
+          {truncateMessage(conversation.last_message || '')}
         </p>
         <div className="flex items-center justify-between">
           <span className={cn(

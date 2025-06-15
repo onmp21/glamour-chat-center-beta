@@ -55,12 +55,13 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
 
-  // === SCROLL AUTOMÁTICO: sempre rolar para o final ao receber mensagens ===
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // SCROLL AUTOMÁTICO melhorado
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!messagesLoading && messages.length > 0 && messagesEndRef.current) {
-      // scrollIntoView suave para o último elemento
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (!messagesLoading && messages.length > 0 && messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      // Força o scroll para o final
+      container.scrollTop = container.scrollHeight;
     }
   }, [messages.length, messagesLoading]);
 
@@ -152,7 +153,11 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-4">
+      <div
+        className="flex-1 overflow-auto p-4"
+        ref={messagesContainerRef}
+        style={{ minHeight: 0, height: "100%" }}
+      >
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
@@ -160,38 +165,74 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         ) : (
           <div className="space-y-4">
             {messages.map((message) => {
-              const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai' || message.sender === 'agent';
+              const isAgent =
+                message.tipo_remetente === "USUARIO_INTERNO" ||
+                message.tipo_remetente === "Yelena-ai" ||
+                message.sender === "agent";
 
-              // Now safely get the contact name
-              const contactName = (message as any).Nome_do_contato || (message as any).nome_do_contato || message.sender || 'Cliente';
+              // Nome do CLIENTE (só nome)
+              const contactName =
+                (message as any).Nome_do_contato ||
+                (message as any).nome_do_contato ||
+                message.sender ||
+                "Cliente";
               const nomeExibido = truncateName(contactName);
 
+              // Nome do canal E nome do usuário (se enviado via sistema)
               const canalNome = getChannelDisplayName(channelId);
-              // Use read_at if available, otherwise timestamp, otherwise now
+
+              // Format Hora
               const hora = (message as any).read_at
                 ? formatHour((message as any).read_at)
                 : formatHour(message.timestamp || new Date().toISOString());
 
               return (
-                <div key={message.id} className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
-                  <div className={cn("max-w-xs lg:max-w-md px-4 py-2 rounded-lg", isAgent ? "bg-[#b5103c] text-white" : isDarkMode ? "bg-[#3f3f46] text-white" : "bg-gray-200 text-gray-900")}>
-                    {/* Linha com nome truncado + canal */}
+                <div
+                  key={message.id}
+                  className={cn("flex", isAgent ? "justify-end" : "justify-start")}
+                >
+                  <div
+                    className={cn(
+                      "max-w-xs lg:max-w-md px-4 py-2 rounded-lg",
+                      isAgent
+                        ? "bg-[#b5103c] text-white"
+                        : isDarkMode
+                        ? "bg-[#3f3f46] text-white"
+                        : "bg-gray-200 text-gray-900"
+                    )}
+                  >
                     <div className="flex gap-2 text-xs mb-1 opacity-80">
-                      <span>
-                        {isAgent ? 'Agente' : nomeExibido}
-                      </span>
-                      <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
-                        ({canalNome})
-                      </span>
+                      {!isAgent && (
+                        // Balão do cliente externo: só nome
+                        <span>{nomeExibido}</span>
+                      )}
+                      {isAgent && (
+                        <>
+                          <span>
+                            {/* Nome do canal se for agente */}
+                            {canalNome}
+                          </span>
+                          {/* Se a mensagem for USUARIO_INTERNO e mandada pelo sistema (ex: sender === "agent") */}
+                          {message.tipo_remetente === "USUARIO_INTERNO" && !!message.Nome_do_contato && (
+                            <span className="font-semibold">
+                              {/* Exibir nome do usuario, mas só quando for mensagem enviada pelo sistema */}
+                              {message.Nome_do_contato}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
 
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {message.content}
+                    </p>
                     <p className="text-xs opacity-70 mt-1 text-right">{hora}</p>
                   </div>
                 </div>
               );
             })}
-            <div ref={messagesEndRef} />
+            {/* Mantém o div de referência para garantir scroll no final */}
+            <div />
           </div>
         )}
       </div>
