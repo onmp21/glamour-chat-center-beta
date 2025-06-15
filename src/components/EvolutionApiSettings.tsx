@@ -354,6 +354,17 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   };
 
   // SEÇÃO 3: Vincular Canal à Instância
+  const webhookMap: Record<string, string> = {
+    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-yelena',
+    '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-canarana',
+    'b7996f75-41a7-4725-8229-564f31868027': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-souto',
+    '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-joao',
+    '64d8acad-c645-4544-a1e6-2f0825fae00b': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-america',
+    'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerentelojas',
+    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerenteexterno'
+    // Adicione outros canais aqui seguindo o padrão!
+  };
+
   const linkChannelToInstance = async () => {
     if (!selectedChannelForMapping || !selectedInstanceForMapping) {
       toast({
@@ -373,7 +384,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         throw new Error('Canal ou instância não encontrados');
       }
 
-      // Criar mapeamento no banco
+      // ✅ 1. Criar mapeamento no banco
       await channelMappingService.createMapping({
         channel_id: selectedChannel.id,
         channel_name: selectedChannel.name,
@@ -384,56 +395,51 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         is_active: true
       });
 
-      // Configurar webhook automaticamente usando o novo webhook universal
-      console.log('🔗 [WEBHOOK] Configurando novo webhook universal para instância:', selectedInstance.instanceName);
-      
+      // ✅ 2. Configurar webhook do canal
+      const webhookUrl = webhookMap[selectedChannel.id];
+      if (!webhookUrl) {
+        throw new Error("Canal não tem um webhook configurado! Edite o código para adicionar.");
+      }
+
+      const events = [
+        "MESSAGES_UPSERT",
+        "MESSAGES_SET",
+        "MESSAGES_UPDATE",
+        "CONNECTION_UPDATE",
+        "QRCODE_UPDATED",
+        "CONTACTS_UPSERT",
+        "CONTACTS_SET",
+        "CONTACTS_UPDATE",
+        "CHATS_UPSERT",
+        "CHATS_SET",
+        "CHATS_UPDATE",
+        "PRESENCE_UPDATE",
+        "GROUPS_UPSERT",
+        "GROUP_UPDATE",
+        "GROUP_PARTICIPANTS_UPDATE"
+      ];
+
       const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
         instanceName: selectedInstance.instanceName
       });
 
-      // URL do novo webhook universal que substitui o antigo
-      const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/webhook-evolution-universal`;
-      
-      // Todos os eventos que o setWebhook suporta
-      const webhookEvents = [
-        'MESSAGES_UPSERT',
-        'MESSAGES_SET', 
-        'MESSAGES_UPDATE',
-        'CONNECTION_UPDATE',
-        'QRCODE_UPDATED',
-        'CONTACTS_UPSERT',
-        'CONTACTS_SET',
-        'CONTACTS_UPDATE',
-        'CHATS_UPSERT',
-        'CHATS_SET',
-        'CHATS_UPDATE',
-        'PRESENCE_UPDATE',
-        'GROUPS_UPSERT',
-        'GROUP_UPDATE',
-        'GROUP_PARTICIPANTS_UPDATE'
-      ];
+      // Seta o webhook individual do canal
+      const webhookResult = await service.setWebhook(webhookUrl, events, selectedInstance.instanceName);
 
-      const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
-      
       if (webhookResult.success) {
-        console.log('✅ [WEBHOOK] Novo webhook universal configurado com sucesso para instância:', selectedInstance.instanceName);
+        console.log('✅ [WEBHOOK] Webhook canal configurado:', webhookUrl);
       } else {
-        console.warn('⚠️ [WEBHOOK] Falha ao configurar novo webhook universal:', webhookResult.error);
+        throw new Error(webhookResult.error || 'Erro ao configurar webhook');
       }
-
-      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName} usando novo webhook universal`)
 
       toast({
         title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com novo webhook universal configurado!`,
+        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook dedicado!`
       });
 
-      // Recarregar mapeamentos
       await loadChannelMappings();
-      
-      // Limpar seleções
       setSelectedChannelForMapping('');
       setSelectedInstanceForMapping('');
     } catch (error) {
