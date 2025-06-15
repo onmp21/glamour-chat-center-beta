@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+// Corrigir: importar o utilitário de mídia compartilhado
+import { getMediaSaveDetails } from "../webhook-shared/mediaUtils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,7 +129,7 @@ async function processMessage(supabase, messageData, tableName, instance) {
     const messageContent = getMessageContent(messageData);
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
 
-    // NOVO uso: pega type/placeholder/url
+    // Aqui, agora está usando a função importada corretamente
     const { type: mensagemType, placeholder, mediaUrl } = getMediaSaveDetails(messageData);
     let realMessageContent = messageContent;
     let mediaBase64 = null;
