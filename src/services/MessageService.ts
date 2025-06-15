@@ -220,13 +220,13 @@ export class MessageService {
   }
 
   /**
-   * Creates a Supabase realtime subscription for the given channel.
+   * Cria uma subscription realtime no Supabase para o canal informado.
    * 
-   * NOTE: This method returns the channel ALREADY SUBSCRIBED.
-   * DO NOT call `.subscribe()` again on the returned channel. Doing so will throw an error.
-   * @param callback payload handler
-   * @param channelSuffix unique suffix for channel separation
-   * @returns The realtime channel instance (already subscribed)
+   * ATENÇÃO: O canal JÁ ESTÁ inscrito (já chamou subscribe internamente)
+   * NÃO chame .subscribe() novamente nesse canal – vai causar erro!
+   * @param callback handler do payload
+   * @param channelSuffix sufixo único para o canal
+   * @returns canal realtime já inscrito (não chame .subscribe() novamente!)
    */
   createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
     const repository = this.getRepository();
@@ -251,21 +251,21 @@ export class MessageService {
         }
       );
 
-    // Monkey-patch subscribe to prevent duplicate subscribing
+    // Adiciona proteção para evitar múltiplos subscribe
     const channelAny = channel as any;
     channelAny.__lov_subscribed = false;
     channelAny.__lov_original_subscribe = channel.subscribe;
 
     channel.subscribe = function (...args: any[]) {
       if (channelAny.__lov_subscribed) {
-        console.error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
-        throw new Error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
+        console.error("Tried to subscribe multiple times. '.subscribe()' can only be called uma vez por instância do canal.");
+        throw new Error("Tried to subscribe multiple times. '.subscribe()' can only be called uma vez por instância do canal.");
       }
       channelAny.__lov_subscribed = true;
       return channelAny.__lov_original_subscribe.apply(this, args);
     };
 
-    // Call subscribe() ONCE here **only**
+    // Faz a inscrição UMA ÚNICA VEZ aqui!
     channel.subscribe((status: string, err?: any) => {
       if (status === 'SUBSCRIBED') {
         console.log(`✅ [MESSAGE_SERVICE] Realtime channel subscribed for ${subscriptionKey}`);
@@ -275,10 +275,10 @@ export class MessageService {
       }
     });
 
-    // Store the subscription
+    // Guarda o canal inscrito
     MessageService.activeSubscriptions.set(subscriptionKey, channel);
 
-    return channel; // <-- Return the already-subscribed channel
+    return channel; // JÁ inscrito! Não chame .subscribe() novamente!
   }
 
   static unsubscribeChannel(channelSuffix: string, tableName: string) {
