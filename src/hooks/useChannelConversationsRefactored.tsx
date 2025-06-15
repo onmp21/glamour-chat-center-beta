@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
@@ -65,7 +64,6 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         loadConversations();
       }, channelSuffix);
 
-      channel.subscribe();
       DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
     }
 
