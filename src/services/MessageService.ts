@@ -241,19 +241,17 @@ export class MessageService {
           callback(payload);
         }
       );
-    
-    // Call subscribe() immediately, once per channel instance!
-    // Add guard to prevent duplicate subscribing on this channel
-    channel.__lov_subscribed = false;
 
-    channel.__lov_original_subscribe = channel.subscribe;
+    // Safely add custom properties with type assertion
+    (channel as any).__lov_subscribed = false;
+    (channel as any).__lov_original_subscribe = channel.subscribe;
     channel.subscribe = function (...args: any[]) {
-      if (this.__lov_subscribed) {
+      if ((this as any).__lov_subscribed) {
         console.error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
         throw new Error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
       }
-      this.__lov_subscribed = true;
-      return channel.__lov_original_subscribe.apply(this, args);
+      (this as any).__lov_subscribed = true;
+      return (channel as any).__lov_original_subscribe.apply(this, args);
     };
 
     channel.subscribe((status: string, err?: any) => {
