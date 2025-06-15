@@ -54,46 +54,63 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [sendingLocal, setSendingLocal] = useState(false);
 
   // Envio REAL via Evolution (corrigido: sempre chama callback local)
+  let sendLock: boolean = false; // Lock global ao componente. Reset no efeito ou após envio.
   const handleSend = async (customCaption?: string) => {
-    if (!message.trim() && !filePreview || !user || !selectedConv || !channelId || sending || sendingLocal) return;
+    if (sendLock || sending || sendingLocal) return; // Debounce
+    if ((!message.trim() && !filePreview) || !user || !selectedConv || !channelId) return;
     // Extra: impede duplo envio se arquivo em preview está aberto
     if (filePreview && showFilePreviewModal) return;
+    sendLock = true;
     setSendingLocal(true);
 
-    // Montar dados mínimos para o sender
+    // SELEÇÃO CORRETA DO NOME DO CONTATO
+    const isAgentMsg = true; // Sempre agente quando envia por este input!
+    let correctContactName: string | undefined = undefined;
+    // Para clientes, tente captar nome real do contato, nunca número
+    if (!isAgentMsg && selectedConv.contact_name && selectedConv.contact_name.trim() && isNaN(Number(selectedConv.contact_name.trim()))) {
+      correctContactName = selectedConv.contact_name.trim();
+    }
+    // Para agente, NUNCA mande nome_do_contato
+  
     let fileData = null;
     let fileType: string | undefined = undefined;
-    if (filePreview) {
-      try {
+    try {
+      if (filePreview) {
         let base64: string;
         let mimeType = filePreview.file.type;
-        if (filePreview.type === "audio") {
-          // Mantém áudio em webm base64 para envio
-          base64 = await FileService.convertToBase64(filePreview.file);
-          mimeType = "audio/webm";
-        } else {
-          base64 = await FileService.convertToBase64(filePreview.file);
-        }
+        base64 = await FileService.convertToBase64(filePreview.file);
         fileData = {
-          base64,
+          base64: base64.startsWith("data:") ? base64.split(",")[1] : base64,
           fileName: filePreview.file.name,
           mimeType: mimeType,
           size: filePreview.file.size
         };
         fileType = filePreview.type;
-      } catch (err) {
-        alert("Erro ao processar arquivo de anexo.");
-        setSendingLocal(false);
-        return;
       }
+    } catch (err) {
+      alert("Erro ao processar arquivo de anexo.");
+      setSendingLocal(false);
+      sendLock = false;
+      return;
     }
 
-    // Verifica se precisa do número puro para APIs
+    // Monta conversationId real (nunca número em nome)
     let conversationId = selectedConv.contact_phone || selectedConv.id;
-    if (conversationId.includes("_")) conversationId = conversationId.split("_")[0];
+    if (conversationId?.includes("_")) conversationId = conversationId.split("_")[0];
 
-    // Determina messageType conforme tipo de mídia ou texto
-    const messageType = fileData ? fileType === 'image' ? 'image' : fileType === 'audio' ? 'audio' : fileType === 'video' ? 'video' : fileType === 'file' ? 'file' : 'text' : 'text';
+    const messageType = fileData
+      ? fileType === 'image'
+        ? 'image'
+        : fileType === 'audio'
+        ? 'audio'
+        : fileType === 'video'
+        ? 'video'
+        : fileType === 'file'
+        ? 'file'
+        : 'text'
+      : 'text';
+
+    // Chama hook de envio (vai propagar até o backend corretamente agora)
     const success = await sendMessage({
       conversationId,
       channelId,
@@ -102,6 +119,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       agentName: user.name,
       messageType: messageType,
       fileData: fileData || undefined
+      // NUNCA passa nome_do_contato
     });
     if (success) {
       setMessage('');
@@ -110,6 +128,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       setRecordingTime(0);
     }
     setSendingLocal(false);
+    setTimeout(() => { sendLock = false }, 700); // Solta o lock
   };
   const handleQuickResponse = (response: string) => {
     setMessage(response);
@@ -216,19 +235,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleRecordStop = () => {
     setIsPressingMic(false);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: 'audio/webm;codecs=opus'
         });
-        // ENVIAR DIRETO! Cria File para seguir o mesmo fluxo de envio
         const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, {
           type: 'audio/webm'
         });
-        // Envia como mensagem de áudio, mostra imediatamente
+
         setSendingLocal(true);
-        onSendMessage?.('[Áudio]');
-        // Adapta para chamar o sender igual anexo
-        sendMessage({
+        // Converte corretamente
+        let convertedBase64 = '';
+        try {
+          convertedBase64 = await FileService.convertToBase64(audioFile);
+        } catch {
+          alert('Erro ao codificar áudio');
+          setSendingLocal(false);
+          return;
+        }
+        await sendMessage({
           conversationId: selectedConv?.contact_phone || selectedConv?.id,
           channelId,
           content: '[Áudio]',
@@ -236,13 +261,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           agentName: user?.name,
           messageType: 'audio',
           fileData: {
-            base64: '',
-            // Iremos converter base64 agora
+            base64: convertedBase64.startsWith("data:") ? convertedBase64.split(",")[1] : convertedBase64,
             fileName: audioFile.name,
             mimeType: audioFile.type,
             size: audioFile.size
           }
-        }).then(() => setSendingLocal(false));
+          // NUNCA manda nome_do_contato!
+        });
+        setSendingLocal(false);
         setIsRecording(false);
         setRecordingTime(0);
         if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);

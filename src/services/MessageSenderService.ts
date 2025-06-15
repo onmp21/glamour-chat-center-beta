@@ -163,20 +163,21 @@ export class MessageSenderService {
       const result = await response.json();
       this.logger.debug('Resposta da API Evolution', { result });
 
-      // Sempre usar valores válidos para data e nome_do_contato (minúsculo)
+      // Sempre usar valores válidos para data e nome_do_contato (NUNCA NÚMERO)
       const nowIso = new Date().toISOString();
+      // Usar null para nome_do_contato fora de mensagens do cliente!
       const messageData: RawMessage = {
         session_id: formattedNumber,
         message: text,
-        read_at: nowIso, // Corrigido para ISO 8601 (suportado pelo PG)
-        nome_do_contato: formattedNumber,
+        read_at: nowIso,
+        nome_do_contato: null,
         mensagemtype: 'conversation',
         tipo_remetente: 'USUARIO_INTERNO',
         id: result.key?.id || result.messageId || Date.now().toString(),
         sender: 'agent',
         timestamp: nowIso,
         content: text,
-        media_base64: null // sempre null em texto
+        media_base64: null
       };
 
       // Log de validação
