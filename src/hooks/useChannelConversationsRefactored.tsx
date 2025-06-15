@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
@@ -10,7 +11,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // UseRef para armazenar o mesmo sufixo e canal durante o ciclo de vida do hook
+  // Track the current channel suffix and subscription instance
   const channelSuffixRef = useRef<string>();
   const subscriptionInstanceRef = useRef<any>(null);
 
@@ -54,14 +55,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   }, [channelId, loadConversations]);
 
   useEffect(() => {
-    loadConversations();
-
     let unsubscribed = false;
-
-    // DEFENSIVE: always cleanup even if already cleaned up
+    // CLEANUP BEFORE CREATE: Always cleanup first
     if (subscriptionInstanceRef.current) {
+      DetailedLogger.info("useChannelConversationsRefactored", "Cleanup before new effect run: Unsubscribing previous instance.");
       try {
-        DetailedLogger.info("useChannelConversationsRefactored", "Forcing cleanup: Unsubscribing previous instance before mounting new.");
         if (subscriptionInstanceRef.current.unsubscribe) {
           subscriptionInstanceRef.current.unsubscribe();
         }
@@ -78,16 +76,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       channelSuffixRef.current = undefined;
     }
 
-    if (channelId) {
-      // Always generate new suffix per channel run!
-      channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
-      const channelSuffix = channelSuffixRef.current;
+    loadConversations();
 
-      // Defensive: PREVENT double subscription!
-      if (subscriptionInstanceRef.current) {
-        DetailedLogger.warn("useChannelConversationsRefactored", "Tried to create a duplicate channel subscription, skipping.");
-        return () => { };
-      }
+    // Only create a new subscription if channelId is valid
+    if (channelId) {
+      // Generate a truly unique suffix for each run
+      channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}-${Date.now()}`;
+      const channelSuffix = channelSuffixRef.current;
 
       const messageService = new MessageService(channelId);
       const channel = messageService.createRealtimeSubscription(
@@ -98,13 +93,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         channelSuffix
       );
       subscriptionInstanceRef.current = channel;
-      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} (sufixo: ${channelSuffix})`);
+      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription criado para ${channelId} (suffix: ${channelSuffix})`);
     }
 
     return () => {
       unsubscribed = true;
       if (subscriptionInstanceRef.current && channelId && channelSuffixRef.current) {
-        DetailedLogger.info("useChannelConversationsRefactored", `Cleanup: Realtime subscription interrompido para o canal ${channelId}`);
+        DetailedLogger.info("useChannelConversationsRefactored", `Cleanup: Unsubscribing realtime for canal ${channelId} (suffix: ${channelSuffixRef.current})`);
         try {
           const messageService = new MessageService(channelId);
           const repository = messageService['getRepository']();
