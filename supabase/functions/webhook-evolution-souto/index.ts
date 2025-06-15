@@ -125,24 +125,28 @@ async function processMessage(supabase: any, messageData: any, tableName: string
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
+    let realMensagemType = mensagemType;
+    let realMessageContent = messageContent;
+    let mediaBase64 = null;
+    if (mediaUrl && isDataUrl(mediaUrl)) {
+      mediaBase64 = mediaUrl;
+      if (mensagemType === 'image') realMessageContent = '[Imagem]';
+      else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
+      else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
+      else if (mensagemType === 'document') realMessageContent = '[Documento]';
+      else realMessageContent = '[Mídia]';
+    }
+
     const insertData: any = {
       session_id: sessionId,
-      message: messageContent,
+      message: realMessageContent,
       read_at: new Date().toISOString(),
-      mensagemtype: mensagemType,
+      mensagemtype: realMensagemType,
       tipo_remetente: tipoRemetente,
       nome_do_contato: name,
-      is_read: false
+      is_read: false,
+      media_base64: mediaBase64
     };
-
-    if (mediaUrl && isDataUrl(mediaUrl)) {
-      insertData.media_base64 = mediaUrl;
-      if (mensagemType === 'image') insertData.message = '[Imagem]';
-      else if (mensagemType === 'audio') insertData.message = '[Áudio]';
-      else if (mensagemType === 'video') insertData.message = '[Vídeo]';
-      else if (mensagemType === 'document') insertData.message = '[Documento]';
-      else insertData.message = '[Mídia]';
-    }
 
     console.log(`${LOG_PREFIX} Attempting to insert message into table:`, tableName, "with payload:", JSON.stringify(insertData, null, 2));
     const { data: insertResult, error: insertError } = await supabase

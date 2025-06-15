@@ -9,7 +9,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-function isDataUrl(str: string) {
+function isDataUrl(str) {
   return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
 }
 
@@ -116,7 +116,7 @@ serve(async (req) => {
   }
 });
 
-async function processMessage(supabase: any, messageData: any, tableName: string, instance: string) {
+async function processMessage(supabase, messageData, tableName, instance) {
   try {
     console.log(`${LOG_PREFIX} processMessage data:`, JSON.stringify(messageData, null, 2));
     const { phone, name } = extractPhoneAndName(messageData);
@@ -125,24 +125,29 @@ async function processMessage(supabase: any, messageData: any, tableName: string
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    const insertData: any = {
-      session_id: sessionId,
-      message: messageContent,
-      read_at: new Date().toISOString(),
-      mensagemtype: mensagemType,
-      tipo_remetente: tipoRemetente,
-      nome_do_contato: name,
-      is_read: false
-    };
+    let realMensagemType = mensagemType;
+    let realMessageContent = messageContent;
+    let mediaBase64 = null;
 
     if (mediaUrl && isDataUrl(mediaUrl)) {
-      insertData.media_base64 = mediaUrl;
-      if (mensagemType === 'image') insertData.message = '[Imagem]';
-      else if (mensagemType === 'audio') insertData.message = '[Áudio]';
-      else if (mensagemType === 'video') insertData.message = '[Vídeo]';
-      else if (mensagemType === 'document') insertData.message = '[Documento]';
-      else insertData.message = '[Mídia]';
+      mediaBase64 = mediaUrl;
+      if (mensagemType === 'image') realMessageContent = '[Imagem]';
+      else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
+      else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
+      else if (mensagemType === 'document') realMessageContent = '[Documento]';
+      else realMessageContent = '[Mídia]';
     }
+
+    const insertData = {
+      session_id: sessionId,
+      message: realMessageContent,
+      read_at: new Date().toISOString(),
+      mensagemtype: realMensagemType,
+      tipo_remetente: tipoRemetente,
+      nome_do_contato: name,
+      is_read: false,
+      media_base64: mediaBase64
+    };
 
     console.log(`${LOG_PREFIX} Attempting to insert message into table:`, tableName, "with payload:", JSON.stringify(insertData, null, 2));
     const { data: insertResult, error: insertError } = await supabase
@@ -168,7 +173,7 @@ async function processMessage(supabase: any, messageData: any, tableName: string
       success: true,
       tableName,
       messageId: insertResult?.[0]?.id,
-      mediaUrl: (mediaUrl && isDataUrl(mediaUrl)) ? mediaUrl : null
+      mediaUrl: mediaBase64
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
