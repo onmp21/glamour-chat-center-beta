@@ -3,8 +3,9 @@ import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
-import { Brain, Sparkles, Loader2 } from 'lucide-react';
+import { Brain, Loader2 } from 'lucide-react';
 import { openaiService } from '@/services/openaiService';
+
 interface Message {
   id: string;
   content: string;
@@ -36,7 +37,7 @@ export interface ChatMainAreaProps {
   onSendFile: (file: File, caption?: string) => Promise<void>;
   onSendAudio: (audioBlob: Blob, duration: number) => Promise<void>;
 }
-;
+
 export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   selectedConv,
   conversationForHeader,
@@ -119,13 +120,8 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     }
     try {
       setIsGeneratingSummary(true);
-      console.log('🤖 [AI_SUMMARY] Gerando resumo da conversa...');
       const summary = await openaiService.generateConversationSummary(channelId, selectedConv.contact_phone);
       setSummaryContent(summary);
-      console.log('✅ [AI_SUMMARY] Resumo gerado com sucesso');
-
-      // Mostrar o resumo em um modal ou área dedicada
-      // Por enquanto, vamos usar um alert para demonstração
       alert(`Resumo da Conversa:\n\n${summary}`);
     } catch (error) {
       console.error('❌ [AI_SUMMARY] Erro ao gerar resumo:', error);
@@ -172,12 +168,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           "flex-1 overflow-y-auto p-4 transition-all",
           isDarkMode ? "bg-[#09090b]" : "bg-white"
         )}
-        style={{
-          minHeight: 0,
-          height: "calc(100vh - 74px - 96px - env(safe-area-inset-bottom, 0px))", // header + input
-          maxHeight: "calc(100vh - 74px - 96px - env(safe-area-inset-bottom, 0px))",
-          // fallback for browser, otherwise flex-1
-        }}
+        style={{ minHeight: 0 }}
       >
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -190,19 +181,13 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 message.tipo_remetente === "USUARIO_INTERNO" ||
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
-
-              // Nome do CLIENTE (só nome)
               const contactName =
                 (message as any).Nome_do_contato ||
                 (message as any).nome_do_contato ||
                 message.sender ||
                 "Cliente";
               const nomeExibido = truncateName(contactName);
-
-              // Nome do canal E nome do usuário (se enviado via sistema)
               const canalNome = getChannelDisplayName(channelId);
-
-              // Format Hora
               const hora = (message as any).read_at
                 ? formatHour((message as any).read_at)
                 : formatHour(message.timestamp || new Date().toISOString());
@@ -224,26 +209,21 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                   >
                     <div className="flex gap-2 text-xs mb-1 opacity-80">
                       {!isAgent && (
-                        // Balão do cliente externo: só nome
                         <span>{nomeExibido}</span>
                       )}
                       {isAgent && (
                         <>
                           <span>
-                            {/* Nome do canal se for agente */}
                             {canalNome}
                           </span>
-                          {/* Se a mensagem for USUARIO_INTERNO e mandada pelo sistema (ex: sender === "agent") */}
                           {message.tipo_remetente === "USUARIO_INTERNO" && !!message.Nome_do_contato && (
                             <span className="font-semibold">
-                              {/* Exibir nome do usuario, mas só quando for mensagem enviada pelo sistema */}
                               {message.Nome_do_contato}
                             </span>
                           )}
                         </>
                       )}
                     </div>
-
                     <p className="text-sm whitespace-pre-wrap">
                       {message.content}
                     </p>
