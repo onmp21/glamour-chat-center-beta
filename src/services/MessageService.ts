@@ -226,25 +226,48 @@ export class MessageService {
     
     // Check if subscription already exists
     if (MessageService.activeSubscriptions.has(subscriptionKey)) {
-      console.log(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing`);
+      console.warn(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing.`);
       return MessageService.activeSubscriptions.get(subscriptionKey);
     }
-    
+
     const channel = supabase
       .channel(`${tableName}-changes${channelSuffix}`)
-      .on('postgres_changes', 
+      .on(
+        'postgres_changes', 
         { event: '*', schema: 'public', table: tableName as any },
         (payload) => {
           console.log(`🔔 [MESSAGE_SERVICE] Realtime update for ${tableName}:`, payload);
-          // Invalidar cache quando há mudanças
           MessageService.queryCache.clear();
           callback(payload);
         }
       );
+    
+    // Call subscribe() immediately, once per channel instance!
+    // Add guard to prevent duplicate subscribing on this channel
+    channel.__lov_subscribed = false;
+
+    channel.__lov_original_subscribe = channel.subscribe;
+    channel.subscribe = function (...args: any[]) {
+      if (this.__lov_subscribed) {
+        console.error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
+        throw new Error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
+      }
+      this.__lov_subscribed = true;
+      return channel.__lov_original_subscribe.apply(this, args);
+    };
+
+    channel.subscribe((status: string, err?: any) => {
+      if (status === 'SUBSCRIBED') {
+        console.log(`✅ [MESSAGE_SERVICE] Realtime channel subscribed for ${subscriptionKey}`);
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.error(`[MESSAGE_SERVICE] Channel subscription error for ${subscriptionKey}:`, err || status);
+      }
+    });
 
     // Store the subscription
     MessageService.activeSubscriptions.set(subscriptionKey, channel);
-    
+
     return channel;
   }
 
