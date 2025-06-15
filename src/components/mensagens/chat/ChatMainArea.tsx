@@ -161,11 +161,16 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           <div className="space-y-4">
             {messages.map((message) => {
               const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai' || message.sender === 'agent';
-              const contactName = message.Nome_do_contato || message.nome_do_contato || message.sender || 'Cliente';
+
+              // Now safely get the contact name
+              const contactName = (message as any).Nome_do_contato || (message as any).nome_do_contato || message.sender || 'Cliente';
               const nomeExibido = truncateName(contactName);
+
               const canalNome = getChannelDisplayName(channelId);
-              // Para garantir compatibilidade com HH:mm, tenta usar .timestamp, .read_at ou backup com string da data
-              const hora = formatHour((message.timestamp as any) || (message.read_at as any) || new Date().toISOString());
+              // Use read_at if available, otherwise timestamp, otherwise now
+              const hora = (message as any).read_at
+                ? formatHour((message as any).read_at)
+                : formatHour(message.timestamp || new Date().toISOString());
 
               return (
                 <div key={message.id} className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
