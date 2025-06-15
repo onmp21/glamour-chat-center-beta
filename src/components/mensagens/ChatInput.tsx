@@ -19,10 +19,13 @@ import {
 import { EmojiPickerCompact } from './EmojiPickerCompact';
 import { openaiService } from '@/services/openaiService';
 import { ChannelConversation } from '@/types/messages';
+import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
+import { useAuth } from '@/contexts/AuthContext';
+import { FileService } from '@/services/FileService';
 
 interface ChatInputProps {
   isDarkMode: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage?: (message: string) => void;
   onSendFile?: (file: File, caption?: string) => void;
   onSendAudio?: (audioBlob: Blob, duration: number) => void;
   selectedConv?: ChannelConversation;
@@ -46,9 +49,6 @@ const QUICK_RESPONSES = [
 
 export const ChatInput: React.FC<ChatInputProps> = ({ 
   isDarkMode, 
-  onSendMessage,
-  onSendFile,
-  onSendAudio,
   selectedConv,
   channelId
 }) => {
@@ -64,19 +64,62 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingStartTimeRef = useRef<number>(0);
 
-  const handleSend = () => {
-    if (message.trim() || filePreview) {
-      if (filePreview) {
-        console.log("Sending file:", filePreview.file.name);
-        onSendFile?.(filePreview.file, message.trim() || undefined);
-        setFilePreview(null);
-        setShowFilePreviewModal(false);
-        setMessage("");
-      } else if (message.trim()) {
-        onSendMessage(message.trim());
-        setMessage("");
+  // NOVO: para envio real via Evolution API
+  const { sendMessage, sending } = useMessageSenderExtended();
+  const { user } = useAuth();
+
+  // Envio REAL via Evolution
+  const handleSend = async () => {
+    if ((!message.trim() && !filePreview) || !user || !selectedConv || !channelId || sending) return;
+
+    // Extra: impede duplo envio se arquivo em preview está aberto
+    if (filePreview && showFilePreviewModal) return;
+
+    // Montar dados mínimos para o sender
+    let fileData = null;
+    if (filePreview) {
+      // Converte arquivo para base64 usando FileService utility (já utilizada em YelenaChatInput)
+      try {
+        let base64: string;
+        let mimeType = filePreview.file.type;
+        if (filePreview.type === "audio") {
+          base64 = await FileService.convertAudioToMp3Base64(filePreview.file);
+          mimeType = "audio/mpeg";
+        } else {
+          base64 = await FileService.convertToBase64(filePreview.file);
+        }
+        fileData = {
+          base64,
+          fileName: filePreview.file.name,
+          mimeType: mimeType,
+          size: filePreview.file.size
+        };
+      } catch (err) {
+        alert("Erro ao processar arquivo de anexo.");
+        return;
       }
     }
+
+    // Verifica se precisa do número puro para APIs
+    let conversationId = selectedConv.contact_phone || selectedConv.id;
+    if (conversationId.includes("_")) {
+      conversationId = conversationId.split("_")[0];
+    }
+
+    await sendMessage({
+      conversationId,
+      channelId,
+      content: message.trim() || (filePreview ? filePreview.file.name : ""),
+      sender: "agent",
+      agentName: user.name,
+      messageType: filePreview ? filePreview.type : "text",
+      fileData: fileData || undefined
+    });
+    setMessage('');
+    setFilePreview(null);
+    setShowFilePreviewModal(false);
+    setRecordingTime(0);
+    // não mexer nas props de callbacks antigos, mantemos apenas novo fluxo
   };
 
   const handleQuickResponse = (response: string) => {
