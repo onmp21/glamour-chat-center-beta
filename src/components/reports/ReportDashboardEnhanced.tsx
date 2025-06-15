@@ -249,7 +249,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onGenerateReport={generateReport}
               onClearReport={clearReport}
               hasReportResult={!!reportResult}
-              availableChannels={[]} {/* Fix: pass empty array or real channels */}
+              availableChannels={[]}
             />
 
             {/* Report Display */}
@@ -260,7 +260,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onDownloadReport={downloadReport}
             />
           </div>
-
           {/* Report History */}
           <ReportHistoryComponent
             isDarkMode={isDarkMode}
