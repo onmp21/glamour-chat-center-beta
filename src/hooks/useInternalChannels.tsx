@@ -20,7 +20,7 @@ const NAME_TO_LEGACYID: Record<string, string> = {
   'Souto Soares': 'souto-soares',
   'João Dourado': 'joao-dourado',
   'América Dourada': 'america-dourada',
-  'Gustavo Gerente das Lojas': 'gerente-lojas',
+  'Gerente das Lojas': 'gerente-lojas', // PADRÃO CORRETO!
   'Andressa Gerente Externo': 'gerente-externo'
 };
 

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -29,8 +28,8 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
       'Souto Soares': 'souto-soares',
       'João Dourado': 'joao-dourado',
       'América Dourada': 'america-dourada',
-      'Andressa Gerente Externo': 'gerente-externo',
-      'Gustavo Gerente das Lojas': 'gerente-lojas'
+      'Gerente das Lojas': 'gerente-lojas', // CORRETO
+      'Andressa Gerente Externo': 'gerente-externo'
     };
     return nameToId[channel.name] || channel.id;
   };
@@ -38,7 +37,7 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   const getChannelDisplayName = (channel: any) => {
     const nameMappings: Record<string, string> = {
       'Andressa Gerente Externo': 'Andressa',
-      'Gustavo Gerente das Lojas': 'Gustavo',
+      'Gerente das Lojas': 'Gustavo', // Mostra "Gustavo" para o usuário
       'Yelena-AI': 'Óticas Villa Glamour'
     };
     return nameMappings[channel.name] || channel.name;
