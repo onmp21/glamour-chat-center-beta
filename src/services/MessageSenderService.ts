@@ -5,6 +5,7 @@ import { AudioCompressor } from './AudioCompressor';
 import { VideoCompressor } from './VideoCompressor';
 import { DetailedLogger } from './DetailedLogger';
 import { RetryManager } from './RetryManager';
+import { getContactDisplayName } from "@/utils/getContactDisplayName";
 
 export class MessageSenderService {
   private retryCount: number = 3;
@@ -105,7 +106,7 @@ export class MessageSenderService {
     }
   }
 
-  async sendTextMessage(channelId: string, to: string, text: string): Promise<RawMessage> {
+  async sendTextMessage(channelId: string, to: string, text: string, senderType: "customer" | "agent" = "agent", contactName?: string | null): Promise<RawMessage> {
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
@@ -130,6 +131,11 @@ export class MessageSenderService {
         throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
       }
       const formattedNumber = this.formatPhoneNumber(to);
+
+      let nomeDoContato: string | null = getContactDisplayName({
+        sender: senderType,
+        contactName: contactName,
+      });
 
       const payload = {
         number: formattedNumber,
@@ -170,11 +176,11 @@ export class MessageSenderService {
         session_id: formattedNumber,
         message: text,
         read_at: nowIso,
-        nome_do_contato: null,
+        nome_do_contato: nomeDoContato,
         mensagemtype: 'conversation',
-        tipo_remetente: 'USUARIO_INTERNO',
+        tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
         id: result.key?.id || result.messageId || Date.now().toString(),
-        sender: 'agent',
+        sender: senderType,
         timestamp: nowIso,
         content: text,
         media_base64: null
@@ -226,7 +232,15 @@ export class MessageSenderService {
     return mimeToExt[mimeType] || 'bin';
   }
 
-  async sendMediaMessage(channelId: string, to: string, mediaUrl: string, caption: string, mediaType: 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
+  async sendMediaMessage(
+    channelId: string,
+    to: string,
+    mediaUrl: string,
+    caption: string,
+    mediaType: 'image' | 'audio' | 'video' | 'document',
+    senderType: "customer" | "agent" = "agent",
+    contactName?: string | null
+  ): Promise<RawMessage> {
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
@@ -339,15 +353,20 @@ export class MessageSenderService {
       // Data padrão
       const nowIso = new Date().toISOString();
 
+      let nomeDoContato: string | null = getContactDisplayName({
+        sender: senderType,
+        contactName: contactName,
+      });
+
       const messageData: RawMessage = {
         session_id: formattedNumber,
         message: `data:${mimeType};base64,${base64Content}`,
         read_at: nowIso,
-        nome_do_contato: formattedNumber,
+        nome_do_contato: nomeDoContato,
         mensagemtype: mediaType,
-        tipo_remetente: 'USUARIO_INTERNO',
+        tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
         id: result.key?.id || result.messageId || Date.now().toString(),
-        sender: 'agent',
+        sender: senderType,
         timestamp: nowIso,
         content: `data:${mimeType};base64,${base64Content}`,
         media_base64: `data:${mimeType};base64,${base64Content}`,
@@ -370,11 +389,18 @@ export class MessageSenderService {
     });
   }
 
-  async sendMessage(channelId: string, to: string, content: string, mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
+  async sendMessage(
+    channelId: string,
+    to: string,
+    content: string,
+    mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document',
+    senderType: "customer" | "agent" = "agent",
+    contactName?: string | null
+  ): Promise<RawMessage> {
     if (!mediaType || mediaType === 'text') {
-      return await this.sendTextMessage(channelId, to, content);
+      return await this.sendTextMessage(channelId, to, content, senderType, contactName);
     } else {
-      return await this.sendMediaMessage(channelId, to, content, '', mediaType);
+      return await this.sendMediaMessage(channelId, to, content, '', mediaType, senderType, contactName);
     }
   }
 }

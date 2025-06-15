@@ -9,6 +9,8 @@ import { ChannelConversation } from '@/types/messages';
 import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileService } from '@/services/FileService';
+import { useAgentMessageLock } from "@/hooks/useAgentMessageLock";
+import { getContactDisplayName } from "@/utils/getContactDisplayName";
 interface ChatInputProps {
   isDarkMode: boolean;
   onSendMessage?: (message: string) => void;
@@ -56,22 +58,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   // Envio REAL via Evolution (corrigido: sempre chama callback local)
   let sendLock: boolean = false; // Lock global ao componente. Reset no efeito ou após envio.
   const handleSend = async (customCaption?: string) => {
-    if (sendLock || sending || sendingLocal) return; // Debounce
+    // INICIO DO BLOQUEIO DUPLICADO
+    if (!beginLock() || sending || sendingLocal) return; // Debounce/lock
     if ((!message.trim() && !filePreview) || !user || !selectedConv || !channelId) return;
-    // Extra: impede duplo envio se arquivo em preview está aberto
     if (filePreview && showFilePreviewModal) return;
-    sendLock = true;
     setSendingLocal(true);
 
-    // SELEÇÃO CORRETA DO NOME DO CONTATO
-    const isAgentMsg = true; // Sempre agente quando envia por este input!
+    // Seleção correta do nome para contato
+    const agentMsg = true;
     let correctContactName: string | undefined = undefined;
-    // Para clientes, tente captar nome real do contato, nunca número
-    if (!isAgentMsg && selectedConv.contact_name && selectedConv.contact_name.trim() && isNaN(Number(selectedConv.contact_name.trim()))) {
-      correctContactName = selectedConv.contact_name.trim();
-    }
-    // Para agente, NUNCA mande nome_do_contato
-  
+    // Regra TUDO em getContactDisplayName agora
+    correctContactName = getContactDisplayName({
+      sender: agentMsg ? "agent" : "customer",
+      contactName: selectedConv.contact_name,
+    });
+
     let fileData = null;
     let fileType: string | undefined = undefined;
     try {
@@ -90,11 +91,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     } catch (err) {
       alert("Erro ao processar arquivo de anexo.");
       setSendingLocal(false);
-      sendLock = false;
       return;
     }
 
-    // Monta conversationId real (nunca número em nome)
     let conversationId = selectedConv.contact_phone || selectedConv.id;
     if (conversationId?.includes("_")) conversationId = conversationId.split("_")[0];
 
@@ -110,7 +109,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         : 'text'
       : 'text';
 
-    // Chama hook de envio (vai propagar até o backend corretamente agora)
+    // Corrigido para nunca passar nome_do_contato para agente
     const success = await sendMessage({
       conversationId,
       channelId,
@@ -119,7 +118,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       agentName: user.name,
       messageType: messageType,
       fileData: fileData || undefined
-      // NUNCA passa nome_do_contato
     });
     if (success) {
       setMessage('');
@@ -128,7 +126,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       setRecordingTime(0);
     }
     setSendingLocal(false);
-    setTimeout(() => { sendLock = false }, 700); // Solta o lock
   };
   const handleQuickResponse = (response: string) => {
     setMessage(response);

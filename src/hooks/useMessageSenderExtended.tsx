@@ -4,6 +4,7 @@ import { MessageSenderService } from '@/services/MessageSenderService';
 import { FileService } from '@/services/FileService';
 import { FileData, RawMessage } from '@/types/messageTypes';
 import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
+import { getContactDisplayName } from "@/utils/getContactDisplayName";
 
 export interface ExtendedMessageData {
   conversationId: string;
@@ -25,6 +26,7 @@ export const useMessageSenderExtended = () => {
     addMessageToState?: (message: RawMessage) => void
   ): Promise<boolean> => {
     setSending(true);
+    console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
     try {
       let phoneNumber = messageData.conversationId;
       if (phoneNumber.includes("_")) {
@@ -34,36 +36,42 @@ export const useMessageSenderExtended = () => {
 
       let resultMessage: RawMessage;
 
+      const senderType = messageData.sender;
+      const contactNameRefined = getContactDisplayName({
+        sender: senderType,
+        contactName: messageData.agentName
+      });
+
       if (messageData.fileData) {
         const fileType = FileService.getFileType(messageData.fileData.mimeType);
-
         let mediaContent = messageData.fileData.base64;
         if (!mediaContent.startsWith("data:")) {
           mediaContent = `data:${messageData.fileData.mimeType};base64,${mediaContent}`;
         }
+        resultMessage = await messageSenderService.sendMediaMessage(
+          processedChannelId || messageData.channelId,
+          phoneNumber,
+          mediaContent,
+          messageData.content || messageData.fileData.fileName,
+          fileType as "image" | "audio" | "video" | "document",
+          senderType,
+          messageData.agentName
+        );
+      } else {
+        resultMessage = await messageSenderService.sendTextMessage(
+          processedChannelId || messageData.channelId,
+          phoneNumber,
+          messageData.content,
+          senderType,
+          messageData.agentName
+        );
+      }
 
-      // CHAVE: nunca passar nome_do_contato aqui
-      resultMessage = await messageSenderService.sendMediaMessage(
-        processedChannelId || messageData.channelId,
-        phoneNumber,
-        mediaContent,
-        messageData.content || messageData.fileData.fileName,
-        fileType as "image" | "audio" | "video" | "document"
-      );
-    } else {
-      resultMessage = await messageSenderService.sendTextMessage(
-        processedChannelId || messageData.channelId,
-        phoneNumber,
-        messageData.content
-      );
-    }
-
-    if (addMessageToState && resultMessage) {
-      addMessageToState(resultMessage);
-    }
-
-    return true;
-  } catch (error) {
+      if (addMessageToState && resultMessage) {
+        addMessageToState(resultMessage);
+      }
+      return true;
+    } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
       if (error instanceof Error) {
         console.error("Detalhes do erro:", error.message);
