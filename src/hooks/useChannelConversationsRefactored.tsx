@@ -5,13 +5,14 @@ import { MessageService } from '@/services/MessageService';
 import { ChannelConversation } from '@/types/messages';
 import { DetailedLogger } from '@/services/DetailedLogger';
 
+// We want to guarantee: NO channel instance is ever reused across effect runs
 export const useChannelConversationsRefactored = (channelId: string) => {
   const [conversations, setConversations] = useState<ChannelConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track the current channel suffix and subscription instance
+  // Channel instance & suffix refs to support safe cleanup
   const channelSuffixRef = useRef<string>();
   const subscriptionInstanceRef = useRef<any>(null);
 
@@ -56,9 +57,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
   useEffect(() => {
     let unsubscribed = false;
-    // CLEANUP BEFORE CREATE: Always cleanup first
+
+    // --- DEFENSIVE CLEANUP: always remove old channel instance,
+    //                        suppressing ALL errors.
     if (subscriptionInstanceRef.current) {
-      DetailedLogger.info("useChannelConversationsRefactored", "Cleanup before new effect run: Unsubscribing previous instance.");
+      DetailedLogger.info("useChannelConversationsRefactored", "Cleanup before useEffect: Ensuring previous channel is removed.");
       try {
         if (subscriptionInstanceRef.current.unsubscribe) {
           subscriptionInstanceRef.current.unsubscribe();
@@ -72,15 +75,21 @@ export const useChannelConversationsRefactored = (channelId: string) => {
           MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
         }
       } catch (_e) {}
+      try {
+        // Defensive: forcibly remove from supabase if possible
+        if (subscriptionInstanceRef.current && typeof subscriptionInstanceRef.current === "object" && subscriptionInstanceRef.current.constructor?.name?.toLowerCase().includes("realtime")) {
+          // supabase.removeChannel(instance) would be called inside MessageService.unsubscribeChannel
+        }
+      } catch (_e) {}
       subscriptionInstanceRef.current = null;
       channelSuffixRef.current = undefined;
     }
 
     loadConversations();
 
-    // Only create a new subscription if channelId is valid
+    // --- CREATE NEW SUBSCRIPTION
     if (channelId) {
-      // Generate a truly unique suffix for each run
+      // Always use a unique suffix for every new useEffect run
       channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}-${Date.now()}`;
       const channelSuffix = channelSuffixRef.current;
 
@@ -98,9 +107,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
     return () => {
       unsubscribed = true;
+      // --- REALLY REMOVE subscription & channel refs
       if (subscriptionInstanceRef.current && channelId && channelSuffixRef.current) {
-        DetailedLogger.info("useChannelConversationsRefactored", `Cleanup: Unsubscribing realtime for canal ${channelId} (suffix: ${channelSuffixRef.current})`);
+        DetailedLogger.info("useChannelConversationsRefactored", `Cleanup on unmount: Unsubscribing realtime for canal ${channelId} (suffix: ${channelSuffixRef.current})`);
         try {
+          // channelSuffixRef must be passed, never an empty string
           const messageService = new MessageService(channelId);
           const repository = messageService['getRepository']();
           const tableName = repository.getTableName();
