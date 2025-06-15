@@ -12,7 +12,7 @@ interface ReportStatsSectionProps {
     reportsThisMonth: number;
     averageGenerationTime: number;
   };
-  providers: AIProvider[];
+  providers: any[];
 }
 
 export const ReportStatsSection: React.FC<ReportStatsSectionProps> = ({
