@@ -232,11 +232,17 @@ export class MessageService {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
     const subscriptionKey = `${tableName}-${channelSuffix}`;
-    
-    // Check if subscription already exists
+
+    // Defensive: always remove previous subscription before creating new one
     if (MessageService.activeSubscriptions.has(subscriptionKey)) {
-      console.warn(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing.`);
-      return MessageService.activeSubscriptions.get(subscriptionKey);
+      const oldChannel = MessageService.activeSubscriptions.get(subscriptionKey);
+      try {
+        if (oldChannel.unsubscribe) oldChannel.unsubscribe();
+      } catch (_e) {}
+      try {
+        supabase.removeChannel(oldChannel);
+      } catch (_e) {}
+      MessageService.activeSubscriptions.delete(subscriptionKey);
     }
 
     const channel = supabase
@@ -250,12 +256,9 @@ export class MessageService {
           callback(payload);
         }
       );
-
-    // Adiciona proteção para evitar múltiplos subscribe
     const channelAny = channel as any;
     channelAny.__lov_subscribed = false;
     channelAny.__lov_original_subscribe = channel.subscribe;
-
     channel.subscribe = function (...args: any[]) {
       if (channelAny.__lov_subscribed) {
         console.error("Tried to subscribe multiple times. '.subscribe()' can only be called uma vez por instância do canal.");
@@ -275,19 +278,24 @@ export class MessageService {
       }
     });
 
-    // Guarda o canal inscrito
     MessageService.activeSubscriptions.set(subscriptionKey, channel);
 
-    return channel; // JÁ inscrito! Não chame .subscribe() novamente!
+    return channel;
   }
 
   static unsubscribeChannel(channelSuffix: string, tableName: string) {
     const subscriptionKey = `${tableName}-${channelSuffix}`;
     const channel = MessageService.activeSubscriptions.get(subscriptionKey);
-    
     if (channel) {
       console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from ${subscriptionKey}`);
-      supabase.removeChannel(channel);
+
+      try {
+        if (channel.unsubscribe) channel.unsubscribe();
+      } catch (_e) {}
+
+      try {
+        supabase.removeChannel(channel);
+      } catch (_e) {}
       MessageService.activeSubscriptions.delete(subscriptionKey);
     }
   }

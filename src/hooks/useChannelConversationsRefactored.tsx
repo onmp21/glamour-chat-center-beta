@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
@@ -59,20 +58,23 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
     let unsubscribed = false;
 
-    // CLEANUP LOGIC: Always clean up on mount before subscribing new
+    // DEFENSIVE: always cleanup even if already cleaned up
     if (subscriptionInstanceRef.current) {
       try {
-        DetailedLogger.info("useChannelConversationsRefactored", "Initial cleanup: Unsubscribing previous instance before mounting new.");
+        DetailedLogger.info("useChannelConversationsRefactored", "Forcing cleanup: Unsubscribing previous instance before mounting new.");
         if (subscriptionInstanceRef.current.unsubscribe) {
           subscriptionInstanceRef.current.unsubscribe();
         }
       } catch (_e) {}
+      try {
+        if (channelSuffixRef.current) {
+          const messageService = new MessageService(channelId);
+          const repository = messageService['getRepository']();
+          const tableName = repository.getTableName();
+          MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
+        }
+      } catch (_e) {}
       subscriptionInstanceRef.current = null;
-    }
-
-    // Always clear channelSuffixRef on channelId change!
-    if (channelSuffixRef.current) {
-      DetailedLogger.info("useChannelConversationsRefactored", "Cleaning channelSuffixRef on channelId change");
       channelSuffixRef.current = undefined;
     }
 
@@ -81,43 +83,39 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
       const channelSuffix = channelSuffixRef.current;
 
-      // Defensive: Prevent double subscription, but should never hit
+      // Defensive: PREVENT double subscription!
       if (subscriptionInstanceRef.current) {
-        DetailedLogger.warn("useChannelConversationsRefactored", "Tried to create a duplicate channel subscription, preventing duplicate subscribe. Subscription already exists for this channelId, skipping new instance.");
-        return () => { /* no cleanup needed if not created */ };
+        DetailedLogger.warn("useChannelConversationsRefactored", "Tried to create a duplicate channel subscription, skipping.");
+        return () => { };
       }
 
       const messageService = new MessageService(channelId);
       const channel = messageService.createRealtimeSubscription(
         (payload) => {
           DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-          if (!unsubscribed) {
-            loadConversations();
-          }
+          if (!unsubscribed) loadConversations();
         },
         channelSuffix
       );
-
       subscriptionInstanceRef.current = channel;
-
       DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} (sufixo: ${channelSuffix})`);
     }
 
     return () => {
       unsubscribed = true;
       if (subscriptionInstanceRef.current && channelId && channelSuffixRef.current) {
-        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
-        const messageService = new MessageService(channelId);
-        const repository = messageService['getRepository']();
-        const tableName = repository.getTableName();
-        MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
-        // Also call unsubscribe if available
-        if (subscriptionInstanceRef.current.unsubscribe) {
-          try {
+        DetailedLogger.info("useChannelConversationsRefactored", `Cleanup: Realtime subscription interrompido para o canal ${channelId}`);
+        try {
+          const messageService = new MessageService(channelId);
+          const repository = messageService['getRepository']();
+          const tableName = repository.getTableName();
+          MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
+        } catch (_e) {}
+        try {
+          if (subscriptionInstanceRef.current.unsubscribe) {
             subscriptionInstanceRef.current.unsubscribe();
-          } catch (_e) {}
-        }
-        // Always clean both refs now!
+          }
+        } catch (_e) {}
         subscriptionInstanceRef.current = null;
         channelSuffixRef.current = undefined;
       }
