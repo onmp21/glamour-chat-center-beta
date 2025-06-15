@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
-import { ChannelConversation, ChannelMessage } from '@/types/messages';
+import { ChannelConversation } from '@/types/messages';
 import { DetailedLogger } from '@/services/DetailedLogger';
 
 export const useChannelConversationsRefactored = (channelId: string) => {
@@ -9,6 +10,9 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // UseRef para armazenar o mesmo sufixo durante o ciclo de vida do hook
+  const channelSuffixRef = useRef<string>();
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -55,25 +59,30 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     let channel: any = null;
 
     if (channelId) {
+      // Gere o sufixo UMA vez só por ciclo de efeito
+      if (!channelSuffixRef.current) {
+        channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
+      }
+      const channelSuffix = channelSuffixRef.current;
+
       const messageService = new MessageService(channelId);
-      const channelSuffix = `-conversations-${Date.now()}`;
-      
       channel = messageService.createRealtimeSubscription((payload) => {
         DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-        // Recarregar conversas para refletir as novas mensagens
         loadConversations();
       }, channelSuffix);
 
-      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
+      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} (sufixo: ${channelSuffix})`);
     }
 
     return () => {
-      if (channel && channelId) {
+      if (channel && channelId && channelSuffixRef.current) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         const messageService = new MessageService(channelId);
         const repository = messageService['getRepository']();
         const tableName = repository.getTableName();
-        MessageService.unsubscribeChannel(`-conversations-${Date.now()}`, tableName);
+        // Remova o mesmo canal criado!
+        MessageService.unsubscribeChannel(channelSuffixRef.current, tableName);
+        channelSuffixRef.current = undefined; // Libera o ref para nova inscrição futura
       }
     };
   }, [channelId, loadConversations]);
