@@ -52,6 +52,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     user
   } = useAuth();
 
+  // Corrigido: Lock de envio para evitar mensagens duplicadas (previne duplo click/toque)
+  const { beginLock } = useAgentMessageLock();
+
   // ADICIONADO: Estado para status de envio (feedback)
   const [sendingLocal, setSendingLocal] = useState(false);
 
