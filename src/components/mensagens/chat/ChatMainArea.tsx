@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
@@ -54,6 +54,51 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   console.log("🐛 [ChatMainArea] Renderizando. selectedConv:", selectedConv, "conversationForHeader:", conversationForHeader);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
+
+  // === SCROLL AUTOMÁTICO: sempre rolar para o final ao receber mensagens ===
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!messagesLoading && messages.length > 0 && messagesEndRef.current) {
+      // scrollIntoView suave para o último elemento
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length, messagesLoading]);
+
+  // ===== Utils para nome, canal e hora =====
+  // Truncar nome para dois primeiros termos
+  const truncateName = (name: string = ''): string => {
+    const parts = (name || '').split(' ').filter(Boolean);
+    return parts.slice(0, 2).join(' ') || name || 'Cliente';
+  };
+  // Formatar hora como HH:mm
+  const formatHour = (iso: string) => {
+    try {
+      const date = new Date(iso);
+      return date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'America/Sao_Paulo'
+      });
+    } catch {
+      return '--:--';
+    }
+  };
+  // Canal amigável
+  const getChannelDisplayName = (channel: string) => {
+    const mapping: Record<string, string> = {
+      'chat': 'Yelena AI',
+      'yelena_ai_conversas': 'Yelena AI',
+      'canarana': 'Canarana',
+      'souto-soares': 'Souto Soares',
+      'joao-dourado': 'João Dourado',
+      'america-dourada': 'América Dourada',
+      'gerente-lojas': 'Gustavo Gerente',
+      'gerente-externo': 'Andressa Gerente'
+    };
+    return mapping[channel] || channel;
+  };
+
   const handleGenerateSummary = async () => {
     if (!selectedConv || !channelId) {
       console.error('❌ [AI_SUMMARY] Conversa ou canal não selecionado');
@@ -108,18 +153,42 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
 
       {/* Messages */}
       <div className="flex-1 overflow-auto p-4">
-        {messagesLoading ? <div className="flex items-center justify-center h-full">
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
-          </div> : <div className="space-y-4">
-            {messages.map(message => <div key={message.id} className={cn("flex", message.sender === 'agent' ? "justify-end" : "justify-start")}>
-                <div className={cn("max-w-xs lg:max-w-md px-4 py-2 rounded-lg", message.sender === 'agent' ? "bg-[#b5103c] text-white" : isDarkMode ? "bg-[#3f3f46] text-white" : "bg-gray-200 text-gray-900")}>
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  <p className="text-xs opacity-70 mt-1">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => {
+              const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai' || message.sender === 'agent';
+              const contactName = message.Nome_do_contato || message.nome_do_contato || message.sender || 'Cliente';
+              const nomeExibido = truncateName(contactName);
+              const canalNome = getChannelDisplayName(channelId);
+              // Para garantir compatibilidade com HH:mm, tenta usar .timestamp, .read_at ou backup com string da data
+              const hora = formatHour((message.timestamp as any) || (message.read_at as any) || new Date().toISOString());
+
+              return (
+                <div key={message.id} className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
+                  <div className={cn("max-w-xs lg:max-w-md px-4 py-2 rounded-lg", isAgent ? "bg-[#b5103c] text-white" : isDarkMode ? "bg-[#3f3f46] text-white" : "bg-gray-200 text-gray-900")}>
+                    {/* Linha com nome truncado + canal */}
+                    <div className="flex gap-2 text-xs mb-1 opacity-80">
+                      <span>
+                        {isAgent ? 'Agente' : nomeExibido}
+                      </span>
+                      <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>
+                        ({canalNome})
+                      </span>
+                    </div>
+
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-1 text-right">{hora}</p>
+                  </div>
                 </div>
-              </div>)}
-          </div>}
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </div>
 
       {/* Chat Input com funções de IA */}
