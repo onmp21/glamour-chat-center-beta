@@ -1,5 +1,7 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { getMediaSaveDetails, toDataUrlIfBase64, isDataUrl } from "../webhook-shared/mediaUtils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,10 +10,6 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-function isDataUrl(str: string) {
-  return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
-}
 
 function cleanPhoneFromSessionId(sessionId: string) {
   if (typeof sessionId !== 'string') return '';
@@ -42,19 +40,6 @@ function getMessageContent(messageData: any) {
     messageData.message?.videoMessage?.caption ||
     messageData.message?.documentMessage?.caption ||
     '[Mídia]';
-}
-
-function getMessageType(messageData: any) {
-  if (messageData.message?.imageMessage) {
-    return { type: 'image', mediaUrl: messageData.message.imageMessage.url };
-  } else if (messageData.message?.audioMessage) {
-    return { type: 'audio', mediaUrl: messageData.message.audioMessage.url };
-  } else if (messageData.message?.videoMessage) {
-    return { type: 'video', mediaUrl: messageData.message.videoMessage.url };
-  } else if (messageData.message?.documentMessage) {
-    return { type: 'document', mediaUrl: messageData.message.documentMessage.url };
-  }
-  return { type: 'text' };
 }
 
 const TABLE_NAME = "canarana_conversas";
@@ -123,13 +108,21 @@ async function processMessage(supabase: any, messageData: any, tableName: string
     const sessionId = phone;
     const messageContent = getMessageContent(messageData);
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
-    const { type: mensagemType, mediaUrl } = getMessageType(messageData);
 
-    let realMensagemType = mensagemType;
+    const { type: mensagemType, placeholder, mediaUrl } = getMediaSaveDetails(messageData);
+
     let realMessageContent = messageContent;
     let mediaBase64 = null;
-    if (mediaUrl && isDataUrl(mediaUrl)) {
-      mediaBase64 = mediaUrl;
+
+    let checkedMediaUrl = toDataUrlIfBase64(mediaUrl);
+    let usedMediaUrl = checkedMediaUrl && isDataUrl(checkedMediaUrl) ? checkedMediaUrl : null;
+
+    if (usedMediaUrl) {
+      mediaBase64 = usedMediaUrl;
+      realMessageContent = placeholder || '[Mídia]';
+      console.log(`${LOG_PREFIX} Salva mídia como DataURL:`, (mediaBase64+"").substring(0,60),'...');
+    } else if (mediaUrl) {
+      mediaBase64 = null;
       if (mensagemType === 'image') realMessageContent = '[Imagem]';
       else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
       else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
@@ -137,11 +130,11 @@ async function processMessage(supabase: any, messageData: any, tableName: string
       else realMessageContent = '[Mídia]';
     }
 
-    const insertData: any = {
+    const insertData = {
       session_id: sessionId,
       message: realMessageContent,
       read_at: new Date().toISOString(),
-      mensagemtype: realMensagemType,
+      mensagemtype: mensagemType,
       tipo_remetente: tipoRemetente,
       nome_do_contato: name,
       is_read: false,
@@ -172,7 +165,7 @@ async function processMessage(supabase: any, messageData: any, tableName: string
       success: true,
       tableName,
       messageId: insertResult?.[0]?.id,
-      mediaUrl: (mediaUrl && isDataUrl(mediaUrl)) ? mediaUrl : null
+      mediaUrl: mediaBase64
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

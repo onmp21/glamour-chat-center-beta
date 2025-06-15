@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { getMediaSaveDetails, toDataUrlIfBase64, isDataUrl } from "../webhook-shared/mediaUtils.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,13 +109,21 @@ async function processMessage(supabase, messageData, tableName, instance) {
     const messageContent = getMessageContent(messageData);
 
     let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
-    const { type: mensagemType, mediaUrl } = getMessageType(messageData);
+    const { type: mensagemType, placeholder, mediaUrl } = getMediaSaveDetails(messageData);
 
     let realMensagemType = mensagemType;
     let realMessageContent = messageContent;
     let mediaBase64 = null;
-    if (mediaUrl && isDataUrl(mediaUrl)) {
-      mediaBase64 = mediaUrl;
+
+    let checkedMediaUrl = toDataUrlIfBase64(mediaUrl);
+    let usedMediaUrl = checkedMediaUrl && isDataUrl(checkedMediaUrl) ? checkedMediaUrl : null;
+
+    if (usedMediaUrl) {
+      mediaBase64 = usedMediaUrl;
+      realMessageContent = placeholder || '[Mídia]';
+      console.log(`[Webhook-Joao] Salva mídia como DataURL:`, (mediaBase64+"").substring(0,60),'...');
+    } else if (mediaUrl) {
+      mediaBase64 = null;
       if (mensagemType === 'image') realMessageContent = '[Imagem]';
       else if (mensagemType === 'audio') realMessageContent = '[Áudio]';
       else if (mensagemType === 'video') realMessageContent = '[Vídeo]';
