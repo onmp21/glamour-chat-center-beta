@@ -35,7 +35,7 @@ interface ChatInputProps {
 interface FilePreview {
   file: File;
   url: string;
-  type: 'image' | 'video' | 'audio' | 'document';
+  type: 'image' | 'video' | 'audio' | 'file';
 }
 
 const QUICK_RESPONSES = [
@@ -189,7 +189,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (!file) return;
 
     const url = URL.createObjectURL(file);
-    let type: 'image' | 'video' | 'audio' | 'document' = 'document';
+    let type: 'image' | 'video' | 'audio' | 'file' = 'file';
     
     if (file.type.startsWith('image/')) type = 'image';
     else if (file.type.startsWith('video/')) type = 'video';
@@ -228,23 +228,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
       };
       
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
-        const duration = (Date.now() - recordingStartTimeRef.current) / 1000;
-        
-        console.log('🎤 [AUDIO_RECORDING] Gravação finalizada:', {
-          size: audioBlob.size,
-          duration: duration,
-          type: audioBlob.type
-        });
-        
-        // Parar todas as tracks do stream
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Enviar áudio
-        onSendAudio?.(audioBlob, duration);
-      };
-      
       mediaRecorderRef.current = mediaRecorder;
       recordingStartTimeRef.current = Date.now();
       
@@ -267,12 +250,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     console.log('🎤 [AUDIO_RECORDING] Parando gravação...');
     
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
+        const url = URL.createObjectURL(audioBlob);
+        // Create a File (for consistency)
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm;codecs=opus' });
+        setFilePreview({ file: audioFile, url, type: 'audio' });
+        setShowFilePreviewModal(true);
+        setIsRecording(false);
+        setRecordingTime(0);
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+        }
+      };
       mediaRecorderRef.current.stop();
-    }
-    
-    setIsRecording(false);
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
     }
   };
 
@@ -364,7 +355,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   <audio src={filePreview.url} className="w-full" controls />
                 </div>
               )}
-              {filePreview.type === 'document' && (
+              {filePreview.type === 'file' && (
                 <div className="w-full p-4 bg-gray-100 rounded-lg flex flex-col items-center text-center">
                   {getFileIcon(filePreview.type)}
                   <p className="mt-2 text-sm font-medium">{filePreview.file.name}</p>
