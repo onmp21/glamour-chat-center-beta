@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,15 +8,7 @@ import { Brain, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AIProvider } from '@/types/ai-providers';
 import { AIProviderService } from '@/services/AIProviderService';
-
-interface ReportFilters {
-  channel_id?: string;
-  status?: string;
-  date_from?: string;
-  date_to?: string;
-  report_type: 'conversations' | 'channels' | 'exams' | 'custom'; // PATCH: add exams
-  custom_prompt?: string;
-}
+import { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportGeneratorProps {
   isDarkMode: boolean;

@@ -11,18 +11,10 @@ import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
 import { useActiveChannels } from '@/hooks/useActiveChannels';
+import { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
-}
-
-interface ReportFilters {
-  channel_id?: string;
-  status?: string;
-  date_from?: string;
-  date_to?: string;
-  report_type: 'conversations' | 'channels' | 'exams' | 'custom'; // include 'exams'
-  custom_prompt?: string;
 }
 
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
