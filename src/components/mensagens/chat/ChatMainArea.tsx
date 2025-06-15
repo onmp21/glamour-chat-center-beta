@@ -5,6 +5,7 @@ import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
 import { openaiService } from '@/services/openaiService';
+import { AIResumoOverlay } from '@/components/chat/AIResumoOverlay';
 
 interface Message {
   id: string;
@@ -53,8 +54,10 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   onSendAudio
 }) => {
   console.log("🐛 [ChatMainArea] Renderizando. selectedConv:", selectedConv, "conversationForHeader:", conversationForHeader);
+  const [isResumoOpen, setIsResumoOpen] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   // ==== SCROLL AUTOMÁTICO ROBUSTO ====
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -120,12 +123,14 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     }
     try {
       setIsGeneratingSummary(true);
+      setSummaryError(null);
+      setSummaryContent(null);
+      setIsResumoOpen(true);
       const summary = await openaiService.generateConversationSummary(channelId, selectedConv.contact_phone);
       setSummaryContent(summary);
-      alert(`Resumo da Conversa:\n\n${summary}`);
     } catch (error) {
       console.error('❌ [AI_SUMMARY] Erro ao gerar resumo:', error);
-      alert('Erro ao gerar resumo da conversa. Verifique a configuração da API OpenAI.');
+      setSummaryError('Erro ao gerar resumo da conversa. Verifique a configuração da API OpenAI.');
     } finally {
       setIsGeneratingSummary(false);
     }
@@ -150,10 +155,24 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         
         <div className="flex items-center space-x-2">
           {/* Botão de Resumo com IA */}
-          <Button onClick={handleGenerateSummary} disabled={isGeneratingSummary} variant="outline" size="sm" className={cn("flex items-center space-x-2", isDarkMode ? "border-[#3f3f46] text-white hover:bg-[#27272a]" : "border-gray-300 text-gray-700 hover:bg-gray-50")}>
+          <Button
+            onClick={handleGenerateSummary}
+            disabled={isGeneratingSummary}
+            variant="outline"
+            size="sm"
+            className={cn("flex items-center space-x-2", isDarkMode ? "border-[#3f3f46] text-white hover:bg-[#27272a]" : "border-gray-300 text-gray-700 hover:bg-gray-50")}
+          >
             {isGeneratingSummary ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
             <span>{isGeneratingSummary ? 'Gerando...' : 'Resumo IA'}</span>
           </Button>
+          <AIResumoOverlay
+            open={isResumoOpen}
+            onClose={() => setIsResumoOpen(false)}
+            summary={summaryContent}
+            isLoading={isGeneratingSummary}
+            error={summaryError}
+            isDarkMode={isDarkMode}
+          />
           
           <Button onClick={onMarkAsResolved} size="sm" className="text-white bg-[#b5103c] py-0 my-0 text-center">
             Marcar como Resolvido
