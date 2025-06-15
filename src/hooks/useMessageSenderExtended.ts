@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSenderService } from '@/services/MessageSenderService';
@@ -30,15 +29,11 @@ export const useMessageSenderExtended = () => {
     
     try {
       let phoneNumber = messageData.conversationId;
-      console.log('[useMessageSenderExtended] conversationId original:', messageData.conversationId);
-      
       if (phoneNumber.includes("_")) {
         phoneNumber = phoneNumber.split("_")[0];
-        console.log('[useMessageSenderExtended] phoneNumber após extração:', phoneNumber);
       }
-
       const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
-      console.log('[useMessageSenderExtended] channelId processado para UUID:', processedChannelId);
+      console.log('[useMessageSenderExtended] channelId processado:', messageData.channelId, '-> UUID:', processedChannelId);
 
       let resultMessage: RawMessage;
 

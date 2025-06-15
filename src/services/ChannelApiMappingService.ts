@@ -1,4 +1,3 @@
-
 import { supabase } from "../lib/supabase";
 import { RawMessage } from '@/types/messageTypes';
 
@@ -60,14 +59,56 @@ export class ChannelApiMappingService {
     return this.mappings;
   }
 
-  static async getChannelUuid(channelId: string): Promise<string | null> {
-    const mappings = await this.getMappings();
-    if (!mappings) {
-      console.warn("Channel mappings not yet loaded.");
-      return null;
+  /**
+   * Novo método para obter o UUID real do canal a partir de seu legacyId.
+   * Busca no Supabase caso ainda não esteja em cache.
+   */
+  static async getChannelUuid(legacyId: string): Promise<string | null> {
+    // Tenta buscar todos os mapeamentos do Supabase só uma vez
+    if (!this.mappings) {
+      await this.fetchMappings();
+    }
+    const allChannels = this.mappings;
+
+    // Buscar na coluna legacyId, se existir
+    // Prioriza busca exata pelo canal (caso a tabela 'channels' contenha este campo futuro)
+    // Aqui mantemos compatibilidade buscando por legacyId conhecido e depois pelo próprio UUID
+    const legacyToUuid: Record<string, string> = {};
+    // Monta um dicionário legacyId → UUID
+    if (allChannels) {
+      for (const mapping of allChannels) {
+        legacyToUuid[mapping.channel_id] = mapping.channel_id; // assume UUID coincidente
+      }
+    }
+    // Se está usando um UUID, devolve como está
+    if (/^[0-9a-fA-F-]{36}$/.test(legacyId)) {
+      return legacyId;
     }
 
-    return mappings.find(mapping => mapping.channel_id === channelId)?.api_instance_uuid || null;
+    // Adicionar aliases conhecidos usados na aplicação:
+    const aliasToName: Record<string, string> = {
+      "chat": "Yelena-AI",
+      "canarana": "Canarana",
+      "souto-soares": "Souto Soares",
+      "joao-dourado": "João Dourado",
+      "america-dourada": "América Dourada",
+      "gerente-lojas": "Gerente das Lojas",
+      "gerente-externo": "Andressa Gerente Externo",
+    };
+
+    const channelsTable = await supabase.from('channels').select('id, name');
+    if (channelsTable.error) {
+      console.warn("[ChannelApiMappingService] Falha ao buscar canais:", channelsTable.error.message);
+    } else if (channelsTable.data) {
+      for (const ch of channelsTable.data) {
+        // Mapeia tanto pelo nome quanto pelos aliases
+        legacyToUuid[aliasToName[ch.name] || ch.name] = ch.id;
+        legacyToUuid[ch.id] = ch.id;
+        legacyToUuid[ch.name] = ch.id;
+      }
+    }
+
+    return legacyToUuid[legacyId] || null;
   }
 
   static async getApiInstanceForChannel(channelId: string) {
