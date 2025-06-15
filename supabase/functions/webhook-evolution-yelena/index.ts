@@ -4,64 +4,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-function isDataUrl(str: string) {
+function isDataUrl(str) {
   return typeof str === 'string' && str.startsWith('data:') && str.includes(';base64,');
 }
-function getExtensionFromMimeType(mimeType: string): string {
-  const extensions: Record<string, string> = {
-    'image/jpeg': '.jpg',
-    'image/png': '.png',
-    'image/gif': '.gif',
-    'image/webp': '.webp',
-    'audio/mpeg': '.mp3',
-    'audio/ogg': '.ogg',
-    'video/mp4': '.mp4',
-    'application/pdf': '.pdf'
-  };
-  return extensions[mimeType] || '.bin';
-}
-function detectMimeTypeFromBase64(base64: string): string {
-  if (base64.startsWith('iVBORw')) return 'image/png';
-  if (base64.startsWith('/9j/')) return 'image/jpeg';
-  if (base64.startsWith('R0lGO')) return 'image/gif';
-  if (base64.startsWith('UklGR')) return 'image/webp';
-  if (base64.startsWith('SUQz') || base64.startsWith('//uQ')) return 'audio/mpeg';
-  if (base64.startsWith('T2dn')) return 'audio/ogg';
-  if (base64.startsWith('AAAAGG') || base64.startsWith('AAAAFG')) return 'video/mp4';
-  return 'application/octet-stream';
-}
-async function uploadBase64ToStorage(supabase: any, base64Content: string, filePrefix: string = "media_"): Promise<string | null> {
-  try {
-    const [, base64Body] = base64Content.split(',');
-    let mimeType = 'application/octet-stream';
-    const match = base64Content.match(/data:([^;]+);base64,/);
-    if (match && match[1]) mimeType = match[1];
-    else if (base64Body) mimeType = detectMimeTypeFromBase64(base64Body);
-    const extension = getExtensionFromMimeType(mimeType);
-    const fileName = `${filePrefix}${Date.now()}_${Math.floor(Math.random()*1e7)}${extension}`;
-    const binary = atob(base64Body);
-    const array = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-    const { error } = await supabase.storage
-      .from('media-files')
-      .upload(fileName, array, {
-        contentType: mimeType,
-        upsert: true
-      });
-    if (error) return null;
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/media-files/${fileName}`;
-    return publicUrl;
-  } catch (err) {
-    return null;
-  }
-}
-function extractPhoneAndName(sessionId: string) {
+
+function extractPhoneAndName(sessionId) {
   if (!sessionId) return { phone: '', name: 'Cliente' };
   const parts = sessionId.split('-');
   if (parts.length > 1 && /^\d{10,15}$/.test(parts[0])) {
@@ -70,7 +23,8 @@ function extractPhoneAndName(sessionId: string) {
   const phoneMatch = sessionId.match(/(\d{10,15})/);
   return { phone: phoneMatch ? phoneMatch[1] : sessionId, name: 'Cliente' };
 }
-function getMessageContent(messageData: any): string {
+
+function getMessageContent(messageData) {
   return messageData.message?.conversation ||
     messageData.message?.extendedTextMessage?.text ||
     messageData.message?.imageMessage?.caption ||
@@ -79,7 +33,8 @@ function getMessageContent(messageData: any): string {
     messageData.message?.documentMessage?.caption ||
     '[Mídia]';
 }
-function getMessageType(messageData: any): { type: string; mediaUrl?: string } {
+
+function getMessageType(messageData) {
   if (messageData.message?.imageMessage) {
     return { type: 'image', mediaUrl: messageData.message.imageMessage.url };
   } else if (messageData.message?.audioMessage) {
@@ -101,9 +56,14 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const webhookData = await req.json();
     const { event, instance, data } = webhookData;
+
     if (!event || !instance) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: event or instance' }), 
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({
+        error: 'Missing required fields: event or instance'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     switch (event.toLowerCase()) {
@@ -111,99 +71,97 @@ serve(async (req) => {
       case 'messages_upsert':
       case 'messagesupsert':
         if (!data) {
-          return new Response(JSON.stringify({ error: 'No message data' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({
+            error: 'No message data'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
         return await processMessage(supabase, data, TABLE_NAME, instance);
+
       default:
-        return new Response(
-          JSON.stringify({ success: true, message: `Event ${event} received but not processed`, instance }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({
+          success: true,
+          message: `Event ${event} received but not processed`,
+          instance
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
 
   } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Internal server error',
-        details: error.message || 'Unknown error'
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      error: 'Internal server error',
+      details: error.message || 'Unknown error'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
 
-async function processMessage(supabase: any, messageData: any, tableName: string, instance: string) {
+async function processMessage(supabase, messageData, tableName, instance) {
   try {
     const sessionId = messageData.key?.remoteJid || '';
     const { phone, name } = extractPhoneAndName(sessionId);
     const messageContent = getMessageContent(messageData);
-    let tipoRemetente = messageData.key?.fromMe
-      ? 'USUARIO_INTERNO'
-      : 'CONTATO_EXTERNO';
+
+    let tipoRemetente = messageData.key?.fromMe ? 'USUARIO_INTERNO' : 'CONTATO_EXTERNO';
     const { type: mensagemType, mediaUrl } = getMessageType(messageData);
-    let finalMediaUrl = null;
-    if (mediaUrl) {
-      if (isDataUrl(mediaUrl)) {
-        finalMediaUrl = await uploadBase64ToStorage(supabase, mediaUrl);
-      } else if (
-        typeof mediaUrl === 'string' && 
-        /^\s*[A-Za-z0-9+/]{100,}={0,2}\s*$/.test(mediaUrl)
-      ) {
-        const mimeTypeGuess = detectMimeTypeFromBase64(mediaUrl.trim());
-        const dataUrl = `data:${mimeTypeGuess};base64,${mediaUrl.trim()}`;
-        finalMediaUrl = await uploadBase64ToStorage(supabase, dataUrl);
-      } else {
-        finalMediaUrl = mediaUrl;
-      }
-    }
-    const insertData: any = {
+
+    const insertData = {
       session_id: sessionId,
       message: messageContent,
       read_at: new Date().toISOString(),
       mensagemtype: mensagemType,
       tipo_remetente: tipoRemetente,
-      nome_do_contato: name
+      nome_do_contato: name,
+      is_read: false
     };
-    if (finalMediaUrl) {
-      insertData.media_base64 = finalMediaUrl;
-      if (
-        mensagemType === 'image'
-      ) insertData.message = '[Imagem]';
+
+    if (mediaUrl && isDataUrl(mediaUrl)) {
+      insertData.media_base64 = mediaUrl;
+      if (mensagemType === 'image') insertData.message = '[Imagem]';
       else if (mensagemType === 'audio') insertData.message = '[Áudio]';
       else if (mensagemType === 'video') insertData.message = '[Vídeo]';
       else if (mensagemType === 'document') insertData.message = '[Documento]';
       else insertData.message = '[Mídia]';
     }
-    // Tabelas de Yelena, Souto, Canarana, etc. têm coluna is_read
-    insertData.is_read = false;
+
     const { data: insertResult, error: insertError } = await supabase
       .from(tableName)
       .insert([insertData])
       .select();
+
     if (insertError) {
-      return new Response(
-        JSON.stringify({
-          error: 'Database error',
-          details: insertError.message,
-          tableName
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({
+        error: 'Database error',
+        details: insertError.message,
+        tableName
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
-    return new Response(
-      JSON.stringify({
-        success: true,
-        tableName,
-        messageId: insertResult?.[0]?.id,
-        storageUrl: finalMediaUrl
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+
+    return new Response(JSON.stringify({
+      success: true,
+      tableName,
+      messageId: insertResult?.[0]?.id,
+      mediaUrl: (mediaUrl && isDataUrl(mediaUrl)) ? mediaUrl : null
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Message processing failed', details: error.message || 'Unknown error', tableName }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      error: 'Message processing failed',
+      details: error.message || 'Unknown error',
+      tableName
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 }
