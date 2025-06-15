@@ -71,8 +71,10 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const webhookData = await req.json();
 
-    console.log("[Webhook-Yelena] Received webhook data:", JSON.stringify(webhookData, null, 2));
     const { event, instance, data } = webhookData;
+
+    // 🌟 LOG every incoming event type and key details
+    console.log(`[Webhook-Yelena][DEBUG] Received event: ${event} | Instance: ${instance} | Payload: ${JSON.stringify(webhookData, null, 2)}`);
 
     if (!event || !instance) {
       console.error("[Webhook-Yelena] Missing required fields: event or instance");
@@ -98,6 +100,48 @@ serve(async (req) => {
           });
         }
         return await processMessage(supabase, data, TABLE_NAME, instance);
+
+      // 🌟 NEW: Add explicit debug logs for all message event types you do NOT process:
+      case 'messages.update':
+      case 'messages_update':
+      case 'messagesupdate':
+      case 'contacts.update':
+      case 'contacts_update':
+      case 'contactsupdate':
+      case 'chats.update':
+      case 'chats.upsert':
+      case 'chats_update':
+      case 'chatsupsert':
+        console.warn(`[Webhook-Yelena][DEBUG] Event ${event} received, NOT processed. Payload:`, JSON.stringify(data, null, 2));
+        // Optionally print message/media fields for further debugging
+        try {
+          if (Array.isArray(data)) {
+            for (const item of data) {
+              console.log(`[Webhook-Yelena][DEBUG] Item:`, JSON.stringify(item, null, 2));
+              if (item?.message) {
+                console.log(`[Webhook-Yelena][DEBUG] Item.message:`, JSON.stringify(item.message, null, 2));
+              }
+            }
+          } else if (typeof data === 'object') {
+            if (data?.message) {
+              console.log(`[Webhook-Yelena][DEBUG] data.message:`, JSON.stringify(data.message, null, 2));
+            } else {
+              console.log(`[Webhook-Yelena][DEBUG] data (no .message):`, JSON.stringify(data, null, 2));
+            }
+          } else {
+            console.log(`[Webhook-Yelena][DEBUG] data:`, data);
+          }
+        } catch (ddd) {
+          console.log(`[Webhook-Yelena][DEBUG] Could not parse data for debug`);
+        }
+        return new Response(JSON.stringify({
+          debug: true,
+          success: true,
+          message: `Event ${event} received but not processed (DEBUG logged)`,
+          instance
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
 
       default:
         console.warn(`[Webhook-Yelena] Event ${event} received but not processed`);
