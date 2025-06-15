@@ -229,7 +229,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         isDarkMode={isDarkMode}
         stats={{
           ...stats,
-          averageGenerationTimeFormatted: formatSeconds(stats.averageGenerationTime)
         }}
         providers={providers}
       />
@@ -250,6 +249,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onGenerateReport={generateReport}
               onClearReport={clearReport}
               hasReportResult={!!reportResult}
+              availableChannels={[]} {/* Fix: pass empty array or real channels */}
             />
 
             {/* Report Display */}

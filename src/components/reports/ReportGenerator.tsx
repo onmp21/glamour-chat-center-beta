@@ -54,7 +54,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         </label>
         <select
           value={filters.channel_id || ""}
-          onChange={e => setFilters(f => ({ ...f, channel_id: e.target.value }))}
+          onChange={e => setFilters({ ...filters, channel_id: e.target.value })}
           className="border rounded px-3 py-2 bg-white"
         >
           <option value="">Todos os canais</option>
