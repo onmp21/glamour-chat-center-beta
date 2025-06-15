@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { MediaMessageRenderer } from './MediaMessageRenderer';
@@ -16,26 +17,28 @@ interface GerenteLojasMessageDisplayProps {
     mensagemtype?: string;
   };
   isDarkMode: boolean;
+  channelName?: string;
+  userName?: string;
 }
 
-export const GerenteLojasMessageDisplay: React.FC<GerenteLojasMessageDisplayProps> = ({ 
-  message, 
-  isDarkMode 
+export const GerenteLojasMessageDisplay: React.FC<GerenteLojasMessageDisplayProps> = ({
+  message,
+  isDarkMode,
+  channelName = 'Gerente Lojas',
+  userName
 }) => {
-  const isAgent = 
-    message.tipo_remetente === 'USUARIO_INTERNO' || 
+  const isAgent =
+    message.tipo_remetente === 'USUARIO_INTERNO' ||
     message.tipo_remetente === 'Gerente-Lojas' ||
-    message.sender === 'agent' || 
+    message.sender === 'agent' ||
     message.isOwn;
-  
-  const displayName = isAgent 
-    ? (message.agentName || 'Gustavo Gerente das Lojas') 
+
+  const displayName = isAgent
+    ? (message.agentName || 'Gustavo Gerente das Lojas')
     : (message.Nome_do_contato || message.nome_do_contato || message.sender || 'Cliente');
 
   const renderMessageContent = () => {
-    // Verificar se é mídia
     const isMediaMessage = message.mensagemtype && message.mensagemtype !== 'text';
-    
     if (isMediaMessage) {
       return (
         <MediaMessageRenderer
@@ -47,8 +50,6 @@ export const GerenteLojasMessageDisplay: React.FC<GerenteLojasMessageDisplayProp
         />
       );
     }
-    
-    // Texto normal
     return <p className="whitespace-pre-wrap break-words">{message.content}</p>;
   };
 
@@ -57,16 +58,24 @@ export const GerenteLojasMessageDisplay: React.FC<GerenteLojasMessageDisplayProp
       "chat-message-whatsapp message-animate",
       isAgent ? "sent" : "received"
     )}>
-      {!isAgent && (
-        <div className="chat-message-sender">
-          {displayName}
+      <div className="chat-message-header">
+        <div className="channel-name">
+          📱 {channelName}
         </div>
-      )}
-      
+        {!isAgent && (
+          <div className="chat-message-sender">
+            👤 {displayName}
+          </div>
+        )}
+        {isAgent && userName && (
+          <div className="user-indicator">
+            ✏️ Enviado por: {userName}
+          </div>
+        )}
+      </div>
       <div className="chat-message-content">
         {renderMessageContent()}
       </div>
-      
       <div className="chat-message-timestamp">
         {new Date(message.timestamp).toLocaleTimeString('pt-BR', {
           hour: '2-digit',
@@ -79,4 +88,3 @@ export const GerenteLojasMessageDisplay: React.FC<GerenteLojasMessageDisplayProp
     </div>
   );
 };
-
