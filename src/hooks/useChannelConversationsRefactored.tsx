@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
@@ -58,7 +59,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
     let unsubscribed = false;
 
-    // Defensive: always cleanup first (it works for first run, but extra safe)
+    // CLEANUP LOGIC: Always clean up on mount before subscribing new
     if (subscriptionInstanceRef.current) {
       try {
         DetailedLogger.info("useChannelConversationsRefactored", "Initial cleanup: Unsubscribing previous instance before mounting new.");
@@ -69,21 +70,24 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       subscriptionInstanceRef.current = null;
     }
 
+    // Always clear channelSuffixRef on channelId change!
+    if (channelSuffixRef.current) {
+      DetailedLogger.info("useChannelConversationsRefactored", "Cleaning channelSuffixRef on channelId change");
+      channelSuffixRef.current = undefined;
+    }
+
     if (channelId) {
-      // Only generate suffix once per channel run
-      if (!channelSuffixRef.current) {
-        channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
-      }
+      // Always generate new suffix per channel run!
+      channelSuffixRef.current = `-conversations-${Math.random().toString(36).substr(2, 8)}`;
       const channelSuffix = channelSuffixRef.current;
 
-      // Extra guard: REFUSE to create a new subscription if one exists
+      // Defensive: Prevent double subscription, but should never hit
       if (subscriptionInstanceRef.current) {
         DetailedLogger.warn("useChannelConversationsRefactored", "Tried to create a duplicate channel subscription, preventing duplicate subscribe. Subscription already exists for this channelId, skipping new instance.");
         return () => { /* no cleanup needed if not created */ };
       }
 
       const messageService = new MessageService(channelId);
-      // Só cria o canal, não chame .subscribe() novamente!
       const channel = messageService.createRealtimeSubscription(
         (payload) => {
           DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
@@ -93,9 +97,6 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         },
         channelSuffix
       );
-
-      // NÃO chame channel.subscribe() - já está inscrito!
-      // channel.subscribe(...) REMOVIDO
 
       subscriptionInstanceRef.current = channel;
 
@@ -116,8 +117,9 @@ export const useChannelConversationsRefactored = (channelId: string) => {
             subscriptionInstanceRef.current.unsubscribe();
           } catch (_e) {}
         }
-        channelSuffixRef.current = undefined; // Allow for new subscription in the future
+        // Always clean both refs now!
         subscriptionInstanceRef.current = null;
+        channelSuffixRef.current = undefined;
       }
     };
   }, [channelId, loadConversations]);
