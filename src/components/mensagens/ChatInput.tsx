@@ -639,7 +639,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             {/* Send/Mic Button */}
             {(message.trim() || filePreview) ? (
               <Button
-                onClick={filePreview && !showFilePreviewModal ? () => setShowFilePreviewModal(true) : handleSend}
+                // CORRIGIDO AQUI:
+                onClick={
+                  filePreview && !showFilePreviewModal
+                    ? () => setShowFilePreviewModal(true)
+                    : () => handleSend() // ← sempre arrow function sem argumento
+                }
                 className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0 rounded-full"
                 disabled={sending || sendingLocal}
               >
