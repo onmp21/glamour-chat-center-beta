@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
@@ -55,14 +55,26 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
 
-  // SCROLL AUTOMÁTICO melhorado
+  // ==== SCROLL AUTOMÁTICO ROBUSTO ====
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!messagesLoading && messages.length > 0 && messagesContainerRef.current) {
+  useLayoutEffect(() => {
+    let count = 0;
+    const maxAttempts = 8;
+    function scrollToBottom() {
       const container = messagesContainerRef.current;
-      // Força o scroll para o final
-      container.scrollTop = container.scrollHeight;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
     }
+    scrollToBottom();
+    // Múltiplas tentativas para garantir scroll após animações ou timeout de render
+    const timeouts: NodeJS.Timeout[] = [];
+    for (let delay of [0, 50, 100, 150, 250, 500, 1000, 1200]) {
+      timeouts.push(setTimeout(scrollToBottom, delay));
+    }
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
   }, [messages.length, messagesLoading]);
 
   // ===== Utils para nome, canal e hora =====
@@ -127,9 +139,10 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         <p className="text-lg">Selecione uma conversa para começar</p>
       </div>;
   }
-  return <div className={cn("flex-1 flex flex-col", isDarkMode ? "bg-[#09090b]" : "bg-white")}>
-      {/* Header com funções de IA */}
-      <div className={cn("p-4 border-b flex items-center justify-between", isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white")}>
+  return (
+    <div className={cn("flex-1 flex flex-col h-full", isDarkMode ? "bg-[#09090b]" : "bg-white")}>
+      {/* Header */}
+      <div className={cn("p-4 border-b flex items-center justify-between h-[74px] min-h-[64px] max-h-[96px]", isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white")}>
         <div className="flex flex-col">
           <h2 className={cn("font-semibold", isDarkMode ? "text-white" : "text-gray-900")}>
             {conversationForHeader?.contactName || selectedConv.contact_name}
@@ -152,11 +165,19 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Mensagens */}
       <div
-        className="flex-1 overflow-auto p-4"
         ref={messagesContainerRef}
-        style={{ minHeight: 0, height: "100%" }}
+        className={cn(
+          "flex-1 overflow-y-auto p-4 transition-all",
+          isDarkMode ? "bg-[#09090b]" : "bg-white"
+        )}
+        style={{
+          minHeight: 0,
+          height: "calc(100vh - 74px - 96px - env(safe-area-inset-bottom, 0px))", // header + input
+          maxHeight: "calc(100vh - 74px - 96px - env(safe-area-inset-bottom, 0px))",
+          // fallback for browser, otherwise flex-1
+        }}
       >
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -237,7 +258,16 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         )}
       </div>
 
-      {/* Chat Input com funções de IA */}
-      <ChatInput isDarkMode={isDarkMode} onSendMessage={onSendMessage} onSendFile={onSendFile} onSendAudio={onSendAudio} selectedConv={selectedConv} channelId={channelId} />
-    </div>;
+      {/* Input fixo */}
+      <div
+        className={cn("w-full", isDarkMode ? "bg-[#18181b]" : "bg-white")}
+        style={{
+          minHeight: 82,
+          maxHeight: 96,
+        }}
+      >
+        <ChatInput isDarkMode={isDarkMode} onSendMessage={onSendMessage} onSendFile={onSendFile} onSendAudio={onSendAudio} selectedConv={selectedConv} channelId={channelId} />
+      </div>
+    </div>
+  );
 };
