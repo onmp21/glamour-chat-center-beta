@@ -219,6 +219,15 @@ export class MessageService {
     return match ? match[1] : sessionId;
   }
 
+  /**
+   * Creates a Supabase realtime subscription for the given channel.
+   * 
+   * NOTE: This method returns the channel ALREADY SUBSCRIBED.
+   * DO NOT call `.subscribe()` again on the returned channel. Doing so will throw an error.
+   * @param callback payload handler
+   * @param channelSuffix unique suffix for channel separation
+   * @returns The realtime channel instance (already subscribed)
+   */
   createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
@@ -242,18 +251,21 @@ export class MessageService {
         }
       );
 
-    // Safely add custom properties with type assertion
-    (channel as any).__lov_subscribed = false;
-    (channel as any).__lov_original_subscribe = channel.subscribe;
+    // Monkey-patch subscribe to prevent duplicate subscribing
+    const channelAny = channel as any;
+    channelAny.__lov_subscribed = false;
+    channelAny.__lov_original_subscribe = channel.subscribe;
+
     channel.subscribe = function (...args: any[]) {
-      if ((this as any).__lov_subscribed) {
+      if (channelAny.__lov_subscribed) {
         console.error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
         throw new Error("Tried to subscribe multiple times. '.subscribe()' can only be called a single time per channel instance.");
       }
-      (this as any).__lov_subscribed = true;
-      return (channel as any).__lov_original_subscribe.apply(this, args);
+      channelAny.__lov_subscribed = true;
+      return channelAny.__lov_original_subscribe.apply(this, args);
     };
 
+    // Call subscribe() ONCE here **only**
     channel.subscribe((status: string, err?: any) => {
       if (status === 'SUBSCRIBED') {
         console.log(`✅ [MESSAGE_SERVICE] Realtime channel subscribed for ${subscriptionKey}`);
@@ -266,7 +278,7 @@ export class MessageService {
     // Store the subscription
     MessageService.activeSubscriptions.set(subscriptionKey, channel);
 
-    return channel;
+    return channel; // <-- Return the already-subscribed channel
   }
 
   static unsubscribeChannel(channelSuffix: string, tableName: string) {
