@@ -1,4 +1,3 @@
-
 import { supabase } from '../integrations/supabase/client';
 import { ChannelApiMappingService } from './ChannelApiMappingService';
 import { RawMessage } from '@/types/messageTypes';
@@ -24,6 +23,7 @@ export class MessageSenderService {
   }
 
   private getMessageTypeForMedia(mediaType: 'image' | 'audio' | 'video' | 'document'): string {
+    // Retorna apenas o tipo simples conforme documentação Evolution API v2
     return mediaType;
   }
 
@@ -86,7 +86,7 @@ export class MessageSenderService {
   private async reconnectInstance(baseUrl: string, apiKey: string, instanceName: string): Promise<boolean> {
     try {
       const response = await fetch(`${baseUrl}/instance/restart/${instanceName}`, {
-        method: 'POST',
+        method: 'PUT', // Corrigido para PUT conforme documentação
         headers: {
           'apikey': apiKey,
           'Content-Type': 'application/json'
@@ -135,13 +135,15 @@ export class MessageSenderService {
 
       const formattedNumber = this.formatPhoneNumber(to);
 
+      // Payload conforme documentação Evolution API v2
       const payload = {
         number: formattedNumber,
         text: text
       };
 
       this.logger.debug('Enviando texto para API Evolution', { 
-        endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}` 
+        endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`,
+        payload 
       });
 
       const response = await fetch(`${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`, {
@@ -160,10 +162,11 @@ export class MessageSenderService {
           statusText: response.statusText, 
           body: errorText 
         });
-        throw new Error(`Falha ao enviar mensagem: ${response.statusText}`);
+        throw new Error(`Falha ao enviar mensagem: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      this.logger.debug('Resposta da API Evolution', { result });
 
       let senderName: string;
       if (channelId === 'yelena') {
@@ -181,7 +184,7 @@ export class MessageSenderService {
         Nome_do_contato: formattedNumber,
         mensagemtype: 'conversation',
         tipo_remetente: senderName,
-        id: result.id || Date.now().toString(),
+        id: result.key?.id || result.messageId || Date.now().toString(),
         sender: 'agent',
         timestamp: new Date().toISOString(),
         content: text
@@ -189,7 +192,7 @@ export class MessageSenderService {
 
       await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
 
-      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.id });
+      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.key?.id });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -300,16 +303,22 @@ export class MessageSenderService {
       }
 
       const endpoint = `/message/sendMedia/${apiInstance.instance_name}`;
+      
+      // Payload conforme documentação Evolution API v2
       const payload = {
         number: formattedNumber,
-        mediatype: this.getMessageTypeForMedia(mediaType),
+        mediatype: mediaType, // Usar tipo simples: 'image', 'audio', 'video', 'document'
         mimetype: mimeType,
         caption: caption || "",
-        media: base64Content,
+        media: `data:${mimeType};base64,${base64Content}`, // Data URL completa
         fileName: `media_${Date.now()}.${fileExtension}`
       };
 
-      this.logger.debug('Enviando mídia para API Evolution', { endpoint: `${apiInstance.base_url}${endpoint}`, mediaType });
+      this.logger.debug('Enviando mídia para API Evolution', { 
+        endpoint: `${apiInstance.base_url}${endpoint}`, 
+        mediaType,
+        payload: { ...payload, media: '[BASE64_DATA]' } // Log sem o base64 completo
+      });
 
       const response = await fetch(`${apiInstance.base_url}${endpoint}`, {
         method: "POST",
@@ -327,10 +336,11 @@ export class MessageSenderService {
           statusText: response.statusText, 
           body: errorText 
         });
-        throw new Error(`Falha ao enviar mensagem de mídia: ${response.statusText}`);
+        throw new Error(`Falha ao enviar mensagem de mídia: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      this.logger.debug('Resposta da API Evolution para mídia', { result });
 
       let senderName: string;
       if (channelId === 'yelena') {
@@ -343,20 +353,20 @@ export class MessageSenderService {
 
       const messageData: RawMessage = {
         session_id: formattedNumber,
-        message: base64Content,
+        message: `data:${mimeType};base64,${base64Content}`, // Salvar data URL completa
         read_at: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
         Nome_do_contato: formattedNumber,
-        mensagemtype: `${this.getMessageTypeForMedia(mediaType)}Message`,
+        mensagemtype: mediaType, // Usar tipo simples
         tipo_remetente: senderName,
-        id: result.id || Date.now().toString(),
+        id: result.key?.id || result.messageId || Date.now().toString(),
         sender: 'agent',
         timestamp: new Date().toISOString(),
-        content: base64Content
+        content: `data:${mimeType};base64,${base64Content}`
       };
 
       await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
 
-      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.id, mediaType });
+      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.key?.id, mediaType });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -374,3 +384,4 @@ export class MessageSenderService {
     }
   }
 }
+

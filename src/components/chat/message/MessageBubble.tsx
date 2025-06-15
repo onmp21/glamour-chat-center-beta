@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '@/types/chat';
@@ -7,12 +6,16 @@ interface MessageBubbleProps {
   message: ChatMessage;
   isDarkMode: boolean;
   children: React.ReactNode;
+  channelName?: string; // Nome do canal
+  userName?: string; // Nome do usuário que enviou (se aplicável)
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   isDarkMode,
-  children
+  children,
+  channelName,
+  userName
 }) => {
   const isOwn = message.isOwn || message.sender.type === 'agent';
 
@@ -28,14 +31,32 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           : "bg-card text-card-foreground rounded-bl-none border border-border",
         isDarkMode ? "dark" : ""
       )}>
-        {!isOwn && message.sender.name && (
-          <div className={cn(
-            "text-xs font-semibold mb-1",
-            isDarkMode ? "text-muted-foreground" : "text-gray-600"
-          )}>
-            {message.sender.name}
-          </div>
-        )}
+        {/* Header com informações do canal e remetente */}
+        <div className={cn(
+          "text-xs mb-1 space-y-0.5",
+          isDarkMode ? "text-muted-foreground" : "text-gray-600"
+        )}>
+          {/* Nome do canal */}
+          {channelName && (
+            <div className="font-medium text-blue-600 dark:text-blue-400">
+              📱 {channelName}
+            </div>
+          )}
+          
+          {/* Nome do cliente ou usuário */}
+          {!isOwn && message.sender.name && (
+            <div className="font-semibold">
+              👤 {message.sender.name}
+            </div>
+          )}
+          
+          {/* Indicativo para mensagens enviadas pela barra de input */}
+          {isOwn && userName && (
+            <div className="font-semibold text-green-600 dark:text-green-400">
+              ✏️ Enviado por: {userName}
+            </div>
+          )}
+        </div>
         
         <div className="text-sm">
           {children}
@@ -57,5 +78,4 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </div>
   );
 };
-
 
