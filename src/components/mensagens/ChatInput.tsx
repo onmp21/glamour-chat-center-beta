@@ -50,7 +50,8 @@ const QUICK_RESPONSES = [
 export const ChatInput: React.FC<ChatInputProps> = ({ 
   isDarkMode, 
   selectedConv,
-  channelId
+  channelId,
+  onSendMessage, // NOVO: usar a prop para atualizar tela local
 }) => {
   const [message, setMessage] = useState('');
   const [filePreview, setFilePreview] = useState<FilePreview | null>(null);
@@ -68,23 +69,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const { sendMessage, sending } = useMessageSenderExtended();
   const { user } = useAuth();
 
-  // Envio REAL via Evolution
-  const handleSend = async () => {
-    if ((!message.trim() && !filePreview) || !user || !selectedConv || !channelId || sending) return;
+  // ADICIONADO: Estado para status de envio (feedback)
+  const [sendingLocal, setSendingLocal] = useState(false);
 
+  // Envio REAL via Evolution (corrigido: sempre chama callback local)
+  const handleSend = async (customCaption?: string) => {
+    if ((!message.trim() && !filePreview) || !user || !selectedConv || !channelId || sending || sendingLocal) return;
     // Extra: impede duplo envio se arquivo em preview está aberto
     if (filePreview && showFilePreviewModal) return;
 
+    setSendingLocal(true);
+
     // Montar dados mínimos para o sender
     let fileData = null;
+    let fileType: string | undefined = undefined;
     if (filePreview) {
-      // Converte arquivo para base64 usando FileService utility (já utilizada em YelenaChatInput)
       try {
         let base64: string;
         let mimeType = filePreview.file.type;
         if (filePreview.type === "audio") {
-          base64 = await FileService.convertAudioToMp3Base64(filePreview.file);
-          mimeType = "audio/mpeg";
+          // Mantém áudio em webm base64 para envio
+          base64 = await FileService.convertToBase64(filePreview.file);
+          mimeType = "audio/webm";
         } else {
           base64 = await FileService.convertToBase64(filePreview.file);
         }
@@ -94,32 +100,47 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           mimeType: mimeType,
           size: filePreview.file.size
         };
+        fileType = filePreview.type;
       } catch (err) {
         alert("Erro ao processar arquivo de anexo.");
+        setSendingLocal(false);
         return;
       }
     }
 
     // Verifica se precisa do número puro para APIs
     let conversationId = selectedConv.contact_phone || selectedConv.id;
-    if (conversationId.includes("_")) {
-      conversationId = conversationId.split("_")[0];
-    }
+    if (conversationId.includes("_")) conversationId = conversationId.split("_")[0];
+
+    // Determina messageType conforme tipo de mídia ou texto
+    const messageType = fileData ? (
+      fileType === 'image' ? 'image' :
+      fileType === 'audio' ? 'audio' :
+      fileType === 'video' ? 'video' :
+      fileType === 'file' ? 'file' : 'text'
+    ) : 'text';
+
+    // Mensagem que será exibida imediatamente
+    const tempMessage = customCaption || message.trim() || (filePreview ? filePreview.file.name : '');
+
+    // CHAMA callback local para exibição instantânea
+    onSendMessage?.(tempMessage);
 
     await sendMessage({
       conversationId,
       channelId,
-      content: message.trim() || (filePreview ? filePreview.file.name : ""),
+      content: customCaption !== undefined ? customCaption : (message.trim() || (filePreview ? filePreview.file.name : "")),
       sender: "agent",
       agentName: user.name,
-      messageType: filePreview ? filePreview.type : "text",
+      messageType: messageType,
       fileData: fileData || undefined
     });
+
     setMessage('');
     setFilePreview(null);
     setShowFilePreviewModal(false);
     setRecordingTime(0);
-    // não mexer nas props de callbacks antigos, mantemos apenas novo fluxo
+    setSendingLocal(false);
   };
 
   const handleQuickResponse = (response: string) => {
@@ -204,7 +225,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     event.target.value = '';
   };
 
+  // FLUXO ÁUDIO PARA WHATSAPP STYLE: NÃO USA MODAL, ENVIA DIRETO AO PARAR
+  const [isPressingMic, setIsPressingMic] = useState(false);
+
   const handleRecordStart = async () => {
+    setIsPressingMic(true);
     try {
       console.log('🎤 [AUDIO_RECORDING] Iniciando gravação de áudio...');
       
@@ -246,28 +271,43 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
+  // Ao parar, monta audio e envia direto, não abre modal
   const handleRecordStop = () => {
-    console.log('🎤 [AUDIO_RECORDING] Parando gravação...');
-    
+    setIsPressingMic(false);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
-        const url = URL.createObjectURL(audioBlob);
-        // Create a File (for consistency)
-        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm;codecs=opus' });
-        setFilePreview({ file: audioFile, url, type: 'audio' });
-        setShowFilePreviewModal(true);
+        // ENVIAR DIRETO! Cria File para seguir o mesmo fluxo de envio
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+        // Envia como mensagem de áudio, mostra imediatamente
+        setSendingLocal(true);
+        onSendMessage?.('[Áudio]');
+        // Adapta para chamar o sender igual anexo
+        sendMessage({
+          conversationId: selectedConv?.contact_phone || selectedConv?.id,
+          channelId,
+          content: '[Áudio]',
+          sender: "agent",
+          agentName: user?.name,
+          messageType: 'audio',
+          fileData: {
+            base64: '', // Iremos converter base64 agora
+            fileName: audioFile.name,
+            mimeType: audioFile.type,
+            size: audioFile.size
+          }
+        }).then(() => setSendingLocal(false));
         setIsRecording(false);
         setRecordingTime(0);
-        if (recordingIntervalRef.current) {
-          clearInterval(recordingIntervalRef.current);
-        }
+        if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
       };
       mediaRecorderRef.current.stop();
     }
   };
 
+  // Ao cancelar
   const handleRecordCancel = () => {
+    setIsPressingMic(false);
     console.log('🎤 [AUDIO_RECORDING] Cancelando gravação...');
     
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -303,6 +343,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setMessage(prev => prev + emoji);
   };
 
+  // Envio do botão no modal aceita legenda corretamente
   const renderFilePreviewModal = () => {
     if (!filePreview) return null;
 
@@ -400,11 +441,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               Cancelar
             </Button>
             <Button
-              onClick={handleSend}
-              className="bg-[#b5103c] hover:bg-[#9d0e34] text-white"
+              onClick={() => handleSend(message)} // Agora passa a legenda
+              className={cn(
+                "bg-[#b5103c] hover:bg-[#9d0e34] text-white",
+                sendingLocal && "opacity-70 cursor-not-allowed"
+              )}
+              disabled={sending || sendingLocal}
             >
               <Send size={16} className="mr-2" />
-              Enviar
+              {sendingLocal ? "Enviando..." : "Enviar"}
             </Button>
           </div>
         </div>
@@ -412,6 +457,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     );
   };
 
+  // RENDERIZA botão mic (pressionar e segurar/push-to-talk)
   if (isRecording) {
     return (
       <div className={cn(
@@ -426,7 +472,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </span>
           </div>
           <Button
-            onClick={handleRecordCancel}
+            onPointerUp={handleRecordCancel}
             variant="ghost"
             size="icon"
             className="text-red-500 hover:bg-red-100"
@@ -434,7 +480,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <X size={18} />
           </Button>
           <Button
-            onClick={handleRecordStop}
+            onPointerUp={handleRecordStop}
             className="bg-[#b5103c] hover:bg-[#9d0e34] text-white"
           >
             <Check size={18} />
@@ -527,10 +573,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {/* Input Area */}
         <div className="p-4">
           <div className="flex items-end gap-3">
-            {/* Action Buttons */}
             <div className="flex items-center gap-1">
               <Button 
                 variant="ghost" 
@@ -588,16 +632,36 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
                 )}
                 rows={1}
+                disabled={sending || sendingLocal}
               />
             </div>
 
             {/* Send/Mic Button */}
-            <Button
-              onClick={message.trim() || filePreview ? (filePreview && !showFilePreviewModal ? () => setShowFilePreviewModal(true) : handleSend) : handleRecordStart}
-              className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0 rounded-full"
-            >
-              {message.trim() || filePreview ? <Send size={18} /> : <Mic size={18} />}
-            </Button>
+            {(message.trim() || filePreview) ? (
+              <Button
+                onClick={filePreview && !showFilePreviewModal ? () => setShowFilePreviewModal(true) : handleSend}
+                className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0 rounded-full"
+                disabled={sending || sendingLocal}
+              >
+                {sending || sendingLocal ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  <Send size={18} />
+                )}
+              </Button>
+            ) : (
+              // MIC estilo whatsapp: pressionar-e-segurar grava
+              <Button
+                className="bg-[#b5103c] hover:bg-[#9d0e34] text-white h-10 w-10 flex-shrink-0 rounded-full"
+                onPointerDown={handleRecordStart}
+                onPointerUp={handleRecordStop}
+                onPointerLeave={handleRecordCancel}
+                disabled={sending || sendingLocal}
+                title="Segure para gravar áudio"
+              >
+                <Mic size={18} />
+              </Button>
+            )}
           </div>
         </div>
 
