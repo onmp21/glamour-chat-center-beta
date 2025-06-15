@@ -10,6 +10,7 @@ import { ReportStatsSection } from './ReportStatsSection';
 import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
+import { useActiveChannels } from '@/hooks/useActiveChannels';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
@@ -43,16 +44,44 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     reportsThisMonth: 0,
     averageGenerationTime: 0
   });
+  const { channels: availableChannels, loading: channelsLoading } = useActiveChannels();
 
   // Função utilitária para formatar segundos em mm:ss
   function formatSeconds(seconds: number): string {
     if (!seconds || isNaN(seconds)) return "0s";
-    const min = Math.floor(seconds / 60);
-    const sec = Math.round(seconds % 60);
+    const min = Math.floor(seconds);
+    const sec = Math.round((seconds - min) * 60);
     if (min > 0) {
-      return `${min}m ${sec}s`;
+      return `${min}m ${sec.toString().padStart(2, "0")}s`;
     }
     return `${sec}s`;
+  }
+
+  // BUSCA DADOS REAIS para o relatório
+  async function fetchReportData(report_type: string, channel_id?: string) {
+    const supabaseClient = require('@/integrations/supabase/client').supabase;
+    if (report_type === 'conversations' && channel_id) {
+      // Buscar até 30 conversas recentes do canal selecionado
+      // Determinar a tabela pelo channel_id
+      const { getTableNameForChannel } = require('@/utils/channelMapping');
+      const tableName = getTableNameForChannel(channel_id);
+      const { data } = await supabaseClient
+        .from(tableName)
+        .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
+        .limit(30)
+        .order('read_at', { ascending: false });
+      return data || [];
+    }
+    if (report_type === 'exams') {
+      // Buscar até 30 exames
+      const { data } = await supabaseClient
+        .from('exams')
+        .select('*')
+        .limit(30)
+        .order('appointment_date', { ascending: false });
+      return data || [];
+    }
+    return {}; // Para custom, retorna vazio
   }
 
   useEffect(() => {
@@ -120,10 +149,15 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
+      // Busca dados REAIS conforme tipo do relatório
+      let reportData: any = {};
+      if (filters.report_type === "conversations" || filters.report_type === "exams") {
+        reportData = await fetchReportData(filters.report_type, filters.channel_id);
+      }
       const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
         report_type: filters.report_type,
-        data: {},
+        data: reportData,
         custom_prompt: filters.custom_prompt
       });
 
@@ -229,6 +263,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         isDarkMode={isDarkMode}
         stats={{
           ...stats,
+          averageGenerationTimeFormatted: formatSeconds(stats.averageGenerationTime)
         }}
         providers={providers}
       />
@@ -249,7 +284,8 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onGenerateReport={generateReport}
               onClearReport={clearReport}
               hasReportResult={!!reportResult}
-              availableChannels={[]}
+              availableChannels={availableChannels}
+              channelsLoading={channelsLoading}
             />
 
             {/* Report Display */}

@@ -30,6 +30,7 @@ interface ReportGeneratorProps {
   onClearReport: () => void;
   hasReportResult: boolean;
   availableChannels: any[];
+  channelsLoading?: boolean;
 }
 
 export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
@@ -43,7 +44,8 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   onGenerateReport,
   onClearReport,
   hasReportResult,
-  availableChannels = []
+  availableChannels = [],
+  channelsLoading = false
 }) => {
   return (
     <div>
@@ -52,16 +54,20 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         <label className="block text-sm mb-1 font-medium">
           Selecionar Canal
         </label>
+        {channelsLoading ? (
+          <div className="text-xs text-muted">Carregando canais...</div>
+        ) : (
         <select
           value={filters.channel_id || ""}
           onChange={e => setFilters({ ...filters, channel_id: e.target.value })}
           className="border rounded px-3 py-2 bg-white"
         >
           <option value="">Todos os canais</option>
-          {availableChannels.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          {availableChannels.map((c: any) => (
+            <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
           ))}
         </select>
+        )}
       </div>
 
       <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
@@ -110,6 +116,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
               <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
                 <SelectItem value="conversations">Análise de Conversas</SelectItem>
                 <SelectItem value="channels">Análise de Canais</SelectItem>
+                <SelectItem value="exams">Análise de Exames</SelectItem>
                 <SelectItem value="custom">Relatório Personalizado</SelectItem>
               </SelectContent>
             </Select>
