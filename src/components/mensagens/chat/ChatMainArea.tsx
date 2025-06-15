@@ -63,6 +63,10 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   // Usar o hook para buscar mensagens (vai usar realtime, loading e erro)
   const { messages: rawMessages, loading: messagesLoading, error, refreshMessages } = useSimpleMessages(channelId, sessionId);
 
+  // NOVO STATE para o resumo e loading do resumo IA
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryContent, setSummaryContent] = useState<string | null>(null);
+
   // Mapeia para o tipo Message usado localmente, convertendo tipos e nomes conforme esperado
   const messages: Message[] = useMemo(() => {
     if (!rawMessages) return [];
@@ -76,9 +80,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       tipo_remetente: m.tipo_remetente,
       type: (m.mensagemtype as any) || "text",
       read: true,
-      Nome_do_contato: m.nome_do_contato,
+      Nome_do_contato: m.Nome_do_contato,
       mensagemtype: m.mensagemtype,
-      // Pode ser extendido para media no futuro
+      nome_do_contato: m.nome_do_contato, // Adicionado: para evitar erro do próximo acesso
     }));
   }, [rawMessages]);
 
@@ -207,12 +211,13 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 message.tipo_remetente === "USUARIO_INTERNO" ||
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
+              // Acesso seguro ao nome_do_contato (corrige TS2551)
               const contactName =
-                message.Nome_do_contato ||
                 message.nome_do_contato ||
+                message.Nome_do_contato ||
                 message.sender ||
                 "Cliente";
-              const nomeExibido = contactName.split(" ").slice(0, 2).join(" ") || "Cliente";
+              const nomeExibido = (contactName || '').split(" ").slice(0, 2).join(" ") || "Cliente";
               const canalNome = channelId;
               const hora = message.timestamp
                 ? (() => {
@@ -254,9 +259,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                           <span>
                             {canalNome}
                           </span>
-                          {message.tipo_remetente === "USUARIO_INTERNO" && !!message.Nome_do_contato && (
+                          {message.tipo_remetente === "USUARIO_INTERNO" && !!(message.Nome_do_contato || message.nome_do_contato) && (
                             <span className="font-semibold">
-                              {message.Nome_do_contato}
+                              {message.Nome_do_contato || message.nome_do_contato}
                             </span>
                           )}
                         </>

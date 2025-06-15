@@ -1,14 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatMainArea } from './ChatMainArea';
-// import { useSimpleConversations, SimpleConversation } from '@/hooks/useSimpleConversations'; // Original import
-// import { useSimpleMessages, SimpleMessage } from '@/hooks/useSimpleMessages'; // Original import
 import { useSimpleConversations } from '@/hooks/useSimpleConversations';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChannelConversation } from '@/types/messages'; // Corrected path if needed
+import { ChannelConversation } from '@/types/messages';
 
 interface ChatOverlayRefactoredProps {
   channelId: string;
@@ -114,7 +111,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     conversationsCount: simpleConversations.length,
     messagesCount: simpleMessagesFromHook.length,
     conversationsLoading,
-    messagesLoading,
     isAuthenticated,
     user: user?.name
   });
@@ -258,21 +254,14 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       <div className="flex-1 flex flex-col">
         <ChatMainArea 
           selectedConv={selectedConvForMainArea} 
-          conversationForHeader={conversationForHeader} 
-          messages={displayMessages} 
-          messagesLoading={messagesLoading} 
+          conversationForHeader={conversationForHeader}
           isSidebarOpen={isSidebarOpen} 
           isDarkMode={isDarkMode} 
           channelId={channelId} 
           onSidebarToggle={setIsSidebarOpen} 
           onMarkAsResolved={() => { console.log('Mark as resolved clicked'); }}
-          // Pass the corrected handlers or the props if they are meant for ChatMainArea
-          onSendMessage={handleSendMessage} 
-          onSendFile={onSendFileProp || handleSendFile} 
-          onSendAudio={onSendAudioProp || handleSendAudio} 
         />
       </div>
     </div>
   );
 };
-
