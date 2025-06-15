@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,7 @@ interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
 }
 
+// Everything below uses ReportType, which allows 'exams' as valid value.
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
   isDarkMode
 }) => {
@@ -297,3 +299,4 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     </div>
   );
 };
+
