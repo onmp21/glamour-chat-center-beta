@@ -12,7 +12,8 @@ interface ReportStatsSectionProps {
     reportsThisMonth: number;
     averageGenerationTime: number;
   };
-  providers: AIProvider[];
+  providers: any[];
+  // There is no direct report_type prop, so no correction needed here unless used elsewhere.
 }
 
 export const ReportStatsSection: React.FC<ReportStatsSectionProps> = ({

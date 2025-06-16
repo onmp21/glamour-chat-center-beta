@@ -1,99 +1,51 @@
-
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { FileText, Eye, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ReportHistory as ReportHistoryType, ReportResult } from '@/types/ai-providers';
 
-interface ReportHistoryProps {
-  isDarkMode: boolean;
-  recentReports: ReportHistoryType[];
-  onViewReport: (result: ReportResult) => void;
-  onDownloadReport: (content: string, type: string, id: string) => void;
-}
+export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownloadReport }) => {
+  const [selectedReport, setSelectedReport] = useState(null);
 
-export const ReportHistory: React.FC<ReportHistoryProps> = ({
-  isDarkMode,
-  recentReports,
-  onViewReport,
-  onDownloadReport
-}) => {
   return (
-    <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center gap-2">
-          <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-accent" : "bg-gray-100")}>
-            <FileText size={18} className="text-primary" strokeWidth={1.5} />
-          </div>
-          <div>
-            <CardTitle className={cn("text-lg", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-              Histórico de Relatórios Recentes
-            </CardTitle>
-            <CardDescription className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-              Visualize e gerencie seus relatórios gerados
-            </CardDescription>
+    <div>
+      <h2 className="text-xl font-semibold mb-4">
+        Relatórios Recentes
+      </h2>
+      <ul className="grid gap-3">
+        {recentReports.map(report => (
+          <li key={report.id} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+            <span className="font-medium text-sm">{report.title}</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setSelectedReport(report);
+                  if (typeof onViewReport === "function") onViewReport(report.result);
+                }}
+                className="text-primary px-2 py-1 bg-white border rounded hover:bg-primary/10 transition"
+              >
+                Ver
+              </button>
+              <button
+                onClick={() => onDownloadReport(report.generated_report, report.report_type, report.id)}
+                className="text-xs text-gray-600 hover:underline"
+              >
+                Download
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {/* Modal simples para visualização de relatório */}
+      {selectedReport && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white max-w-lg w-full rounded shadow p-5">
+            <h3 className="font-semibold text-lg mb-2">Relatório</h3>
+            <pre className="overflow-x-auto max-h-96 bg-gray-50 rounded p-3 text-sm">{selectedReport.generated_report || selectedReport.content}</pre>
+            <button className="mt-3 px-4 py-2 bg-primary text-white rounded" onClick={() => setSelectedReport(null)}>
+              Fechar
+            </button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        {recentReports.length === 0 ? (
-          <div className={cn(
-            "flex items-center justify-center h-[100px] border-2 border-dashed rounded-lg",
-            isDarkMode ? "border-border" : "border-gray-300"
-          )}>
-            <p className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-500")}>
-              Nenhum relatório recente.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {recentReports.map(report => (
-              <div key={report.id} className={cn(
-                "p-3 border rounded-lg flex items-center justify-between",
-                isDarkMode ? "bg-input-dark border-input-dark" : "bg-gray-50 border-gray-200"
-              )}>
-                <div>
-                  <p className={cn("font-medium", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-                    {report.prompt}
-                  </p>
-                  <p className={cn("text-xs", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-                    Gerado em: {new Date(report.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onViewReport({ 
-                      ...report.result, 
-                      report_content: report.generated_report,
-                      report_type: report.report_type
-                    })}
-                    className={cn(
-                      isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
-                    )}
-                  >
-                    <Eye size={14} className="mr-2" />
-                    Ver
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onDownloadReport(report.generated_report, report.report_type, report.id)}
-                    className={cn(
-                      isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
-                    )}
-                  >
-                    <Download size={14} className="mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };

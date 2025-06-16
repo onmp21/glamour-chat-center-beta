@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +14,17 @@ interface ChannelManagementCompactProps {
 }
 
 export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> = ({ isDarkMode }) => {
-  const { channels, loading, updateChannelStatus } = useChannels();
+  const { channels, loading, updateChannelStatus, refetch } = useChannels();
   const [searchTerm, setSearchTerm] = useState('');
+  const [optimisticChannels, setOptimisticChannels] = useState<typeof channels | null>(null);
+
+  // Usar optimisticChannels se houver, senão channels do contexto
+  const shownChannels = optimisticChannels ?? channels;
+
+  useEffect(() => {
+    // Quando channels do contexto mudar (ex: após refetch), limpa otimismo
+    setOptimisticChannels(null);
+  }, [channels]);
 
   const getChannelIcon = (channelName: string) => {
     if (channelName.includes('Yelena') || channelName.includes('AI') || channelName.includes('Óticas')) {
@@ -45,8 +53,19 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
   };
 
   const handleToggleChannel = async (channelId: string, isActive: boolean) => {
+    // Otimismo: altera estado local imediatamente
+    setOptimisticChannels((prev) => {
+      const oldList = prev ?? channels;
+      return oldList.map(c =>
+        c.id === channelId
+          ? { ...c, isActive }
+          : c
+      );
+    });
+
     try {
       await updateChannelStatus(channelId, isActive);
+      // O estado global do contexto reflete após o refetch que já existe no hook
       toast({
         title: 'Sucesso',
         description: `Canal ${isActive ? 'ativado' : 'desativado'} com sucesso.`
@@ -57,18 +76,27 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
         description: `Erro ao ${isActive ? 'ativar' : 'desativar'} o canal.`,
         variant: 'destructive'
       });
+      // Se falhar, volta ao valor anterior imediatamente
+      setOptimisticChannels((prev) => {
+        const oldList = prev ?? channels;
+        return oldList.map(c =>
+          c.id === channelId
+            ? { ...c, isActive: !isActive }
+            : c
+        );
+      });
     }
   };
 
-  const filteredChannels = channels.filter(channel => 
+  const filteredChannels = shownChannels.filter(channel => 
     channel.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
-    total: channels.length,
-    active: channels.filter(c => c.isActive).length,
-    inactive: channels.filter(c => !c.isActive).length,
-    stores: channels.filter(c => c.type === 'store').length
+    total: shownChannels.length,
+    active: shownChannels.filter(c => c.isActive).length,
+    inactive: shownChannels.filter(c => !c.isActive).length,
+    stores: shownChannels.filter(c => c.type === 'store').length
   };
 
   if (loading) {

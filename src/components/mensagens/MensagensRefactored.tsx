@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,9 @@ import { ChannelSelectorModal } from './ChannelSelectorModal';
 import { ChatOverlayRefactored } from './chat/ChatOverlayRefactored';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useInternalChannels } from '@/hooks/useInternalChannels';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface MensagensRefactoredProps {
   isDarkMode: boolean;
@@ -34,61 +38,23 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  const { channels } = useChannels();
-  console.log("📊 [MENSAGENS_REFACTORED] Canais brutos do useChannels():", channels);
+  const { channels: internalChannels } = useInternalChannels();
   const { getAccessibleChannels } = usePermissions();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
-    
-    if (initialChannel && initialPhone) {
-      const mappedInitialChannel = getChannelLegacyId({ name: initialChannel, id: initialChannel }); // Mapear o initialChannel
-      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
-      setSelectedChannel(mappedInitialChannel);
-    }
-  }, [initialChannel, initialPhone]);
-
-  const getChannelLegacyId = (channel: any) => {
-    // Mapear nomes de canais para UUIDs do Supabase
-    const nameToId: Record<string, string> = {
-      'yelena-ai': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-      'chat': 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-      'canarana': '011b69ba-cf25-4f63-af2e-4ad0260d9516',
-      'souto soares': 'b7996f75-41a7-4725-8229-564f31868027',
-      'joão dourado': '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
-      'américa dourada': '64d8acad-c645-4544-a1e6-2f0825fae00b',
-      'gustavo gerente das lojas': 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
-      'andressa gerente externo': 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7'
-    };
-    
-    // Converter o nome do canal para uma chave padronizada (ex: tudo minúsculo)
-    const normalizedChannelName = channel.name.toLowerCase();
-
-    // Primeiro tentar mapear pelo nome normalizado
-    console.log(`🔄 [CHANNEL_MAPPING] getChannelLegacyId received channel.name: "${channel.name}", normalized: "${normalizedChannelName}"`);
-    const mappedId = nameToId[normalizedChannelName];
-    if (mappedId) {
-      console.log(`🔄 [CHANNEL_MAPPING] Mapped ${channel.name} to UUID: ${mappedId}`);
-      return mappedId;
-    }
-    
-    // Se não encontrar, usar o ID original
-    console.log(`🔄 [CHANNEL_MAPPING] Using original ID for ${channel.name}: ${channel.id}`);
-    return channel.id;
-  };
-
-  const accessibleChannels = getAccessibleChannels();
-  const canaisData = channels
-    .filter(channel => 
-      channel.isActive && // Corrigido de is_active para isActive
-      channel.name !== 'Pedro' &&
-      channel.name
-    )
-<<<<<<< HEAD
-      .map(channel => {
-      console.log(`🔍 [MENSAGENS_REFACTORED] Processing channel name: "${channel.name}", original ID: "${channel.id}"`);
-      return {
-        id: getChannelLegacyId(channel),
+  // Montar lista de canais baseada no role:
+  let canaisData = [];
+  if (user?.role === 'admin') {
+    // Admin pode ver todos os ativos, exceto Pedro
+    canaisData = internalChannels
+      .filter(channel =>
+        channel.isActive &&
+        channel.name &&
+        channel.name.toLowerCase() !== 'pedro'
+      )
+      .map(channel => ({
+        id: channel.legacyId,
         nome: channel.name,
         tipo: channel.type === 'general' ? 'IA Assistant' :
               channel.type === 'store' ? 'Loja' :
@@ -96,26 +62,39 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         status: 'ativo' as const,
         conversasNaoLidas: 0,
         ultimaAtividade: 'Online'
-      };
-    })
-    .filter(channel => accessibleChannels.includes(channel.id));
+      }));
+  } else {
+    // Usuário comum
+    const accessibleChannels = getAccessibleChannels();
+    canaisData = internalChannels
+      .filter(channel =>
+        channel.isActive &&
+        channel.name &&
+        channel.name.toLowerCase() !== 'pedro' &&
+        accessibleChannels.includes(channel.legacyId)
+      )
+      .map(channel => ({
+        id: channel.legacyId,
+        nome: channel.name,
+        tipo: channel.type === 'general' ? 'IA Assistant' :
+              channel.type === 'store' ? 'Loja' :
+              channel.type === 'manager' ? 'Gerente' : 'Canal',
+        status: 'ativo' as const,
+        conversasNaoLidas: 0,
+        ultimaAtividade: 'Online'
+      }));
+  }
 
-  console.log("📊 [MENSAGENS_REFACTORED] canaisData gerado:", canaisData);
+  useEffect(() => {
+    console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
+    
+    if (initialChannel && initialPhone) {
+      const mappedInitialChannel = initialChannel;
+      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
+      setSelectedChannel(mappedInitialChannel);
+    }
+  }, [initialChannel, initialPhone]);
 
-=======
-    .map(channel => ({
-      id: getChannelLegacyId(channel),
-      nome: channel.name,
-      tipo: channel.type === 'general' ? 'IA Assistant' : 
-            channel.type === 'store' ? 'Loja' : 
-            channel.type === 'manager' ? 'Gerente' : 'Canal',
-      status: 'ativo' as const,
-      conversasNaoLidas: 0,
-      ultimaAtividade: 'Online'
-    }))
-    .filter(channel => accessibleChannels.includes(channel.id));
-
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
   const handleSendFile = async (file: File, caption?: string) => {
     console.log('File sending handled by ChatOverlayRefactored');
   };
@@ -125,26 +104,54 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   };
 
   const handleChannelClick = (channelId: string) => {
-    console.log("📺 [MENSAGENS] Channel clicked (raw channelId):", channelId);
     setSelectedChannel(channelId);
-    console.log("📺 [MENSAGENS] selectedChannel updated to (after click):", channelId);
   };
 
   const handleCloseOverlay = () => {
-    console.log("❌ [MENSAGENS] Closing chat overlay");
     setSelectedChannel(null);
-    console.log("❌ [MENSAGENS] selectedChannel set to null.");
-    
     const newUrl = "/?section=mensagens";
     window.history.replaceState({}, "", newUrl);
   };
 
-<<<<<<< HEAD
-  console.log("Current selectedChannel in MensagensRefactored (before render):", selectedChannel);
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
+  const handleNewContact = (contactData: { nome: string; telefone: string; canal: string }) => {
+    console.log('🆕 [NEW_CONTACT] Creating contact:', contactData);
+    
+    // Mostrar toast de sucesso
+    toast({
+      title: "Contato Criado",
+      description: `Contato ${contactData.nome} criado com sucesso. Aguardando primeira mensagem.`,
+    });
+    
+    // Abrir o canal selecionado para o novo contato
+    setSelectedChannel(contactData.canal);
+  };
+
+  const handleContactClick = (contact: any) => {
+    console.log('👤 [CONTACT_CLICK] Contact selected:', contact);
+    
+    // Se o contato tem apenas um canal, abrir diretamente
+    if (contact.canais && contact.canais.length === 1) {
+      setSelectedChannel(contact.canais[0]);
+    } else if (contact.canais && contact.canais.length > 1) {
+      // Se tem múltiplos canais, abrir modal de seleção
+      setSelectedContactChannels(contact.canais);
+      setSelectedContactName(contact.nome);
+      setIsChannelSelectorOpen(true);
+    } else {
+      // Fallback: usar o primeiro canal disponível
+      const firstChannel = canaisData[0]?.id;
+      if (firstChannel) {
+        setSelectedChannel(firstChannel);
+      }
+    }
+  };
+
+  const handleChannelSelect = (channelId: string) => {
+    setSelectedChannel(channelId);
+    setIsChannelSelectorOpen(false);
+  };
+
   if (selectedChannel) {
-    console.log("Rendering ChatOverlayRefactored for channel:", selectedChannel);
     return (
       <ChatOverlayRefactored
         channelId={selectedChannel}
@@ -205,8 +212,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         />
       ) : (
         <ContactsListOptimized
-          contacts={[]}
-          onContactClick={() => {}}
+          onContactClick={handleContactClick}
           isDarkMode={isDarkMode}
         />
       )}
@@ -214,14 +220,14 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       <NewContactModal
         isOpen={isNewContactModalOpen}
         onClose={() => setIsNewContactModalOpen(false)}
-        onSubmit={() => {}}
+        onSubmit={handleNewContact}
         isDarkMode={isDarkMode}
       />
 
       <ChannelSelectorModal
         isOpen={isChannelSelectorOpen}
         onClose={() => setIsChannelSelectorOpen(false)}
-        onChannelSelect={() => {}}
+        onChannelSelect={handleChannelSelect}
         contactName={selectedContactName}
         availableChannels={selectedContactChannels}
         isDarkMode={isDarkMode}

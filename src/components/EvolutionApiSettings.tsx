@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X, LogOut } from 'lucide-react';
-import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService';
+import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService.ts';
 import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
 
 interface EvolutionApiSettingsProps {
@@ -354,6 +354,17 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   };
 
   // SEÇÃO 3: Vincular Canal à Instância
+  const webhookMap: Record<string, string> = {
+    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-yelena',
+    '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-canarana',
+    'b7996f75-41a7-4725-8229-564f31868027': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-souto',
+    '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-joao',
+    '64d8acad-c645-4544-a1e6-2f0825fae00b': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-america',
+    'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerentelojas',
+    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerenteexterno'
+    // Adicione outros canais aqui seguindo o padrão!
+  };
+
   const linkChannelToInstance = async () => {
     if (!selectedChannelForMapping || !selectedInstanceForMapping) {
       toast({
@@ -373,7 +384,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         throw new Error('Canal ou instância não encontrados');
       }
 
-      // Criar mapeamento no banco
+      // ✅ 1. Criar mapeamento no banco
       await channelMappingService.createMapping({
         channel_id: selectedChannel.id,
         channel_name: selectedChannel.name,
@@ -384,53 +395,51 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         is_active: true
       });
 
-      // Configurar webhook automaticamente (exceto para instância 'glamour')
-      if (selectedInstance.instanceName !== 'glamour') {
-        console.log('🔗 [WEBHOOK] Configurando webhook automaticamente para instância:', selectedInstance.instanceName);
-        
-        const service = new EvolutionApiService({
-          baseUrl: apiConnection.baseUrl,
-          apiKey: apiConnection.apiKey,
-          instanceName: selectedInstance.instanceName
-        });
-
-        // URL do webhook do Supabase para este canal
-        const webhookUrl = `https://uxccfhptochnfomururlr.supabase.co/functions/v1/whatsapp-webhook-${selectedChannel.name.toLowerCase().replace(/\s+/g, '-')}`;
-        
-        // Eventos que queremos receber
-        const webhookEvents = [
-          'MESSAGES_UPSERT',
-          'MESSAGES_SET', 
-          'MESSAGES_UPDATE',
-          'CONNECTION_UPDATE',
-          'QRCODE_UPDATED',
-          'CONTACTS_UPSERT',
-          'CHATS_UPSERT'
-        ];
-
-        const webhookResult = await service.setWebhook(webhookUrl, webhookEvents, selectedInstance.instanceName);
-        
-        if (webhookResult.success) {
-          console.log('✅ [WEBHOOK] Webhook configurado com sucesso para instância:', selectedInstance.instanceName);
-        } else {
-          console.warn('⚠️ [WEBHOOK] Falha ao configurar webhook:', webhookResult.error);
-        }
-      } else {
-        console.log('⏭️ [WEBHOOK] Instância glamour ignorada (já tem webhook para IA)');
+      // ✅ 2. Configurar webhook do canal
+      const webhookUrl = webhookMap[selectedChannel.id];
+      if (!webhookUrl) {
+        throw new Error("Canal não tem um webhook configurado! Edite o código para adicionar.");
       }
 
-      // Configuração concluída sem WebSocket
-      console.log(`✅ [CONFIG] Canal ${selectedChannel.name} configurado com instância ${selectedInstance.instanceName}`)
+      const events = [
+        "MESSAGES_UPSERT",
+        "MESSAGES_SET",
+        "MESSAGES_UPDATE",
+        "CONNECTION_UPDATE",
+        "QRCODE_UPDATED",
+        "CONTACTS_UPSERT",
+        "CONTACTS_SET",
+        "CONTACTS_UPDATE",
+        "CHATS_UPSERT",
+        "CHATS_SET",
+        "CHATS_UPDATE",
+        "PRESENCE_UPDATE",
+        "GROUPS_UPSERT",
+        "GROUP_UPDATE",
+        "GROUP_PARTICIPANTS_UPDATE"
+      ];
+
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName: selectedInstance.instanceName
+      });
+
+      // Seta o webhook individual do canal
+      const webhookResult = await service.setWebhook(webhookUrl, events, selectedInstance.instanceName);
+
+      if (webhookResult.success) {
+        console.log('✅ [WEBHOOK] Webhook canal configurado:', webhookUrl);
+      } else {
+        throw new Error(webhookResult.error || 'Erro ao configurar webhook');
+      }
 
       toast({
         title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook configurado!`,
+        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook dedicado!`
       });
 
-      // Recarregar mapeamentos
       await loadChannelMappings();
-      
-      // Limpar seleções
       setSelectedChannelForMapping('');
       setSelectedInstanceForMapping('');
     } catch (error) {
@@ -646,7 +655,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                       >
                         <div className="flex items-center gap-2">
                           {getStatusBadge(instance.status)}
-                          <span className="font-semibold">{instance.profileName || instance.instanceName}</span>
+                          <span className="font-semibold">{instance.instanceName}</span>
+                          {instance.profileName && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              ({instance.profileName})
+                            </span>
+                          )}
                           {instance.number && (
                             <span className="text-sm text-gray-500">({instance.number})</span>
                           )}
@@ -762,7 +776,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 Vincular Canal à Instância
               </CardTitle>
               <CardDescription>
-                Associe um canal de comunicação a uma instância da API Evolution.
+                Associe um canal de comunicação a uma instância da API Evolution usando o novo webhook universal.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -809,7 +823,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                     <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
                       {apiConnection.instances.map(instance => (
                         <SelectItem key={instance.instanceName} value={instance.instanceName}>
-                          {instance.profileName || instance.instanceName}
+                          {instance.instanceName}
+                          {instance.profileName && (
+                            <span className="text-xs text-gray-400 ml-1">
+                              ({instance.profileName})
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -827,7 +846,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 {linkingChannel ? (
                   <>
                     <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                    Vinculando...
+                    Configurando novo webhook...
                   </>
                 ) : (
                   <>

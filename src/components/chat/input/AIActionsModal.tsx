@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
 import { AIProvider } from '@/types/ai-providers';
+import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 
 interface AIActionsModalProps {
   isDarkMode: boolean;
@@ -45,6 +46,9 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<AIActionResult | null>(null);
   const [error, setError] = useState<string>('');
+
+  // INICIO NOVO: Buscar mensagens da conversa usando hook existente
+  const { messages, loading: loadingMessages } = useSimpleMessages(channelId || null, conversationId || null);
 
   useEffect(() => {
     loadProviders();
@@ -91,7 +95,22 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
     }
   };
 
+  // NOVA FUNCAO: Preparar as mensagens para enviar ao backend
+  function prepareMessageContext(messagesArr: any[]) {
+    // Prepare up to 50 últimas mensagens para o contexto (mantendo ordem)
+    if (!Array.isArray(messagesArr) || messagesArr.length === 0) return [];
+    return messagesArr.slice(-50).map(m => ({
+      id: m.id,
+      nome_do_contato: m.nome_do_contato,
+      tipo_remetente: m.tipo_remetente,
+      mensagemtype: m.mensagemtype,
+      message: m.message,
+      read_at: m.read_at,
+    }));
+  }
+
   const generateAIContent = async () => {
+    // Agora permite 0, 1 ou mais mensagens
     if (!selectedProvider || !conversationId || !channelId) {
       setError('Dados insuficientes para gerar conteúdo');
       return;
@@ -102,18 +121,13 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
     setResult(null);
 
     try {
-      // Buscar dados da conversa
-      const conversationData = await fetch(`http://localhost:5000/api/conversations/${channelId}/${conversationId}/messages`);
-      if (!conversationData.ok) {
-        throw new Error('Erro ao buscar dados da conversa');
-      }
-      const messages = await conversationData.json();
-
       const actionConfig = getActionConfig(activeAction);
       const prompt = customPrompt.trim() || actionConfig.defaultPrompt;
 
-      // Chamar API de geração
-      const response = await fetch('http://localhost:5000/api/reports/generate', {
+      // Se não houver mensagens, envia contexto vazio mas deixa IA tentar, especialmente quick_response
+      const ctxMessages = prepareMessageContext(messages || []);
+
+      const response = await fetch('/functions/v1/generate-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,8 +139,8 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
             conversation_id: conversationId,
             channel_id: channelId,
             contact_name: contactName,
-            messages: messages,
-            action_type: activeAction
+            messages: ctxMessages,
+            action_type: activeAction,
           },
           custom_prompt: prompt
         })
@@ -140,11 +154,11 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
       const aiResult = await response.json();
       setResult({
         type: activeAction,
-        content: aiResult.report,
-        provider_used: aiResult.metadata.provider_name || 'Desconhecido',
-        model_used: aiResult.metadata.model_used || 'Desconhecido',
-        tokens_used: aiResult.metadata.tokens_used || 0,
-        generation_time: aiResult.metadata.generation_time || 0
+        content: aiResult.content || aiResult.report || 'Sem conteúdo retornado',
+        provider_used: aiResult.metadata?.provider_name || 'Desconhecido',
+        model_used: aiResult.metadata?.model_used || 'Desconhecido',
+        tokens_used: aiResult.metadata?.tokens_used || 0,
+        generation_time: aiResult.metadata?.generation_time || 0
       });
 
       toast({
@@ -396,7 +410,6 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
             </Card>
           )}
         </div>
-
         {/* Ações */}
         <div className="flex justify-between pt-4 border-t border-border">
           <Button 
@@ -427,4 +440,3 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
     </Dialog>
   );
 };
-

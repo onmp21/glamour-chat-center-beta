@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { YelenaMessageDisplay } from './YelenaMessageDisplay';
@@ -26,19 +25,43 @@ interface ChatMessageProps {
   };
   isDarkMode: boolean;
   channelId?: string;
+  userName?: string; // Nome do usuário que enviou a mensagem (se aplicável)
 }
+
+// Mapeamento de canais para nomes amigáveis
+const getChannelDisplayName = (channelId?: string): string => {
+  const channelNames: Record<string, string> = {
+    'chat': 'Yelena AI',
+    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'Yelena AI',
+    'joao-dourado': 'João Dourado',
+    'america-dourada': 'América Dourada',
+    'gerente-lojas': 'Gerente Lojas',
+    'gerente-externo': 'Gerente Externo',
+    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'Gerente Externo',
+    'canarana': 'Canarana',
+    'souto-soares': 'Souto Soares',
+    'yelena': 'Yelena AI'
+  };
+  
+  return channelNames[channelId || ''] || 'Canal Desconhecido';
+};
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ 
   message, 
   isDarkMode, 
-  channelId 
+  channelId,
+  userName 
 }) => {
+  const channelName = getChannelDisplayName(channelId);
+
   // Se for canal Yelena, usar o YelenaMessageDisplay
   if (channelId === 'chat' || channelId === 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6') {
     return (
       <YelenaMessageDisplay 
         message={message} 
-        isDarkMode={isDarkMode} 
+        isDarkMode={isDarkMode}
+        channelName={channelName}
+        userName={userName}
       />
     );
   }
@@ -48,7 +71,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return (
       <JoaoDouradoMessageDisplay 
         message={message} 
-        isDarkMode={isDarkMode} 
+        isDarkMode={isDarkMode}
+        channelName={channelName}
+        userName={userName}
       />
     );
   }
@@ -58,7 +83,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return (
       <AmericaDouradaMessageDisplay 
         message={message} 
-        isDarkMode={isDarkMode} 
+        isDarkMode={isDarkMode}
+        channelName={channelName}
+        userName={userName}
       />
     );
   }
@@ -68,7 +95,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return (
       <GerenteLojasMessageDisplay 
         message={message} 
-        isDarkMode={isDarkMode} 
+        isDarkMode={isDarkMode}
+        channelName={channelName}
+        userName={userName}
       />
     );
   }
@@ -78,7 +107,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return (
       <GerenteExternoMessageDisplay 
         message={message} 
-        isDarkMode={isDarkMode} 
+        isDarkMode={isDarkMode}
+        channelName={channelName}
+        userName={userName}
       />
     );
   }
@@ -109,8 +140,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   return (
-    <MessageBubble message={chatMessage} isDarkMode={isDarkMode}>
+    <MessageBubble 
+      message={chatMessage} 
+      isDarkMode={isDarkMode}
+      channelName={channelName}
+      userName={userName}
+    >
       <MessageContent message={chatMessage} isDarkMode={isDarkMode} />
     </MessageBubble>
   );
 };
+

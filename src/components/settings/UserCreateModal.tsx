@@ -24,13 +24,16 @@ const ROLE_TABS: Record<UserRole, string[]> = {
   salesperson: ['dashboard', 'mensagens', 'exames']
 };
 
-const ROLE_CITIES: Record<UserRole, string[]> = {
-  admin: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
-  manager: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
-  manager_external: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
-  manager_store: ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'],
-  salesperson: []
-};
+// Adaptação dos canais disponíveis para visualização no cadastro (BASE SIMPLIFICADA)
+const AVAILABLE_CHANNELS = [
+  { key: 'canarana', label: 'Canarana' },
+  { key: 'souto-soares', label: 'Souto Soares' },
+  { key: 'joao-dourado', label: 'João Dourado' },
+  { key: 'america-dourada', label: 'América Dourada' },
+  { key: 'gerente-lojas', label: 'Gerente Lojas' },
+  { key: 'gerente-externo', label: 'Gerente Externo' },
+  { key: 'chat', label: 'Chat Geral' }
+];
 
 export const UserCreateModal: React.FC<UserCreateModalProps> = ({
   isOpen,
@@ -44,12 +47,11 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     name: '',
     password: '',
     role: 'salesperson' as UserRole,
-    assignedTabs: [] as string[],
-    assignedCities: [] as string[]
+    assignedTabs: ROLE_TABS['salesperson'],
+    assignedChannels: [] as string[]
   });
 
   const availableTabs = ['dashboard', 'mensagens', 'exames', 'configuracoes', 'relatorios'];
-  const availableCities = ['Canarana', 'Souto Soares', 'João Dourado', 'América Dourada'];
 
   const roleLabels: Record<UserRole, string> = {
     admin: 'Administrador',
@@ -64,7 +66,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
       ...prev,
       role,
       assignedTabs: ROLE_TABS[role],
-      assignedCities: ROLE_CITIES[role]
+      assignedChannels: []
     }));
   };
 
@@ -77,12 +79,12 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
     }));
   };
 
-  const handleCityChange = (city: string, checked: boolean) => {
+  const handleChannelChange = (channel: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      assignedCities: checked
-        ? [...prev.assignedCities, city]
-        : prev.assignedCities.filter(c => c !== city)
+      assignedChannels: checked
+        ? [...prev.assignedChannels, channel]
+        : prev.assignedChannels.filter(c => c !== channel)
     }));
   };
 
@@ -97,7 +99,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
         name: formData.name,
         role: formData.role,
         assignedTabs: formData.assignedTabs,
-        assignedCities: formData.assignedCities
+        assignedChannels: formData.assignedChannels
       });
       toast.success('Usuário criado com sucesso!');
       onUserCreated();
@@ -168,7 +170,7 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
           </div>
 
           <div>
-            <Label>Permissões</Label>
+            <Label>Permissões: Abas Permitidas</Label>
             <div className="space-y-1">
               {availableTabs.map(tab => (
                 <div key={tab} className="flex items-center space-x-2">
@@ -184,16 +186,16 @@ export const UserCreateModal: React.FC<UserCreateModalProps> = ({
           </div>
 
           <div>
-            <Label>Cidades</Label>
+            <Label>Canais</Label>
             <div className="space-y-1">
-              {availableCities.map(city => (
-                <div key={city} className="flex items-center space-x-2">
+              {AVAILABLE_CHANNELS.map(channel => (
+                <div key={channel.key} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`city-${city}`}
-                    checked={formData.assignedCities.includes(city)}
-                    onCheckedChange={(checked) => handleCityChange(city, !!checked)}
+                    id={`channel-${channel.key}`}
+                    checked={formData.assignedChannels.includes(channel.key)}
+                    onCheckedChange={(checked) => handleChannelChange(channel.key, !!checked)}
                   />
-                  <Label htmlFor={`city-${city}`}>{city}</Label>
+                  <Label htmlFor={`channel-${channel.key}`}>{channel.label}</Label>
                 </div>
               ))}
             </div>

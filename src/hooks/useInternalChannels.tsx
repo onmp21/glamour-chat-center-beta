@@ -1,74 +1,28 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from "@/integrations/supabase/client";
 
+// Reflete a tipagem real da tabela channels do Supabase + legacyId para o sistema
 export interface InternalChannel {
-  id: string;
-  name: string;
+  id: string;                   // UUID do canal no Supabase
+  name: string;                 // Nome na tabela
   type: 'general' | 'store' | 'manager' | 'admin';
   isActive: boolean;
   isDefault: boolean;
-  legacyId: string;
+  legacyId: string;             // mapeamento "chat", "canarana", etc.
 }
 
-const DEFAULT_CHANNELS: InternalChannel[] = [
-  {
-    id: 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6',
-    name: 'Yelena-AI',
-    type: 'general',
-    isActive: true,
-    isDefault: true,
-    legacyId: 'chat'
-  },
-  {
-    id: '011b69ba-cf25-4f63-af2e-4ad0260d9516',
-    name: 'Canarana',
-    type: 'store',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'canarana'
-  },
-  {
-    id: 'b7996f75-41a7-4725-8229-564f31868027',
-    name: 'Souto Soares',
-    type: 'store',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'souto-soares'
-  },
-  {
-    id: '621abb21-60b2-4ff2-a0a6-172a94b4b65c',
-    name: 'João Dourado',
-    type: 'store',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'joao-dourado'
-  },
-  {
-    id: '64d8acad-c645-4544-a1e6-2f0825fae00b',
-    name: 'América Dourada',
-    type: 'store',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'america-dourada'
-  },
-  {
-    id: 'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce',
-    name: 'Gustavo Gerente das Lojas',
-    type: 'manager',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'gerente-lojas'
-  },
-  {
-    id: 'd2892900-ca8f-4b08-a73f-6b7aa5866ff7',
-    name: 'Andressa Gerente Externo',
-    type: 'manager',
-    isActive: true,
-    isDefault: false,
-    legacyId: 'gerente-externo'
-  }
-];
+// Mapeamento nome → legacyId (para garantir compatibilidade)
+const NAME_TO_LEGACYID: Record<string, string> = {
+  'Yelena-AI': 'chat',
+  'Óticas Villa Glamour': 'chat',
+  'Canarana': 'canarana',
+  'Souto Soares': 'souto-soares',
+  'João Dourado': 'joao-dourado',
+  'América Dourada': 'america-dourada',
+  'Gerente das Lojas': 'gerente-lojas', // PADRÃO CORRETO!
+  'Andressa Gerente Externo': 'gerente-externo'
+};
 
 export const useInternalChannels = () => {
   const [channels, setChannels] = useState<InternalChannel[]>([]);
@@ -76,53 +30,86 @@ export const useInternalChannels = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Carregar canais do localStorage ou usar padrões
-    const savedChannels = localStorage.getItem('app_channels');
-    if (savedChannels) {
-      try {
-        setChannels(JSON.parse(savedChannels));
-      } catch (error) {
-        console.error('Erro ao carregar canais salvos:', error);
-        setChannels(DEFAULT_CHANNELS);
+    // Carregar canais diretamente do Supabase
+    const fetchChannels = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('channels')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[useInternalChannels] Erro ao buscar canais do Supabase:', error);
+        toast({
+          title: "Erro ao carregar canais",
+          description: "Não foi possível obter a lista de canais. Verifique sua conexão.",
+          variant: "destructive"
+        });
+        setChannels([]);
+      } else {
+        // Converter o formato vindo do banco para InternalChannel + atribuir legacyId
+        const loadedChannels: InternalChannel[] = (data || []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          type: row.type as InternalChannel['type'],
+          isActive: row.is_active,
+          isDefault: row.is_default,
+          legacyId: NAME_TO_LEGACYID[row.name] || row.id // fallback para id se não houver mapeamento
+        }));
+        setChannels(loadedChannels);
       }
-    } else {
-      setChannels(DEFAULT_CHANNELS);
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    fetchChannels();
+    // Opcional: subscribe realtime aqui se precisar (outra etapa)
   }, []);
 
+  // Ajuda "refetch" explícito (usa mesma lógica acima)
+  const refetch = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('channels')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      const loadedChannels: InternalChannel[] = data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        type: row.type as InternalChannel['type'],
+        isActive: row.is_active,
+        isDefault: row.is_default,
+        legacyId: NAME_TO_LEGACYID[row.name] || row.id
+      }));
+      setChannels(loadedChannels);
+    }
+    setLoading(false);
+  };
+
+  // O resto (updateChannelStatus etc) igual
   const saveChannels = (updatedChannels: InternalChannel[]) => {
-    localStorage.setItem('app_channels', JSON.stringify(updatedChannels));
     setChannels(updatedChannels);
   };
 
   const updateChannelStatus = async (channelId: string, isActive: boolean) => {
     try {
-      const channel = channels.find(c => c.id === channelId);
-      if (!channel) {
-        throw new Error('Canal não encontrado');
-      }
-      
-      if (channel.isDefault && !isActive) {
-        toast({
-          title: "Ação não permitida",
-          description: "Canais padrão não podem ser desativados",
-          variant: "destructive"
-        });
-        return;
-      }
+      // Atualiza direto no Supabase
+      const { error } = await supabase
+        .from('channels')
+        .update({ is_active: isActive })
+        .eq('id', channelId);
 
-      const updatedChannels = channels.map(c => 
-        c.id === channelId ? { ...c, isActive } : c
-      );
-      
-      saveChannels(updatedChannels);
-      
+      if (error) throw error;
+
       toast({
         title: "Sucesso",
         description: `Canal ${isActive ? 'ativado' : 'desativado'} com sucesso`,
         variant: "default"
       });
+
+      // Refaz loading após alteração (garante que a UI vai refletir o novo status)
+      await refetch();
     } catch (error) {
       console.error('Erro ao atualizar canal:', error);
       toast({
@@ -131,11 +118,6 @@ export const useInternalChannels = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const refetch = async () => {
-    // Não há necessidade de refetch para dados locais
-    return Promise.resolve();
   };
 
   return {

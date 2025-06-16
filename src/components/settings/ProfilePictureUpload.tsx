@@ -1,10 +1,10 @@
-
 import React, { useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Camera, X, Upload } from 'lucide-react';
+import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 
 interface ProfilePictureUploadProps {
   currentImage: string | null;
@@ -21,27 +21,30 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const {
+    uploadAvatar,
+    removeAvatar: removeAvatarFromDb,
+    loading: supabaseUploading,
+  } = useSupabaseAvatar();
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // Validar tipo de arquivo
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
         title: "Erro",
         description: "Por favor, selecione apenas arquivos de imagem",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-
-    // Validar tamanho (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "Erro",
         description: "A imagem deve ter no máximo 5MB",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -49,53 +52,46 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
     setUploading(true);
 
     try {
-      // Converter para base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64Data = reader.result as string;
-        setPreviewImage(base64Data);
-        onImageChange(base64Data);
-        
+      // Upload no Supabase bucket avatars
+      const publicUrl = await uploadAvatar(file);
+      if (publicUrl) {
+        setPreviewImage(publicUrl);
+        onImageChange(publicUrl);
+
         toast({
           title: "Sucesso",
           description: "Foto de perfil atualizada!",
-          variant: "default"
+          variant: "default",
         });
-      };
-      
-      reader.onerror = () => {
+      } else {
         toast({
           title: "Erro",
-          description: "Erro ao processar a imagem",
-          variant: "destructive"
+          description: "Erro ao fazer upload no Supabase",
+          variant: "destructive",
         });
-      };
-      
-      reader.readAsDataURL(file);
+      }
     } catch (error) {
-      console.error('Erro ao fazer upload da imagem:', error);
       toast({
         title: "Erro",
         description: "Erro ao fazer upload da imagem",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setUploading(false);
-      // Limpar input
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
 
-  const handleRemoveImage = () => {
+  const handleRemoveImage = async () => {
     setPreviewImage(null);
     onImageChange(null);
-    
+    await removeAvatarFromDb();
     toast({
       title: "Sucesso",
       description: "Foto de perfil removida",
-      variant: "default"
+      variant: "default",
     });
   };
 
@@ -140,7 +136,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
             variant="outline"
             size="sm"
             onClick={triggerFileInput}
-            disabled={uploading}
+            disabled={supabaseUploading || uploading}
             className={cn(
               "flex items-center gap-2 h-9",
               isDarkMode ? "border-input hover:bg-accent" : "border-gray-300 hover:bg-gray-50"

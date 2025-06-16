@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MediaProcessor } from '@/services/MediaProcessor';
+import { MediaDownloadService } from '@/services/MediaDownloadService';
 import { AudioPlayerFixed } from './AudioPlayerFixed';
 import { MediaOverlay } from './MediaOverlay';
 import { AlertCircle, Download, Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface MediaResult {
   isProcessed: boolean;
@@ -32,50 +34,55 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   balloonColor = 'received'
 }) => {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [processedResult, setProcessedResult] = useState<MediaResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const { toast } = useToast();
 
-  // Processar mídia usando o MediaProcessor melhorado
-  const processedResult = React.useMemo(() => {
-    console.log('🎯 [MEDIA_RENDERER_FIXED] Processing media:', { 
-      messageId, 
-      messageType, 
-      contentLength: content?.length || 0,
-      startsWithData: content?.startsWith('data:')
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    console.log("🖼️ [MediaRendererFixed] Chamando processAsync para:", { content, messageType, messageId });
+    MediaProcessor.processAsync(content, messageType).then(res => {
+      if (mounted) {
+        setProcessedResult(res);
+        setLoading(false);
+        if (res && !res.isProcessed) {
+          console.warn("[MediaRendererFixed] Não processou mídia:", res.error, {content});
+        }
+      }
     });
-    
-    let result: MediaResult;
-    
-    // Usar métodos específicos baseado no tipo
-    switch (messageType?.toLowerCase()) {
-      case 'audio':
-      case 'audiomessage':
-      case 'ptt':
-      case 'voice':
-        result = MediaProcessor.processAudio(content);
-        break;
-      case 'video':
-      case 'videomessage':
-        result = MediaProcessor.processVideo(content);
-        break;
-      case 'image':
-      case 'imagemessage':
-        result = MediaProcessor.processImage(content);
-        break;
-      default:
-        result = MediaProcessor.process(content, messageType);
+    return () => { mounted = false };
+  }, [content, messageType]);
+
+  const handleDownload = async (mediaUrl: string, fileName?: string) => {
+    if (!MediaDownloadService.isDownloadableMedia(mediaUrl)) {
+      toast({
+        title: "Erro",
+        description: "Mídia não disponível para download",
+        variant: "destructive"
+      });
+      return;
     }
-    
-    console.log('🎯 [MEDIA_RENDERER_FIXED] Media processing result:', {
-      messageId,
-      type: result.type,
-      isProcessed: result.isProcessed,
-      mimeType: result.mimeType,
-      size: result.size,
-      error: result.error
-    });
-    
-    return result;
-  }, [content, messageType, messageId]);
+
+    setDownloading(true);
+    try {
+      await MediaDownloadService.downloadMedia(mediaUrl, fileName);
+      toast({
+        title: "Sucesso",
+        description: "Download iniciado com sucesso",
+      });
+    } catch (error) {
+      console.error('❌ [MEDIA_RENDERER] Erro no download:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao baixar mídia",
+        variant: "destructive"
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Estado de erro
   const renderError = () => (
@@ -94,34 +101,61 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
         "text-xs text-center mt-1",
         isDarkMode ? "text-destructive-foreground/80" : "text-red-500"
       )}>
-        {processedResult.error || 'Formato não suportado'}
+        {(processedResult && processedResult.error) || 'Formato não suportado'}
       </div>
-      {/* Debug info em desenvolvimento */}
-      {import.meta.env.MODE === 'development' && (
-        <div className="text-xs text-muted-foreground mt-2 max-w-full break-all">
-          Type: {messageType} | Length: {content?.length || 0}
-        </div>
-      )}
     </div>
   );
 
-  // Verificar se há erro
+  if (loading || !processedResult) {
+    return (
+      <div className={cn(
+        "flex flex-col items-center justify-center min-h-[80px] p-4 rounded-lg border max-w-[300px]",
+        isDarkMode ? "bg-muted border-border" : "bg-gray-100 border-gray-200"
+      )}>
+        <div className="animate-spin w-6 h-6 rounded-full border-4 border-primary border-t-transparent" />
+        <div className="mt-2 text-xs text-muted-foreground">Carregando mídia…</div>
+      </div>
+    );
+  }
+
   if (!processedResult.isProcessed || !processedResult.url) {
+    console.warn("[MediaRendererFixed] Falha ao processar/renderizar mídia para mensagem:", messageId, processedResult);
     return renderError();
   }
 
   const { url, mimeType, type, size } = processedResult;
 
+  // Exibir apenas se URL está no storage público.
+  const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/');
+  if (!isBucketUrl) {
+    console.warn("[MediaRendererFixed] URL da mídia NÃO É do storage público:", url);
+    return renderError();
+  }
+
   // Renderizar áudio
   if (type === 'audio') {
     return (
-      <div className="max-w-[300px]">
+      <div className="max-w-[300px] relative">
         <AudioPlayerFixed
           audioContent={content}
           isDarkMode={isDarkMode}
           messageId={messageId}
           balloonColor={balloonColor} // Usar a prop balloonColor
         />
+        {MediaDownloadService.isDownloadableMedia(url) && (
+          <button
+            onClick={() => handleDownload(url, `audio_${messageId}.mp3`)}
+            disabled={downloading}
+            className={cn(
+              "absolute top-2 right-2 p-1 rounded-full transition-colors",
+              "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
+              downloading && "opacity-50 cursor-not-allowed"
+            )}
+            title="Baixar áudio"
+          >
+            <Download size={14} className="text-foreground" />
+          </button>
+        )}
       </div>
     );
   }
@@ -143,14 +177,35 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
               console.log('✅ [IMAGE] Carregada:', messageId);
             }}
           />
-          {size && (
-            <div className={cn(
-              "absolute bottom-2 right-2 px-2 py-1 rounded text-xs",
-              "bg-background/50 text-foreground backdrop-blur-sm"
-            )}>
-              {size}
-            </div>
-          )}
+          
+          <div className="absolute top-2 right-2 flex gap-1">
+            {size && (
+              <div className={cn(
+                "px-2 py-1 rounded text-xs",
+                "bg-background/50 text-foreground backdrop-blur-sm"
+              )}>
+                {size}
+              </div>
+            )}
+            
+            {MediaDownloadService.isDownloadableMedia(url) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDownload(url, `image_${messageId}.jpg`);
+                }}
+                disabled={downloading}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
+                  downloading && "opacity-50 cursor-not-allowed"
+                )}
+                title="Baixar imagem"
+              >
+                <Download size={14} className="text-foreground" />
+              </button>
+            )}
+          </div>
         </div>
         
         <MediaOverlay
@@ -180,6 +235,24 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
             console.log('✅ [STICKER] Carregado:', messageId);
           }}
         />
+        
+        {MediaDownloadService.isDownloadableMedia(url) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownload(url, `sticker_${messageId}.webp`);
+            }}
+            disabled={downloading}
+            className={cn(
+              "absolute top-2 right-2 p-1 rounded transition-colors",
+              "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
+              downloading && "opacity-50 cursor-not-allowed"
+            )}
+            title="Baixar sticker"
+          >
+            <Download size={14} className="text-foreground" />
+          </button>
+        )}
         
         <MediaOverlay
           isOpen={isOverlayOpen}
@@ -212,14 +285,31 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
             Seu navegador não suporta vídeo.
           </video>
           
-          {size && (
-            <div className={cn(
-              "absolute bottom-2 right-2 px-2 py-1 rounded text-xs",
-              "bg-background/50 text-foreground backdrop-blur-sm"
-            )}>
-              {size}
-            </div>
-          )}
+          <div className="absolute bottom-2 right-2 flex gap-1">
+            {size && (
+              <div className={cn(
+                "px-2 py-1 rounded text-xs",
+                "bg-background/50 text-foreground backdrop-blur-sm"
+              )}>
+                {size}
+              </div>
+            )}
+            
+            {MediaDownloadService.isDownloadableMedia(url) && (
+              <button
+                onClick={() => handleDownload(url, `video_${messageId}.mp4`)}
+                disabled={downloading}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
+                  downloading && "opacity-50 cursor-not-allowed"
+                )}
+                title="Baixar vídeo"
+              >
+                <Download size={14} className="text-foreground" />
+              </button>
+            )}
+          </div>
         </div>
         
         <MediaOverlay
@@ -237,10 +327,9 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   return (
     <div 
       className={cn(
-        "flex items-center p-3 rounded-lg border cursor-pointer max-w-[300px] transition-colors",
+        "flex items-center p-3 rounded-lg border max-w-[300px] transition-colors",
         isDarkMode ? "bg-card hover:bg-card/80 border-border" : "bg-gray-100 hover:bg-gray-200 border-gray-300"
       )}
-      onClick={() => window.open(url, '_blank')}
     >
       <div className="text-2xl mr-3">
         {MediaProcessor.getMediaIcon((type as "document" | "text" | "audio" | "image" | "video" | "sticker") || 'document')}
@@ -267,7 +356,34 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
           </div>
         )}
       </div>
-      <Download size={16} className="text-muted-foreground" />
+      
+      <div className="flex gap-1">
+        <button
+          onClick={() => window.open(url, '_blank')}
+          className={cn(
+            "p-2 rounded transition-colors",
+            "hover:bg-background/20"
+          )}
+          title="Abrir"
+        >
+          <Play size={16} className="text-muted-foreground" />
+        </button>
+        
+        {MediaDownloadService.isDownloadableMedia(url) && (
+          <button
+            onClick={() => handleDownload(url, fileName)}
+            disabled={downloading}
+            className={cn(
+              "p-2 rounded transition-colors",
+              "hover:bg-background/20",
+              downloading && "opacity-50 cursor-not-allowed"
+            )}
+            title="Baixar"
+          >
+            <Download size={16} className="text-muted-foreground" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

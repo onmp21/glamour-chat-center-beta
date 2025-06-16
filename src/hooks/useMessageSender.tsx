@@ -1,7 +1,7 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
+import { N8nMessagingService } from '@/services/N8nMessagingService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useMessageSender = () => {
   const [sending, setSending] = useState(false);
@@ -10,21 +10,33 @@ export const useMessageSender = () => {
   const sendMessage = async (channelId: string, phoneNumber: string, message: string) => {
     setSending(true);
     try {
-      // Usar método estático
-      const success = await ChannelApiMappingService.sendMessageViaEvolution(
-        channelId,
+      // Buscar mapping do canal para obter informações da instância
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', channelId)
+        .maybeSingle();
+
+      if (mappingError || !mapping) {
+        throw new Error('Mapping não encontrado para o canal');
+      }
+
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendTextMessage(
+        mapping.channel_name,
+        mapping.instance_name,
         phoneNumber,
         message
       );
 
-      if (success) {
+      if (result.success) {
         toast({
           title: "Sucesso",
           description: "Mensagem enviada com sucesso",
         });
         return true;
       } else {
-        throw new Error("Falha ao enviar mensagem");
+        throw new Error(result.error || "Falha ao enviar mensagem");
       }
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
@@ -43,31 +55,42 @@ export const useMessageSender = () => {
     channelId: string, 
     phoneNumber: string, 
     mediaContent: string, 
-    caption?: string
+    caption?: string,
+    mediaType: 'image' | 'audio' | 'video' | 'document' = 'image',
+    fileName?: string
   ) => {
     setSending(true);
     try {
-      // Para mensagens de mídia, usar método estático
-      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
-      if (!apiInstance) {
-        throw new Error("No API instance found for channel");
+      // Buscar mapping do canal para obter informações da instância
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', channelId)
+        .maybeSingle();
+
+      if (mappingError || !mapping) {
+        throw new Error('Mapping não encontrado para o canal');
       }
 
-      const success = await ChannelApiMappingService.sendMessageViaEvolution(
-        channelId,
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendMediaMessage(
+        mapping.channel_name,
+        mapping.instance_name,
         phoneNumber,
+        mediaContent,
         caption || "",
-        mediaContent
+        mediaType,
+        fileName
       );
 
-      if (success) {
+      if (result.success) {
         toast({
           title: "Sucesso",
           description: "Mídia enviada com sucesso",
         });
         return true;
       } else {
-        throw new Error("Falha ao enviar mídia");
+        throw new Error(result.error || "Falha ao enviar mídia");
       }
     } catch (error) {
       console.error("Erro ao enviar mídia:", error);
@@ -88,3 +111,4 @@ export const useMessageSender = () => {
     sending
   };
 };
+

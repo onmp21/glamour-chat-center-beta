@@ -41,8 +41,8 @@ export const ChannelsSubmenu: React.FC<ChannelsSubmenuProps> = ({
       'Souto Soares': 'souto-soares',
       'João Dourado': 'joao-dourado',
       'América Dourada': 'america-dourada',
-      'Gerente das Lojas': 'gerente-lojas',
-      'Gerente do Externo': 'gerente-externo'
+      'Gerente das Lojas': 'gerente-lojas', // PADRONIZADO
+      'Gerente Externo': 'gerente-externo'
     };
     return nameToId[channel.name] || channel.id;
   };

@@ -38,12 +38,15 @@ serve(async (req) => {
     const requestBody = await req.json()
     const { provider_id, report_type, data, custom_prompt, filters } = requestBody
 
-    // Buscar o provedor de IA
-<<<<<<< HEAD
+    console.log('🤖 [GENERATE_REPORT] Requisição recebida:', { 
+      provider_id, 
+      report_type, 
+      user_id: user.id,
+      data_size: JSON.stringify(data).length 
+    });
+
+    // Buscar o provedor de IA ou usar configuração padrão
     let { data: provider, error: providerError } = await supabaseClient
-=======
-    const { data: provider, error: providerError } = await supabaseClient
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       .from('ai_providers')
       .select('*')
       .eq('id', provider_id)
@@ -51,7 +54,6 @@ serve(async (req) => {
       .single()
 
     if (providerError || !provider) {
-<<<<<<< HEAD
       // Se não encontrar provedor específico, usar configuração padrão
       console.log(`⚠️ [GENERATE_REPORT] Provider not found for user ${user.id}, using default configuration`);
       
@@ -76,15 +78,6 @@ serve(async (req) => {
         default_model: 'gpt-3.5-turbo',
         advanced_settings: {}
       };
-=======
-      return new Response(
-        JSON.stringify({ error: 'Provider not found or unauthorized' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
     }
 
     // Preparar prompt baseado no tipo de relatório
@@ -92,15 +85,17 @@ serve(async (req) => {
     let userPrompt = ""
 
     if (report_type === 'conversations') {
-      systemPrompt = "Você é um assistente especializado em análise de conversas de WhatsApp. Analise os dados fornecidos e gere um relatório detalhado e insights úteis."
+      systemPrompt = "Você é um assistente especializado em análise de conversas de WhatsApp. Analise os dados fornecidos e gere um relatório detalhado e insights úteis em português."
       userPrompt = custom_prompt || `Analise as seguintes conversas e gere um relatório detalhado com insights, estatísticas e recomendações: ${JSON.stringify(data)}`
     } else if (report_type === 'channels') {
-      systemPrompt = "Você é um assistente especializado em análise de performance de canais de comunicação. Analise os dados fornecidos e gere um relatório detalhado."
+      systemPrompt = "Você é um assistente especializado em análise de performance de canais de comunicação. Analise os dados fornecidos e gere um relatório detalhado em português."
       userPrompt = custom_prompt || `Analise os seguintes dados de canais e gere um relatório com métricas, insights e recomendações: ${JSON.stringify(data)}`
     } else {
-      systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios."
+      systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios em português."
       userPrompt = custom_prompt || `Analise os seguintes dados e gere um relatório detalhado: ${JSON.stringify(data)}`
     }
+
+    console.log('🔄 [GENERATE_REPORT] Enviando requisição para OpenAI...');
 
     // Chamar a API do provedor de IA
     const startTime = Date.now()
@@ -120,12 +115,16 @@ serve(async (req) => {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
+          max_tokens: 2000,
+          temperature: 0.7,
           ...provider.advanced_settings
         }),
       })
 
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.statusText}`)
+        const errorText = await openaiResponse.text()
+        console.error('❌ [GENERATE_REPORT] OpenAI API error:', errorText)
+        throw new Error(`OpenAI API error: ${openaiResponse.statusText} - ${errorText}`)
       }
 
       response = await openaiResponse.json()
@@ -137,6 +136,8 @@ serve(async (req) => {
     const generationTime = (Date.now() - startTime) / 1000
 
     const reportContent = response.choices?.[0]?.message?.content || 'Erro na geração do relatório'
+
+    console.log('✅ [GENERATE_REPORT] Relatório gerado com sucesso. Tokens:', tokensUsed, 'Tempo:', generationTime + 's');
 
     // Salvar no histórico
     const { data: savedReport, error: saveError } = await supabaseClient
@@ -159,7 +160,7 @@ serve(async (req) => {
       .single()
 
     if (saveError) {
-      console.error('Error saving report:', saveError)
+      console.error('⚠️ [GENERATE_REPORT] Error saving report:', saveError)
     }
 
     return new Response(
@@ -179,11 +180,12 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error generating report:', error)
+    console.error('❌ [GENERATE_REPORT] Error generating report:', error)
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        message: error.message 
+        message: error.message,
+        details: error.toString()
       }),
       { 
         status: 500, 

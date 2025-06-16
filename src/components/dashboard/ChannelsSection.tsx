@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -6,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Folder } from 'lucide-react';
 import { ChannelCard } from './ChannelCard';
+import { useAuth } from '@/contexts/AuthContext'; // Importação correta
 
 interface ChannelsSectionProps {
   isDarkMode: boolean;
@@ -18,6 +18,7 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
 }) => {
   const { channels, loading } = useChannels();
   const { getAccessibleChannels } = usePermissions();
+  const { user } = useAuth(); // hook no contexto React
 
   const getChannelLegacyId = (channel: any) => {
     const nameToId: Record<string, string> = {
@@ -27,35 +28,45 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
       'Souto Soares': 'souto-soares',
       'João Dourado': 'joao-dourado',
       'América Dourada': 'america-dourada',
-      'Andressa Gerente Externo': 'gerente-externo',
-      'Gustavo Gerente das Lojas': 'gerente-lojas'
+      'Gerente das Lojas': 'gerente-lojas', // CORRETO
+      'Andressa Gerente Externo': 'gerente-externo'
     };
     return nameToId[channel.name] || channel.id;
   };
 
   const getChannelDisplayName = (channel: any) => {
-    // Manter os nomes originais dos canais sem unificação
     const nameMappings: Record<string, string> = {
       'Andressa Gerente Externo': 'Andressa',
-      'Gustavo Gerente das Lojas': 'Gustavo',
+      'Gerente das Lojas': 'Gustavo', // Mostra "Gustavo" para o usuário
       'Yelena-AI': 'Óticas Villa Glamour'
     };
     return nameMappings[channel.name] || channel.name;
   };
 
   const accessibleChannels = getAccessibleChannels();
-  const availableChannels = channels
-    .filter(channel => 
-      channel.isActive && 
-      channel.name !== 'Pedro' && // Filtrar o canal Pedro que não existe mais
-      channel.name // Garantir que o canal tem um nome válido
-    )
-    .map(channel => ({
-      ...channel,
-      legacyId: getChannelLegacyId(channel),
-      displayName: getChannelDisplayName(channel)
-    }))
-    .filter(channel => accessibleChannels.includes(channel.legacyId));
+  let availableChannels = [];
+
+  if (user?.role === 'admin') {
+    availableChannels = channels
+      .filter(channel => channel.isActive && channel.name !== 'Pedro')
+      .map(channel => ({
+        ...channel,
+        legacyId: getChannelLegacyId(channel),
+        displayName: getChannelDisplayName(channel)
+      }));
+  } else {
+    availableChannels = channels
+      .filter(channel => 
+        channel.isActive && 
+        channel.name !== 'Pedro' &&
+        accessibleChannels.includes(getChannelLegacyId(channel))
+      )
+      .map(channel => ({
+        ...channel,
+        legacyId: getChannelLegacyId(channel),
+        displayName: getChannelDisplayName(channel)
+      }));
+  }
 
   const handleChannelClick = (channelId: string) => {
     console.log('🔥 Dashboard channel clicked:', channelId);

@@ -16,9 +16,11 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, type = 'report', data = null } = await req.json();
+    const body = await req.json();
+    // Recebe campos personalizados do frontend
+    const { prompt, type = 'report', action_type = null, data = null, custom_prompt = null } = body;
 
-    if (!prompt) {
+    if (!prompt && !custom_prompt) {
       return new Response(
         JSON.stringify({ error: 'Prompt é obrigatório' }),
         {
@@ -28,109 +30,75 @@ serve(async (req) => {
       );
     }
 
-    // Determinar o sistema prompt com base no tipo de solicitação
+    // Determinar sistema prompt/contexto conforme tipo ou action_type
     let systemPrompt = '';
-    
-    if (type === 'report') {
-      systemPrompt = `Você é um assistente especializado em gerar relatórios detalhados e profissionais para sistemas de atendimento ao cliente. 
-      
-      Suas características:
-      - Gera relatórios bem estruturados com seções claras
-      - Inclui insights baseados em dados quando possível
-      - Usa linguagem profissional mas acessível
-      - Fornece recomendações práticas
-      - Formata o texto de forma organizada com títulos e subtítulos
-      - Usa Markdown para formatação
-      
-      Sempre structure seus relatórios da seguinte forma:
-      1. Título do Relatório (use # para título principal)
-      2. Período Analisado (use ## para subtítulos)
-      3. Resumo Executivo (use ## para subtítulos)
-      4. Análise Detalhada (use ## para subtítulos e ### para seções menores)
-      5. Insights e Tendências (use ## para subtítulos)
-      6. Recomendações (use ## para subtítulos)
-      7. Conclusão (use ## para subtítulos)
-      
-      Use formatação Markdown para melhorar a legibilidade:
-      - **Negrito** para pontos importantes
-      - *Itálico* para ênfase
-      - Listas com - ou 1. para enumerações
-      - > para citações ou destaques
-      - --- para separar seções
-      
-      Inclua dados fictícios mas realistas para ilustrar pontos quando apropriado.`;
-    } else if (type === 'backup') {
-      systemPrompt = `Você é um assistente especializado em analisar e documentar backups de dados de sistemas de atendimento ao cliente.
-      
-      Suas características:
-      - Gera documentação detalhada sobre os dados de backup
-      - Identifica padrões e anomalias nos dados
-      - Fornece recomendações para melhorar a qualidade dos dados
-      - Usa linguagem técnica mas compreensível
-      - Formata o texto de forma organizada com títulos e subtítulos
-      - Usa Markdown para formatação
-      
-      Sempre structure seus relatórios de backup da seguinte forma:
-      1. Título do Relatório de Backup (use # para título principal)
-      2. Resumo dos Dados (use ## para subtítulos)
-      3. Estatísticas do Backup (use ## para subtítulos)
-      4. Integridade dos Dados (use ## para subtítulos)
-      5. Recomendações (use ## para subtítulos)
-      
-      Use formatação Markdown para melhorar a legibilidade:
-      - **Negrito** para pontos importantes
-      - *Itálico* para ênfase
-      - Listas com - ou 1. para enumerações
-      - \`código\` para valores técnicos ou identificadores
-      - --- para separar seções`;
-    } else if (type === 'analysis') {
-      systemPrompt = `Você é um analista de dados especializado em sistemas de atendimento ao cliente.
-      
-      Suas características:
-      - Analisa dados de conversas e interações com clientes
-      - Identifica padrões, tendências e insights valiosos
-      - Fornece recomendações baseadas em dados
-      - Usa linguagem analítica mas acessível
-      - Formata o texto de forma organizada com títulos e subtítulos
-      - Usa Markdown para formatação
-      
-      Sempre structure suas análises da seguinte forma:
-      1. Título da Análise (use # para título principal)
-      2. Metodologia (use ## para subtítulos)
-      3. Principais Descobertas (use ## para subtítulos)
-      4. Análise Detalhada (use ## para subtítulos e ### para seções menores)
-      5. Insights Acionáveis (use ## para subtítulos)
-      6. Recomendações (use ## para subtítulos)
-      
-      Use formatação Markdown para melhorar a legibilidade:
-      - **Negrito** para pontos importantes
-      - *Itálico* para ênfase
-      - Listas com - ou 1. para enumerações
-      - Tabelas para apresentar dados comparativos
-      - --- para separar seções`;
-    }
+    let userPrompt = custom_prompt || prompt;
 
-    // Construir mensagens para a API
-    const messages = [
-      {
-        role: 'system',
-        content: systemPrompt
-      },
-      {
-        role: 'user',
-        content: prompt
-      }
-    ];
+    // Mensagens de contexto recebidas do frontend (data.messages) — para quick_response, summary, report
+    const ctxMessages = data?.messages || [];
 
-    // Adicionar dados se fornecidos
-    if (data) {
-      messages.push({
-        role: 'user',
-        content: `Aqui estão os dados para análise:\n\n${JSON.stringify(data, null, 2)}`
+    // Determina contexto para cada ação/prompt orientada
+    if (action_type === 'quick_response') {
+      // Quick response: usar histórico e focar última do cliente
+      // Encontra última mensagem do cliente
+      const lastCustomerMsg = [...ctxMessages].reverse().find(
+        m => m.tipo_remetente === 'customer' || m.tipo_remetente === 'CONTATO_EXTERNO'
+      );
+      const lastMsg = lastCustomerMsg?.message || (ctxMessages.length > 0 ? ctxMessages[ctxMessages.length - 1].message : '');
+
+      systemPrompt = `Você é um assistente de atendimento ao cliente. Sempre gere sugestões de resposta rápidas, breves e profissionais, levando em conta todo o contexto da conversa.`;
+      userPrompt = `Considere todo o histórico desta conversa entre cliente e atendente abaixo. Sugira uma resposta adequada, gentil e profissional para a ÚLTIMA mensagem enviada pelo cliente:\n\n`;
+      ctxMessages.forEach(msg => {
+        const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO'
+          ? (msg.nome_do_contato || "Cliente")
+          : 'Atendente';
+        userPrompt += `${sender}: ${msg.message}\n`;
       });
+      userPrompt += `\nResponder a seguinte mensagem do cliente:\n"${lastMsg}"\nResposta sugerida:`;
+    } else if (action_type === 'summary') {
+      // Summary: resumir toda conversa da sessão
+      systemPrompt = `Você é um assistente especializado em resumir conversas de atendimento ao cliente, destacando os principais pontos, temas e possíveis pendências. Seja objetivo.`;
+      userPrompt = custom_prompt ||
+        `Resuma de forma clara, concisa e completa a conversa abaixo entre cliente e atendente:\n\n` +
+        ctxMessages.map(msg => {
+          const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO'
+            ? (msg.nome_do_contato || "Cliente")
+            : 'Atendente';
+          return `${sender}: ${msg.message}`;
+        }).join('\n');
+    } else if (action_type === 'report' || type === 'report') {
+      // Report: relatório detalhado da sessão
+      systemPrompt = `Você é um assistente especialista em gerar relatórios detalhados e profissionais sobre conversas de atendimento ao cliente.`;
+      userPrompt = custom_prompt ||
+        `Com base em toda a conversa abaixo, gere um relatório estruturado com:
+        1. Resumo da conversa
+        2. Principais assuntos discutidos
+        3. Problemas identificados
+        4. Soluções propostas
+        5. Análise de sentimento do cliente e sugestões de melhoria.
+        
+        Use títulos, subtítulos e formatação em Markdown para facilitar. Mensagens:\n\n` +
+        ctxMessages.map(msg => {
+          const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO'
+            ? (msg.nome_do_contato || "Cliente")
+            : 'Atendente';
+          return `${sender}: ${msg.message}`;
+        }).join('\n');
+    } else {
+      // Fallback: usar prompts antigos ou o prompt informado
+      systemPrompt = '';
+      userPrompt = custom_prompt || prompt;
     }
 
-    // Chamar a API do OpenAI
+    const messages = [];
+    if (systemPrompt) {
+      messages.push({ role: 'system', content: systemPrompt });
+    }
+    if (userPrompt) {
+      messages.push({ role: 'user', content: userPrompt });
+    }
+    // Evita repetir messages/data
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -141,7 +109,7 @@ serve(async (req) => {
         model: 'gpt-4o-mini',
         messages: messages,
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 1500,
       }),
     });
 
@@ -150,8 +118,8 @@ serve(async (req) => {
       throw new Error(`OpenAI API error: ${error.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
+    const resp = await response.json();
+    const content = resp.choices[0].message.content;
 
     // Gerar HTML formatado a partir do Markdown
     const htmlContent = markdownToHTML(content);
@@ -160,7 +128,7 @@ serve(async (req) => {
       JSON.stringify({ 
         content, 
         htmlContent,
-        type,
+        type: action_type || type,
         timestamp: new Date().toISOString()
       }),
       {
@@ -245,4 +213,3 @@ function markdownToHTML(markdown) {
 
   return html;
 }
-

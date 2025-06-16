@@ -1,158 +1,300 @@
 
-import { MessageService } from './MessageService';
-import { getChannelDisplayName } from '@/utils/channelMapping';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface OptimizedContact {
   id: string;
   nome: string;
   telefone: string;
-  canais: string[];
   ultimaMensagem: string;
   tempo: string;
   status: 'pendente' | 'em_andamento' | 'resolvida';
-  lastMessageTime: Date;
+  canais: string[];
+  isGroup?: boolean;
+}
+
+interface RawContactData {
+  id: string;
+  session_id: string;
+  message: string;
+  read_at: string;
+  nome_do_contato?: string;
+  is_read?: boolean;
+  tipo_remetente?: string;
 }
 
 export class OptimizedContactService {
-  private static cache = new Map<string, { data: OptimizedContact[]; timestamp: number }>();
+  private static cache = new Map<string, OptimizedContact[]>();
+  private static cacheExpiry = new Map<string, number>();
   private static readonly CACHE_DURATION = 30000; // 30 segundos
 
+  private static getChannelTableMapping(): Record<string, string> {
+    return {
+      'chat': 'yelena_ai_conversas',
+      'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
+      'canarana': 'canarana_conversas',
+      'souto-soares': 'souto_soares_conversas',
+      'joao-dourado': 'joao_dourado_conversas',
+      'america-dourada': 'america_dourada_conversas',
+      'gerente-lojas': 'gerente_lojas_conversas',
+      'gerente-externo': 'gerente_externo_conversas',
+      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
+    };
+  }
+
+  private static extractPhoneFromSessionId(sessionId: string): string {
+    // Para novo formato: "TELEFONE-NOME" ou "TELEFONE-GRUPO"
+    const parts = sessionId.split('-');
+    if (parts.length > 1 && /^\d{10,15}$/.test(parts[0])) {
+      return parts[0];
+    }
+    
+    // Fallback: procurar por sequência de números
+    const phoneMatch = sessionId.match(/(\d{10,15})/);
+    return phoneMatch ? phoneMatch[1] : sessionId;
+  }
+
+  private static extractNameFromSessionId(sessionId: string, contactName?: string): string {
+    // Priorizar nome do contato se disponível
+    if (contactName && contactName.trim()) {
+      return contactName.trim();
+    }
+    
+    // Para formato: "TELEFONE-NOME"
+    const parts = sessionId.split('-');
+    if (parts.length > 1) {
+      const name = parts.slice(1).join('-').trim();
+      return name || 'Cliente';
+    }
+    
+    return 'Cliente';
+  }
+
+  private static detectGroup(sessionId: string): boolean {
+    // Detectar se é um grupo baseado no session_id
+    return sessionId.includes('Grupo') || sessionId.includes('group') || sessionId.includes('@g.us');
+  }
+
+  private static groupContactsByPhone(rawContacts: RawContactData[], channelId: string): OptimizedContact[] {
+    const contactGroups = new Map<string, RawContactData[]>();
+    
+    // Agrupar por telefone
+    rawContacts.forEach(contact => {
+      const phone = this.extractPhoneFromSessionId(contact.session_id);
+      if (!contactGroups.has(phone)) {
+        contactGroups.set(phone, []);
+      }
+      contactGroups.get(phone)!.push(contact);
+    });
+
+    const contacts: OptimizedContact[] = [];
+
+    contactGroups.forEach((messages, phone) => {
+      // Ordenar mensagens por data
+      messages.sort((a, b) => new Date(b.read_at || '').getTime() - new Date(a.read_at || '').getTime());
+      
+      const latestMessage = messages[0];
+      const unreadCount = messages.filter(m => !m.is_read && m.tipo_remetente !== 'USUARIO_INTERNO').length;
+      
+      // Detectar se é um grupo
+      const isGroup = this.detectGroup(latestMessage.session_id);
+      
+      // Coletar até 4 nomes únicos das mensagens
+      const uniqueNames = new Set<string>();
+      messages.forEach(msg => {
+        if (msg.nome_do_contato && msg.nome_do_contato.trim()) {
+          const name = msg.nome_do_contato.trim();
+          // Filtrar nomes de sistema/agente - mais específico
+          if (!name.toLowerCase().includes('gerente') && 
+              !name.toLowerCase().includes('yelena') && 
+              !name.toLowerCase().includes('andressa') &&
+              !name.toLowerCase().includes('sistema') &&
+              name !== 'Gustavo Gerente das Lojas' &&
+              !name.includes('GerenteLojas')) {
+            uniqueNames.add(name);
+          }
+        }
+      });
+
+      // Se não há nomes válidos, usar extração do session_id
+      if (uniqueNames.size === 0) {
+        const extractedName = this.extractNameFromSessionId(latestMessage.session_id, latestMessage.nome_do_contato);
+        // Evitar adicionar nomes de sistema
+        if (!extractedName.toLowerCase().includes('gerente') && 
+            extractedName !== 'GerenteLojas' &&
+            extractedName !== 'Gustavo Gerente das Lojas') {
+          uniqueNames.add(extractedName);
+        }
+      }
+
+      // Se ainda não há nomes válidos, usar padrão baseado no tipo
+      if (uniqueNames.size === 0) {
+        uniqueNames.add(isGroup ? 'Grupo' : 'Cliente');
+      }
+
+      // Limitar a 4 nomes e criar string legível
+      const namesArray = Array.from(uniqueNames).slice(0, 4);
+      let displayName = '';
+      
+      if (isGroup) {
+        displayName = namesArray.length > 1 
+          ? `Grupo: ${namesArray.slice(0, 2).join(', ')}${namesArray.length > 2 ? ` e mais ${namesArray.length - 2}` : ''}`
+          : `Grupo: ${namesArray[0] || 'Sem nome'}`;
+      } else {
+        displayName = namesArray.length > 1 
+          ? `${namesArray.slice(0, -1).join(', ')} e ${namesArray[namesArray.length - 1]}`
+          : namesArray[0] || 'Cliente';
+      }
+
+      const contact: OptimizedContact = {
+        id: `${channelId}-${phone}`,
+        nome: displayName,
+        telefone: phone,
+        ultimaMensagem: latestMessage.message || '',
+        tempo: this.formatTimeAgo(latestMessage.read_at || ''),
+        status: unreadCount > 0 ? 'pendente' : 'resolvida',
+        canais: [channelId],
+        isGroup
+      };
+
+      contacts.push(contact);
+    });
+
+    return contacts;
+  }
+
+  private static formatTimeAgo(dateString: string): string {
+    if (!dateString) return '';
+    
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 1) return 'Agora';
+    if (diffInMinutes < 60) return `${diffInMinutes}min`;
+    if (diffInHours < 24) return `${diffInHours}h`;
+    if (diffInDays < 7) return `${diffInDays}d`;
+    
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+
   static async getContactsForChannels(channelIds: string[]): Promise<OptimizedContact[]> {
-    const cacheKey = channelIds.sort().join('-');
-    const cached = this.cache.get(cacheKey);
+    console.log('🔍 [OPTIMIZED_CONTACT_SERVICE] Loading contacts for channels:', channelIds);
+    
+    const cacheKey = channelIds.sort().join(',');
+    const now = Date.now();
     
     // Verificar cache
-    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
-      console.log(`🚀 [OPTIMIZED_CONTACT_SERVICE] Using cached data for channels: ${channelIds.join(', ')}`);
-      return cached.data;
+    if (this.cache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
+      const expiry = this.cacheExpiry.get(cacheKey)!;
+      if (now < expiry) {
+        console.log('📋 [OPTIMIZED_CONTACT_SERVICE] Returning cached data');
+        return this.cache.get(cacheKey)!;
+      }
     }
 
-    console.log(`🔍 [OPTIMIZED_CONTACT_SERVICE] Loading contacts for channels: ${channelIds.join(', ')}`);
-    
-    try {
-      // Carregar dados de todos os canais em paralelo
-      const channelPromises = channelIds.map(async (channelId) => {
-        try {
-          const messageService = new MessageService(channelId);
-          const conversations = await messageService.getConversations();
-          
-          return conversations.map(conversation => {
-            const contactPhone = conversation.contact_phone || '';
-            if (!contactPhone) return null;
+    const tableMapping = this.getChannelTableMapping();
+    const allContacts: OptimizedContact[] = [];
+    const phoneToContactMap = new Map<string, OptimizedContact>();
+
+    for (const channelId of channelIds) {
+      const tableName = tableMapping[channelId];
+      if (!tableName) {
+        console.warn(`⚠️ [OPTIMIZED_CONTACT_SERVICE] No table mapping for channel: ${channelId}`);
+        continue;
+      }
+
+      try {
+        console.log(`📊 [OPTIMIZED_CONTACT_SERVICE] Querying table: ${tableName}`);
+        
+        const { data: rawData, error } = await supabase
+          .from(tableName as any)
+          .select('id, session_id, message, read_at, nome_do_contato, is_read, tipo_remetente')
+          .order('read_at', { ascending: false })
+          .limit(1000);
+
+        if (error) {
+          console.error(`❌ [OPTIMIZED_CONTACT_SERVICE] Error querying ${tableName}:`, error);
+          continue;
+        }
+
+        if (!rawData || rawData.length === 0) {
+          console.log(`📭 [OPTIMIZED_CONTACT_SERVICE] No data found in ${tableName}`);
+          continue;
+        }
+
+        // Validar e converter dados
+        const validData: RawContactData[] = [];
+        rawData.forEach((item: any) => {
+          if (item && 
+              typeof item.id !== 'undefined' && 
+              typeof item.session_id === 'string' &&
+              typeof item.message === 'string') {
+            validData.push({
+              id: String(item.id),
+              session_id: item.session_id,
+              message: item.message,
+              read_at: item.read_at || '',
+              nome_do_contato: item.nome_do_contato || undefined,
+              is_read: Boolean(item.is_read),
+              tipo_remetente: item.tipo_remetente || undefined
+            });
+          }
+        });
+
+        const channelContacts = this.groupContactsByPhone(validData, channelId);
+        console.log(`✅ [OPTIMIZED_CONTACT_SERVICE] Found ${channelContacts.length} contacts in ${tableName}`);
+
+        // Agrupar contatos por telefone entre canais
+        channelContacts.forEach(contact => {
+          if (phoneToContactMap.has(contact.telefone)) {
+            const existingContact = phoneToContactMap.get(contact.telefone)!;
+            existingContact.canais.push(...contact.canais);
             
-            const contactName = conversation.contact_name || `Cliente ${contactPhone.slice(-4)}`;
-            const status = conversation.status || 'unread';
+            // Usar a mensagem mais recente
+            const contactTime = new Date(contact.tempo.includes('h') || contact.tempo.includes('min') ? Date.now() : contact.tempo);
+            const existingTime = new Date(existingContact.tempo.includes('h') || existingContact.tempo.includes('min') ? Date.now() : existingContact.tempo);
             
-            let contactStatus: 'pendente' | 'em_andamento' | 'resolvida';
-            switch(status) {
-              case 'unread':
-                contactStatus = 'pendente';
-                break;
-              case 'in_progress':
-                contactStatus = 'em_andamento';
-                break;
-              case 'resolved':
-                contactStatus = 'resolvida';
-                break;
-              default:
-                contactStatus = 'pendente';
+            if (contactTime > existingTime) {
+              existingContact.ultimaMensagem = contact.ultimaMensagem;
+              existingContact.tempo = contact.tempo;
             }
-            
-            const lastMessageTime = conversation.last_message_time 
-              ? new Date(conversation.last_message_time)
-              : new Date(0);
-            
-            return {
-              id: contactPhone,
-              nome: contactName,
-              telefone: contactPhone,
-              canais: [channelId],
-              ultimaMensagem: conversation.last_message || 'Sem mensagem',
-              tempo: this.formatTimeAgo(conversation.last_message_time),
-              status: contactStatus,
-              lastMessageTime,
-              channelName: getChannelDisplayName(channelId)
-            };
-          }).filter(contact => contact !== null);
-        } catch (error) {
-          console.error(`❌ [OPTIMIZED_CONTACT_SERVICE] Error loading channel ${channelId}:`, error);
-          return [];
-        }
+          } else {
+            phoneToContactMap.set(contact.telefone, { ...contact });
+          }
+        });
+
+      } catch (err) {
+        console.error(`❌ [OPTIMIZED_CONTACT_SERVICE] Unexpected error for ${tableName}:`, err);
+      }
+    }
+
+    // Converter map para array e ordenar
+    const finalContacts = Array.from(phoneToContactMap.values())
+      .sort((a, b) => {
+        // Priorizar conversas pendentes
+        if (a.status === 'pendente' && b.status !== 'pendente') return -1;
+        if (b.status === 'pendente' && a.status !== 'pendente') return 1;
+        
+        // Depois ordenar por tempo (mais recente primeiro)
+        const timeA = new Date(a.tempo.includes('h') || a.tempo.includes('min') ? Date.now() : a.tempo);
+        const timeB = new Date(b.tempo.includes('h') || b.tempo.includes('min') ? Date.now() : b.tempo);
+        return timeB.getTime() - timeA.getTime();
       });
 
-      // Aguardar todos os canais carregarem
-      const channelResults = await Promise.all(channelPromises);
-      const allContacts = channelResults.flat();
-      
-      // Agrupar contatos por telefone
-      const contactsMap = new Map<string, OptimizedContact>();
-      
-      allContacts.forEach(contact => {
-        if (!contact) return;
-        
-        const existingContact = contactsMap.get(contact.telefone);
-        
-        if (existingContact) {
-          // Adicionar canal se não existir
-          if (!existingContact.canais.includes(contact.canais[0])) {
-            existingContact.canais.push(contact.canais[0]);
-          }
-          
-          // Atualizar mensagem mais recente se for mais nova
-          if (contact.lastMessageTime > existingContact.lastMessageTime) {
-            existingContact.ultimaMensagem = contact.ultimaMensagem;
-            existingContact.tempo = contact.tempo;
-            existingContact.status = contact.status;
-            existingContact.lastMessageTime = contact.lastMessageTime;
-          }
-        } else {
-          contactsMap.set(contact.telefone, contact);
-        }
-      });
-      
-      // Converter para array e ordenar por última mensagem
-      const sortedContacts = Array.from(contactsMap.values())
-        .sort((a, b) => b.lastMessageTime.getTime() - a.lastMessageTime.getTime());
-      
-      // Salvar no cache
-      this.cache.set(cacheKey, {
-        data: sortedContacts,
-        timestamp: Date.now()
-      });
-      
-      console.log(`✅ [OPTIMIZED_CONTACT_SERVICE] Loaded ${sortedContacts.length} contacts from ${channelIds.length} channels`);
-      return sortedContacts;
-      
-    } catch (error) {
-      console.error(`❌ [OPTIMIZED_CONTACT_SERVICE] Error loading contacts:`, error);
-      return [];
-    }
+    // Atualizar cache
+    this.cache.set(cacheKey, finalContacts);
+    this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
+
+    console.log(`🎯 [OPTIMIZED_CONTACT_SERVICE] Total unique contacts found: ${finalContacts.length}`);
+    return finalContacts;
   }
 
   static clearCache(): void {
     this.cache.clear();
-    console.log(`🧹 [OPTIMIZED_CONTACT_SERVICE] Cache cleared`);
-  }
-
-  private static formatTimeAgo(timestamp: string | null): string {
-    if (!timestamp) return '';
-    
-    try {
-      const messageDate = new Date(timestamp);
-      const now = new Date();
-      const diffMs = now.getTime() - messageDate.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      
-      if (diffMins < 1) return 'agora';
-      if (diffMins < 60) return `${diffMins}min`;
-      
-      const diffHours = Math.floor(diffMins / 60);
-      if (diffHours < 24) return `${diffHours}h`;
-      
-      const diffDays = Math.floor(diffHours / 24);
-      return `${diffDays}d`;
-    } catch (error) {
-      return '';
-    }
+    this.cacheExpiry.clear();
+    console.log('🧹 [OPTIMIZED_CONTACT_SERVICE] Cache cleared');
   }
 }

@@ -1,70 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Input } from '@/components/ui/input';
-import { Camera, Upload, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUserProfiles } from '@/hooks/useUserProfiles';
-import { useAuth } from '@/contexts/AuthContext';
+
+import React, { useRef, useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Camera, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AvatarAdjustDialog } from "./AvatarAdjustDialog";
 
 interface ProfilePictureProps {
   isDarkMode: boolean;
   userName: string;
+  onAvatarChange?: (avatarFile: File | null, previewUrl: string | null) => void;
+  externalPreview?: string | null; // url vinda da ProfileSection: avatarDraftPreview || avatarSaved
 }
 
-// Type guard to check if object has avatar_url property
-const hasAvatarUrl = (obj: any): obj is { avatar_url?: string } => {
-  return obj && typeof obj === 'object';
-};
-
-export const ProfilePicture: React.FC<ProfilePictureProps> = ({ 
-  isDarkMode, 
-  userName
+export const ProfilePicture: React.FC<ProfilePictureProps> = ({
+  isDarkMode,
+  userName,
+  onAvatarChange,
+  externalPreview,
 }) => {
-  const { user } = useAuth();
-  const { getProfileByUserId, loadProfile, uploadAvatar, updateProfile, loading } = useUserProfiles();
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  // Estado só para captura local
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null); // Arquivo temporário só para o pai no Save
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Sempre que o draft externo muda (ProfileSection), ou avatar salvo, atualize o preview mostrado
   useEffect(() => {
-    if (user) {
-      loadProfile(user.id).then(profile => {
-        if (hasAvatarUrl(profile) && profile.avatar_url) {
-          setSelectedImage(profile.avatar_url);
-        }
-      });
+    setPreviewImage(externalPreview ?? null);
+    if (!externalPreview) {
+      setPendingFile(null);
     }
-  }, [user, loadProfile]);
+  }, [externalPreview]);
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem deve ter no máximo 5MB');
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione apenas arquivos de imagem');
-      return;
-    }
-
-    const avatarUrl = await uploadAvatar(file);
-    if (avatarUrl) {
-      setSelectedImage(avatarUrl);
-      await updateProfile({ avatar_url: avatarUrl });
-    }
-
-    event.target.value = '';
-  };
-
-  const handleRemoveImage = async () => {
-    if (user) {
-      setSelectedImage(null);
-      await updateProfile({ avatar_url: null });
-    }
-  };
-
+  // Gera iniciais se não houver imagem
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -74,11 +44,49 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
       .slice(0, 2);
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviewImage(e.target?.result as string);
+      setPendingFile(file);
+      setAdjustDialogOpen(true); // Abre ajuste/crop
+    };
+    reader.readAsDataURL(file);
+    event.target.value = ''; // Limpa input, permitindo outro upload
+  };
+
+  // Usuário cancela crop: limpa apenas draft local, não afeta gravado no backend
+  const handleRemovePreview = () => {
+    setPreviewImage(null);
+    setPendingFile(null);
+    setAdjustDialogOpen(false);
+    onAvatarChange?.(null, null); // Reseta draft no pai
+  };
+
+  // Ao confirmar o crop, envia pro pai só o arquivo temporário (não faz upload)
+  const handleConfirmPreview = (confirmedUrl: string) => {
+    setPreviewImage(confirmedUrl);
+    setAdjustDialogOpen(false);
+    if (pendingFile && confirmedUrl) {
+      onAvatarChange?.(pendingFile, confirmedUrl); // Salva draft temporário
+    }
+  };
+
   return (
     <div className="flex flex-col items-center space-y-4">
       <div className="relative">
         <Avatar className="w-24 h-24">
-          <AvatarImage src={selectedImage || undefined} alt={userName} />
+          <AvatarImage src={previewImage || undefined} alt={userName} />
           <AvatarFallback className={cn(
             "text-2xl font-semibold",
             isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-700"
@@ -86,77 +94,51 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
             {getInitials(userName)}
           </AvatarFallback>
         </Avatar>
-        
+        {/* Dialog para crop/ajuste */}
+        <AvatarAdjustDialog
+          open={adjustDialogOpen}
+          imageUrl={previewImage}
+          onCancel={handleRemovePreview}
+          onConfirm={handleConfirmPreview}
+        />
         <div className="absolute -bottom-2 -right-2">
-          <label htmlFor="avatar-upload">
+          <label>
             <Button
               size="sm"
               className="h-8 w-8 p-0 rounded-full"
               style={{ backgroundColor: '#b5103c' }}
               asChild
-              disabled={loading}
             >
               <div className="cursor-pointer">
                 <Camera size={16} />
               </div>
             </Button>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
           </label>
-          <Input
-            id="avatar-upload"
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-            disabled={loading}
-          />
         </div>
       </div>
-
-      <div className="flex space-x-2">
-        <label htmlFor="avatar-upload-alt">
-          <Button
-            variant="outline"
-            size="sm"
-            style={{
-              backgroundColor: 'transparent',
-              borderColor: isDarkMode ? '#686868' : '#d1d5db',
-              color: isDarkMode ? '#ffffff' : '#374151'
-            }}
-            asChild
-            disabled={loading}
-          >
-            <div className="cursor-pointer flex items-center space-x-2">
-              <Upload size={16} />
-              <span>{loading ? 'Enviando...' : 'Alterar'}</span>
-            </div>
-          </Button>
-        </label>
-        <Input
-          id="avatar-upload-alt"
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="hidden"
-          disabled={loading}
-        />
-        
-        {selectedImage && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRemoveImage}
-            className="text-red-600 hover:text-red-700"
-            style={{
-              backgroundColor: 'transparent',
-              borderColor: '#dc2626',
-              color: '#dc2626'
-            }}
-            disabled={loading}
-          >
-            <Trash2 size={16} />
-          </Button>
-        )}
-      </div>
+      {(previewImage) && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRemovePreview}
+          className="text-red-600 hover:text-red-700 mt-2"
+          style={{
+            backgroundColor: 'transparent',
+            borderColor: '#dc2626',
+            color: '#dc2626'
+          }}
+          type="button"
+        >
+          <Trash2 size={16} />
+        </Button>
+      )}
     </div>
   );
 };

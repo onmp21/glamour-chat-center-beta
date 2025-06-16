@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 
 export interface ChannelInstanceMapping {
   id: string;

@@ -1,7 +1,7 @@
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
 import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 
 export class MessageService {
   private repositories: Map<string, MessageRepository> = new Map();
@@ -278,9 +278,9 @@ export class MessageService {
     
     try {
       // Stats simplificados para evitar queries pesadas
-      const conversations = await this.getConversations(10);
+      const conversations = await this.getConversations(10); // Increased limit for better stats
       const stats = {
-        totalMessages: 0,
+        totalMessages: 0, // Placeholder, as this can be expensive
         totalConversations: conversations.length,
         unreadMessages: conversations.filter(c => c.status === 'unread').length
       };

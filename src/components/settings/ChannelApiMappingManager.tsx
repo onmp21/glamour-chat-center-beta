@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,6 +6,8 @@ import { useApiInstances } from '../../hooks/useApiInstances';
 import { useChannelApiMappings } from '../../hooks/useChannelApiMappings';
 import { useChannels } from '@/contexts/ChannelContext';
 import { Settings, Link, CheckCircle, AlertCircle, Wifi } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+import { EvolutionApiService } from '@/services/EvolutionApiService';
 
 export const ChannelApiMappingManager: React.FC = () => {
   const { instances } = useApiInstances();
@@ -15,9 +16,57 @@ export const ChannelApiMappingManager: React.FC = () => {
   const [selectedChannel, setSelectedChannel] = useState<string>('');
   const [selectedInstance, setSelectedInstance] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [webhookStatus, setWebhookStatus] = React.useState<{[key: string]: boolean}>({});
 
   // Filtrar canais ativos
   const activeChannels = channels.filter(channel => channel.isActive);
+
+  // Função para configurar o webhook Evolution após mapear canal-instância
+  const configureEvolutionWebhook = async (instance: any) => {
+    if (!instance) return;
+
+    const webhookUrl = "https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-universal";
+    const events = [
+      "messages.upsert",
+      "connection.update",
+      "qrcode.updated",
+      "contacts.upsert"
+    ];
+
+    try {
+      // Chamada real ao EvolutionApiService.setWebhook
+      const result = instance
+        ? await new EvolutionApiService({
+            baseUrl: instance.base_url,
+            apiKey: instance.api_key,
+            instanceName: instance.instance_name,
+          }).setWebhook(webhookUrl, events)
+        : { success: false };
+
+      if (result.success) {
+        toast({
+          title: "Webhook Evolution configurado!",
+          description: "A instância está agora conectada ao webhook universal.",
+          variant: "default",
+        });
+        console.log("✅ [WEBHOOK] Configurado na Evolution:", webhookUrl, events);
+      } else {
+        toast({
+          title: "Erro ao configurar webhook",
+          description: result.error || "Falha desconhecida.",
+          variant: "destructive",
+        });
+        console.warn("❌ [WEBHOOK] Falha:", result.error);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao configurar webhook",
+        description: error?.message || "Falha desconhecida.",
+        variant: "destructive",
+      });
+      console.error("❌ [WEBHOOK] Exceção:", error);
+    }
+  };
 
   const handleSaveMapping = async () => {
     if (!selectedChannel || !selectedInstance) return;
@@ -25,22 +74,17 @@ export const ChannelApiMappingManager: React.FC = () => {
     setSaving(true);
     try {
       console.log(`🔗 [MAPPING] Vinculando canal ${selectedChannel} à instância ${selectedInstance}`);
-      
       await upsertMapping(selectedChannel, selectedInstance);
 
-      // Configurar webhook automaticamente
+      // Configurar webhook automaticamente ↴ 
       const instance = instances.find(inst => inst.id === selectedInstance);
       const channel = activeChannels.find(ch => ch.id === selectedChannel);
 
       if (instance && channel) {
-        console.log(`🔌 [WEBHOOK] Configurando webhook para canal: ${channel.name} → instância: ${instance.instance_name}`);
-        
-        try {
-          // Webhook será configurado automaticamente pelo backend
-          console.log(`✅ [WEBHOOK] Configuração de webhook para canal: ${channel.name} será processada pelo backend`);
-        } catch (error) {
-          console.warn("⚠️ [WEBHOOK] Erro durante configuração do webhook:", error);
-        }
+        // Nova: chamar configuração real do EvolutionApiService
+        await configureEvolutionWebhook(instance);
+
+        console.log(`✅ [WEBHOOK] Configuração de webhook para canal: ${channel.name} será processada pelo backend`);
       }
 
       setSelectedChannel("");
@@ -58,7 +102,7 @@ export const ChannelApiMappingManager: React.FC = () => {
       
       const mapping = mappings.find(m => m.channel_id === channelId);
       if (mapping) {
-        const instance = instances.find(inst => inst.id === mapping.api_instance_id);
+        const instance = instances.find(inst => inst.id === mapping.instance_id);
         const channel = activeChannels.find(ch => ch.id === channelId);
 
         await deleteMapping(channelId);
@@ -84,17 +128,57 @@ export const ChannelApiMappingManager: React.FC = () => {
     return instance?.instance_name || 'Instância não encontrada';
   };
 
-  const getWebhookStatus = (channelId: string) => {
-    // Sempre retorna false pois não estamos mais usando WebSocket
-    return false;
+  const checkWebhookForInstance = async (instance: any, channelId: string) => {
+    if (!instance) return;
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: instance.base_url,
+        apiKey: instance.api_key,
+        instanceName: instance.instance_name,
+      });
+      const res = await service.getWebhook();
+      const isSet = !!res.webhook?.webhook?.url &&
+        res.webhook.webhook.url.includes("/webhook-evolution-universal");
+      setWebhookStatus(prev => ({ ...prev, [channelId]: isSet }));
+    } catch {
+      setWebhookStatus(prev => ({ ...prev, [channelId]: false }));
+    }
   };
 
+  React.useEffect(() => {
+    // Checar status para canais mapeados
+    mappings.forEach((mapping) => {
+      const instance = instances.find(i => i.id === mapping.instance_id);
+      if (instance) {
+        checkWebhookForInstance(instance, mapping.channel_id);
+      }
+    });
+    // eslint-disable-next-line
+  }, [mappings, instances]);
+
   const getWebhookStatusBadge = (channelId: string) => {
-    // Sempre mostra webhook configurado quando há mapeamento
+    const has = webhookStatus[channelId];
     return (
-      <div className="flex items-center gap-1 text-xs text-green-600">
+      <div className={`flex items-center gap-1 text-xs ${has ? 'text-green-600' : 'text-amber-600'}`}>
         <Wifi className="h-3 w-3" />
-        {'Webhook Configurado'}
+        {has ? 'Webhook Configurado' : 'Webhook NÃO configurado'}
+        {!has && (
+          <Button
+            size="sm"
+            className="ml-1 px-2 py-0.5 h-5 text-xs"
+            onClick={async () => {
+              // Força nova configuração
+              const mapping = mappings.find(m => m.channel_id === channelId);
+              if (mapping) {
+                const instance = instances.find(i => i.id === mapping.instance_id);
+                await configureEvolutionWebhook(instance);
+                setTimeout(() => checkWebhookForInstance(instance, channelId), 1500);
+              }
+            }}
+          >
+            Corrigir
+          </Button>
+        )}
       </div>
     );
   };
@@ -206,7 +290,7 @@ export const ChannelApiMappingManager: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500" />
                                 <span className="text-sm font-medium">
-                                  {getInstanceName(mapping.api_instance_id)}
+                                  {getInstanceName(mapping.instance_id)}
                                 </span>
                               </div>
                               {getWebhookStatusBadge(channel.id)}

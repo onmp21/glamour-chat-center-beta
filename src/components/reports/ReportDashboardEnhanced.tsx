@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,27 +10,22 @@ import { ReportStatsSection } from './ReportStatsSection';
 import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
+import { useActiveChannels } from '@/hooks/useActiveChannels';
+import { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
 }
 
-interface ReportFilters {
-  channel_id?: string;
-  status?: string;
-  date_from?: string;
-  date_to?: string;
-  report_type: 'conversations' | 'channels' | 'custom';
-  custom_prompt?: string;
-}
-
+// Everything below uses ReportType, which allows 'exams' as valid value.
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
   isDarkMode
 }) => {
   const { toast } = useToast();
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
-  const [filters, setFilters] = useState<ReportFilters>({
+  // Correct: Explicitly type filters as ReportFilters (which includes ReportType = 'conversations' | 'channels' | 'exams' | 'custom')
+  const [filters, setFilters] = useState<any>({
     report_type: 'conversations'
   });
   const [isGenerating, setIsGenerating] = useState(false);
@@ -44,6 +38,40 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     reportsThisMonth: 0,
     averageGenerationTime: 0
   });
+  const { channels: availableChannels, loading: channelsLoading } = useActiveChannels();
+
+  // Função utilitária para formatar segundos em mm:ss
+  function formatSeconds(seconds: number): string {
+    if (!seconds || isNaN(seconds)) return "0s";
+    return `${Math.round(seconds)}s`;
+  }
+
+  // BUSCA DADOS REAIS para o relatório
+  async function fetchReportData(report_type: string, channel_id?: string) {
+    const supabaseClient = require('@/integrations/supabase/client').supabase;
+    if (report_type === 'conversations' && channel_id) {
+      // Buscar até 30 conversas recentes do canal selecionado
+      // Determinar a tabela pelo channel_id
+      const { getTableNameForChannel } = require('@/utils/channelMapping');
+      const tableName = getTableNameForChannel(channel_id);
+      const { data } = await supabaseClient
+        .from(tableName)
+        .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
+        .limit(30)
+        .order('read_at', { ascending: false });
+      return data || [];
+    }
+    if (report_type === 'exams') {
+      // Buscar até 30 exames
+      const { data } = await supabaseClient
+        .from('exams')
+        .select('*')
+        .limit(30)
+        .order('appointment_date', { ascending: false });
+      return data || [];
+    }
+    return {}; // Para custom, retorna vazio
+  }
 
   useEffect(() => {
     loadProviders();
@@ -52,26 +80,19 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const loadProviders = async () => {
     try {
-<<<<<<< HEAD
       console.log("📊 [ReportDashboardEnhanced] Carregando provedores de IA...");
-=======
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
       const activeProviders = await AIProviderService.getProviders();
-      setProviders(activeProviders);
-      if (activeProviders.length > 0) {
+      setProviders(activeProviders || []);
+      if (activeProviders && activeProviders.length > 0) {
         setSelectedProvider(String(activeProviders[0].id));
-<<<<<<< HEAD
         console.log("📊 [ReportDashboardEnhanced] Provedores carregados. Primeiro provedor selecionado:", activeProviders[0].id);
       } else {
+        setSelectedProvider('');
         console.log("📊 [ReportDashboardEnhanced] Nenhum provedor de IA ativo encontrado.");
       }
     } catch (error) {
+      setSelectedProvider('');
       console.error("Erro ao carregar provedores:", error);
-=======
-      }
-    } catch (error) {
-      console.error('Erro ao carregar provedores:', error);
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
     }
   };
 
@@ -108,7 +129,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
 
   const generateReport = async () => {
     if (!selectedProvider) {
-      setError('Selecione um provedor de IA');
+      setError('É necessário cadastrar e selecionar ao menos um provedor de IA ativo antes de gerar relatórios.');
       return;
     }
 
@@ -117,19 +138,34 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
+      // Busca dados REAIS conforme tipo do relatório
+      let reportData: any = {};
+      if (filters.report_type === "conversations" || filters.report_type === "exams") {
+        reportData = await fetchReportData(filters.report_type, filters.channel_id);
+      }
       const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
         report_type: filters.report_type,
-        data: {},
+        data: reportData,
         custom_prompt: filters.custom_prompt
       });
-      
-      setReportResult(result.result);
-      toast({
-        title: "Sucesso",
-        description: "Relatório gerado com sucesso",
-      });
-      loadRecentReports();
+
+      // Exibe mensagem customizada se houver erro no conteúdo do relatório
+      if (
+        result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
+        || result.generated_report?.includes("chave de API")
+        || result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
+      ) {
+        setError(result.generated_report);
+        setReportResult(null);
+      } else {
+        setReportResult(result.result);
+        toast({
+          title: "Sucesso",
+          description: "Relatório gerado com sucesso",
+        });
+        loadRecentReports();
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
       toast({
@@ -221,8 +257,8 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       {/* Main Content */}
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+          {/* Generator e Display juntos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Report Generator */}
             <ReportGenerator
               isDarkMode={isDarkMode}
               providers={providers}
@@ -234,9 +270,9 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onGenerateReport={generateReport}
               onClearReport={clearReport}
               hasReportResult={!!reportResult}
+              availableChannels={availableChannels}
+              channelsLoading={channelsLoading}
             />
-
-            {/* Report Display */}
             <ReportDisplay
               isDarkMode={isDarkMode}
               reportResult={reportResult}
@@ -244,14 +280,15 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onDownloadReport={downloadReport}
             />
           </div>
-
-          {/* Report History */}
-          <ReportHistoryComponent
-            isDarkMode={isDarkMode}
-            recentReports={recentReports}
-            onViewReport={setReportResult}
-            onDownloadReport={downloadReport}
-          />
+          {/* Relatórios Recentes fora do card, com margem em cima */}
+          <div className="mt-10">
+            <ReportHistoryComponent
+              isDarkMode={isDarkMode}
+              recentReports={recentReports}
+              onViewReport={setReportResult}
+              onDownloadReport={downloadReport}
+            />
+          </div>
         </div>
       </div>
     </div>

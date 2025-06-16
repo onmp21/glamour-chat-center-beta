@@ -1,11 +1,12 @@
 
 import { supabase } from '../integrations/supabase/client';
-import { ChannelApiMappingService } from './ChannelApiMappingService';
+import { ChannelApiMappingService } from './ChannelApiMappingServiceRefactored';
 import { RawMessage } from '@/types/messageTypes';
 import { AudioCompressor } from './AudioCompressor';
 import { VideoCompressor } from './VideoCompressor';
 import { DetailedLogger } from './DetailedLogger';
 import { RetryManager } from './RetryManager';
+import { getContactDisplayName } from "@/utils/getContactDisplayName";
 
 export class MessageSenderService {
   private retryCount: number = 3;
@@ -24,6 +25,7 @@ export class MessageSenderService {
   }
 
   private getMessageTypeForMedia(mediaType: 'image' | 'audio' | 'video' | 'document'): string {
+    // Retorna apenas o tipo simples conforme documentação Evolution API v2
     return mediaType;
   }
 
@@ -86,7 +88,7 @@ export class MessageSenderService {
   private async reconnectInstance(baseUrl: string, apiKey: string, instanceName: string): Promise<boolean> {
     try {
       const response = await fetch(`${baseUrl}/instance/restart/${instanceName}`, {
-        method: 'POST',
+        method: 'PUT', // Corrigido para PUT conforme documentação
         headers: {
           'apikey': apiKey,
           'Content-Type': 'application/json'
@@ -105,35 +107,36 @@ export class MessageSenderService {
     }
   }
 
-  async sendTextMessage(channelId: string, to: string, text: string): Promise<RawMessage> {
+  async sendTextMessage(channelId: string, to: string, text: string, senderType: "customer" | "agent" = "agent", contactName?: string | null): Promise<RawMessage> {
+    const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
-
-      const isConfigured = await this.validateApiConfiguration(channelId);
+      const isConfigured = await this.validateApiConfiguration(realChannelId);
       if (!isConfigured) {
-        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
+        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
         if (apiInstance) {
           const reconnected = await this.reconnectInstance(
             apiInstance.base_url, 
             apiInstance.api_key, 
             apiInstance.instance_name
           );
-          
           if (!reconnected) {
-            throw new Error(`API Evolution não configurada ou não conectada para o canal ${channelId}`);
+            throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
           }
         } else {
-          throw new Error(`API Evolution não configurada ou não conectada para o canal ${channelId}`);
+          throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
         }
       }
-
-      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
-      
+      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
       if (!apiInstance) {
-        throw new Error(`Falha ao obter instância da API para canal ${channelId}`);
+        throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
       }
-
       const formattedNumber = this.formatPhoneNumber(to);
+
+      let nomeDoContato: string | null = getContactDisplayName({
+        sender: senderType,
+        contactName: contactName,
+      });
 
       const payload = {
         number: formattedNumber,
@@ -141,7 +144,8 @@ export class MessageSenderService {
       };
 
       this.logger.debug('Enviando texto para API Evolution', { 
-        endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}` 
+        endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`,
+        payload 
       });
 
       const response = await fetch(`${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`, {
@@ -160,36 +164,38 @@ export class MessageSenderService {
           statusText: response.statusText, 
           body: errorText 
         });
-        throw new Error(`Falha ao enviar mensagem: ${response.statusText}`);
+        throw new Error(`Falha ao enviar mensagem: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      this.logger.debug('Resposta da API Evolution', { result });
 
-      let senderName: string;
-      if (channelId === 'yelena') {
-        senderName = 'Yelena-ai';
-      } else if (channelId === 'gerente externo' || channelId === 'gerente lojas') {
-        senderName = 'USUARIO_INTERNO';
-      } else {
-        senderName = 'USUARIO_INTERNO';
-      }
-
+      // Sempre usar valores válidos para data e nome_do_contato (NUNCA NÚMERO)
+      const nowIso = new Date().toISOString();
+      // Usar null para nome_do_contato fora de mensagens do cliente!
       const messageData: RawMessage = {
         session_id: formattedNumber,
         message: text,
-        read_at: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-        Nome_do_contato: formattedNumber,
+        read_at: nowIso,
+        nome_do_contato: nomeDoContato,
         mensagemtype: 'conversation',
-        tipo_remetente: senderName,
-        id: result.id || Date.now().toString(),
-        sender: 'agent',
-        timestamp: new Date().toISOString(),
-        content: text
+        tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
+        id: result.key?.id || result.messageId || Date.now().toString(),
+        sender: senderType,
+        timestamp: nowIso,
+        content: text,
+        media_base64: null
       };
 
-      await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
+      // Log de validação
+      this.logger.debug('Salvando mensagem no canal', {
+        realChannelId, table: '...', messageData
+      });
 
-      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.id });
+      // Tenta salvar a mensagem e lança erro se falhar
+      await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
+
+      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.key?.id });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -227,32 +233,39 @@ export class MessageSenderService {
     return mimeToExt[mimeType] || 'bin';
   }
 
-  async sendMediaMessage(channelId: string, to: string, mediaUrl: string, caption: string, mediaType: 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
+  async sendMediaMessage(
+    channelId: string,
+    to: string,
+    mediaUrl: string,
+    caption: string,
+    mediaType: 'image' | 'audio' | 'video' | 'document',
+    senderType: "customer" | "agent" = "agent",
+    contactName?: string | null
+  ): Promise<RawMessage> {
+    const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
       this.logger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
 
-      const isConfigured = await this.validateApiConfiguration(channelId);
+      const isConfigured = await this.validateApiConfiguration(realChannelId);
       if (!isConfigured) {
-        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
+        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
         if (apiInstance) {
           const reconnected = await this.reconnectInstance(
             apiInstance.base_url, 
             apiInstance.api_key, 
             apiInstance.instance_name
           );
-          
           if (!reconnected) {
-            throw new Error(`API Evolution não configurada ou não conectada para o canal ${channelId}`);
+            throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
           }
         } else {
-          throw new Error(`API Evolution não configurada ou não conectada para o canal ${channelId}`);
+          throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
         }
       }
 
-      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(channelId);
-      
+      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
       if (!apiInstance) {
-        throw new Error(`Falha ao obter instância da API para canal ${channelId}`);
+        throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
       }
 
       const formattedNumber = this.formatPhoneNumber(to);
@@ -300,16 +313,21 @@ export class MessageSenderService {
       }
 
       const endpoint = `/message/sendMedia/${apiInstance.instance_name}`;
+      
       const payload = {
         number: formattedNumber,
-        mediatype: this.getMessageTypeForMedia(mediaType),
+        mediatype: mediaType,
         mimetype: mimeType,
         caption: caption || "",
-        media: base64Content,
+        media: `data:${mimeType};base64,${base64Content}`,
         fileName: `media_${Date.now()}.${fileExtension}`
       };
 
-      this.logger.debug('Enviando mídia para API Evolution', { endpoint: `${apiInstance.base_url}${endpoint}`, mediaType });
+      this.logger.debug('Enviando mídia para API Evolution', { 
+        endpoint: `${apiInstance.base_url}${endpoint}`, 
+        mediaType,
+        payload: { ...payload, media: '[BASE64_DATA]' }
+      });
 
       const response = await fetch(`${apiInstance.base_url}${endpoint}`, {
         method: "POST",
@@ -327,36 +345,42 @@ export class MessageSenderService {
           statusText: response.statusText, 
           body: errorText 
         });
-        throw new Error(`Falha ao enviar mensagem de mídia: ${response.statusText}`);
+        throw new Error(`Falha ao enviar mensagem de mídia: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
+      this.logger.debug('Resposta da API Evolution para mídia', { result });
 
-      let senderName: string;
-      if (channelId === 'yelena') {
-        senderName = 'Yelena-ai';
-      } else if (channelId === 'gerente externo' || channelId === 'gerente lojas') {
-        senderName = 'USUARIO_INTERNO';
-      } else {
-        senderName = 'USUARIO_INTERNO';
-      }
+      // Data padrão
+      const nowIso = new Date().toISOString();
+
+      let nomeDoContato: string | null = getContactDisplayName({
+        sender: senderType,
+        contactName: contactName,
+      });
 
       const messageData: RawMessage = {
         session_id: formattedNumber,
-        message: base64Content,
-        read_at: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-        Nome_do_contato: formattedNumber,
-        mensagemtype: `${this.getMessageTypeForMedia(mediaType)}Message`,
-        tipo_remetente: senderName,
-        id: result.id || Date.now().toString(),
-        sender: 'agent',
-        timestamp: new Date().toISOString(),
-        content: base64Content
+        message: `data:${mimeType};base64,${base64Content}`,
+        read_at: nowIso,
+        nome_do_contato: nomeDoContato,
+        mensagemtype: mediaType,
+        tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
+        id: result.key?.id || result.messageId || Date.now().toString(),
+        sender: senderType,
+        timestamp: nowIso,
+        content: `data:${mimeType};base64,${base64Content}`,
+        media_base64: `data:${mimeType};base64,${base64Content}`,
       };
 
-      await ChannelApiMappingService.saveMessageToChannel(channelId, messageData);
+      // Log de validação
+      this.logger.debug('Salvando mensagem de mídia no canal', {
+        realChannelId, table: '...', messageData
+      });
 
-      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.id, mediaType });
+      await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
+
+      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.key?.id, mediaType });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -366,11 +390,18 @@ export class MessageSenderService {
     });
   }
 
-  async sendMessage(channelId: string, to: string, content: string, mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document'): Promise<RawMessage> {
+  async sendMessage(
+    channelId: string,
+    to: string,
+    content: string,
+    mediaType?: 'text' | 'image' | 'audio' | 'video' | 'document',
+    senderType: "customer" | "agent" = "agent",
+    contactName?: string | null
+  ): Promise<RawMessage> {
     if (!mediaType || mediaType === 'text') {
-      return await this.sendTextMessage(channelId, to, content);
+      return await this.sendTextMessage(channelId, to, content, senderType, contactName);
     } else {
-      return await this.sendMediaMessage(channelId, to, content, '', mediaType);
+      return await this.sendMediaMessage(channelId, to, content, '', mediaType, senderType, contactName);
     }
   }
 }

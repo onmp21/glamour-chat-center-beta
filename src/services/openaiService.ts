@@ -1,291 +1,254 @@
-import { supabase } from '@/integrations/supabase/client';
+import OpenAI from 'openai';
+import { supabase } from '@/integrations/supabase/client.ts';
+import { AIProviderService } from './AIProviderService';
+import { DetailedLogger } from './DetailedLogger';
+import { getTableNameForChannel } from '@/utils/channelMapping';
+import { AIProvider, ProviderType } from '@/types/ai-providers';
 
+// Tipos básicos para mensagens e conversas
 interface ConversationMessage {
-  id: number;
+  id: string;
   message: string;
-  nome_do_contato: string | null;
+  nome_do_contato?: string | null;
   session_id: string;
-  tipo_remetente: string | null;
-  read_at: string | null;
-  mensagemtype: string | null;
+  tipo_remetente: 'customer' | 'agent' | 'USUARIO_INTERNO' | 'Yelena-ai' | 'CONTATO_EXTERNO' | string;
+  created_at: string; 
+  mensagemtype?: string | null;
+  media_url?: string | null;
+  media_caption?: string | null;
+  is_read?: boolean | null;
 }
 
-interface OpenAIResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
+// Removed local AIProvider interface, will use imported one
 
-export class OpenAIService {
-  private apiKey: string | null;
-  private baseUrl: string;
+const MAX_PROMPT_MESSAGES = 20;
 
-  constructor() {
-    // Obter API key de fontes compatíveis com o navegador
-    this.apiKey = this.getApiKey();
-    this.baseUrl = 'https://api.openai.com/v1';
-    
-    if (!this.apiKey) {
-      console.warn('⚠️ [OPENAI_SERVICE] API key não encontrada. Configure através do localStorage ou sessionStorage.');
+export const openaiService = {
+  async getOpenAIInstance(providerType: ProviderType | string = 'openai'): Promise<OpenAI | null> {
+    DetailedLogger.info('OpenAIService', `Buscando provedor OpenAI ativo... Tipo: ${providerType}`);
+    try {
+      // Tentar obter userId global + individual, se hook de contexto disponível
+      let userId: string | undefined = undefined;
+      // Tentativa de buscar userId do contexto está fora deste arquivo
+      // Por simplicidade, consulta ambos (global e usuário) como no serviço acima
+
+      const activeProvidersResult = await AIProviderService.getProviders(userId);
+
+      let provider: AIProvider | null | undefined = null;
+
+      if (Array.isArray(activeProvidersResult)) {
+        console.log('[OpenAIService] Lista de provedores disponíveis:', activeProvidersResult.map(p => `${p.name} (${p.provider_type}) ativo=${p.is_active}, user_id=${p.user_id}`));
+        provider = activeProvidersResult.find(
+          p => p.provider_type === providerType && p.is_active === true
+        );
+        if (!provider) {
+          DetailedLogger.warn(
+            'OpenAIService',
+            `Nenhum provedor OpenAI ativo encontrado para o tipo '${providerType}'.`
+          );
+        }
+      } else if (activeProvidersResult && typeof activeProvidersResult === 'object') {
+        provider = (activeProvidersResult as AIProvider);
+        if (
+          provider.provider_type === providerType &&
+          provider.is_active === true
+        ) {
+          // Ok
+        } else {
+          provider = null;
+        }
+      }
+
+      if (provider && provider.api_key) {
+        DetailedLogger.info(
+          'OpenAIService',
+          `Provedor OpenAI '${provider.name}' encontrado. BaseURL: ${provider.base_url || 'Padrão OpenAI'}`
+        );
+        return new OpenAI({
+          apiKey: provider.api_key,
+          baseURL: provider.base_url || undefined,
+          dangerouslyAllowBrowser: true,
+        });
+      }
+      DetailedLogger.warn('OpenAIService', `Provedor OpenAI não encontrado ou chave de API não configurada. Resultado da busca:`, provider);
+      return null;
+    } catch (error) {
+      DetailedLogger.error('OpenAIService', 'Erro ao obter instância OpenAI:', error);
+      return null;
     }
-  }
+  },
 
-  /**
-   * Obter API key de fontes compatíveis com o navegador
-   */
-  private getApiKey(): string | null {
-    // Tentar obter de localStorage primeiro
-    let apiKey = localStorage.getItem('openai_api_key');
-    
-    // Se não encontrar, tentar sessionStorage
-    if (!apiKey) {
-      apiKey = sessionStorage.getItem('openai_api_key');
-    }
-    
-    // Se não encontrar, tentar de uma variável global (se definida)
-    if (!apiKey && typeof window !== 'undefined' && (window as any).OPENAI_API_KEY) {
-      apiKey = (window as any).OPENAI_API_KEY;
-    }
-    
-    return apiKey;
-  }
-
-  /**
-   * Mapear canais para tabelas do banco de dados
-   */
-  private getTableNameForChannel(channelId: string): string {
-    const channelTableMapping: Record<string, string> = {
-      'chat': 'yelena_ai_conversas',
-      'canarana': 'canarana_conversas',
-      'souto-soares': 'souto_soares_conversas',
-      'joao-dourado': 'joao_dourado_conversas',
-      'america-dourada': 'america_dourada_conversas',
-      'gerente-lojas': 'gerente_lojas_conversas',
-      'gerente-externo': 'gerente_externo_conversas',
-      // Mapeamento por UUID também
-      'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
-      '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas',
-      'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas',
-      '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'joao_dourado_conversas',
-      '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas',
-      'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas',
-      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
-    };
-    
-    return channelTableMapping[channelId] || 'yelena_ai_conversas';
-  }
-
-  /**
-   * Buscar mensagens de uma conversa específica
-   */
-  private async getConversationMessages(channelId: string, sessionId: string): Promise<ConversationMessage[]> {
-    const tableName = this.getTableNameForChannel(channelId);
-    
-    console.log(`📋 [OPENAI_SERVICE] Buscando mensagens da tabela: ${tableName} para sessão: ${sessionId}`);
-
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('id', { ascending: true });
-
-    if (error) {
-      console.error('❌ [OPENAI_SERVICE] Erro ao buscar mensagens:', error);
-      throw new Error(`Erro ao buscar mensagens: ${error.message}`);
+  async generateConversationSummary(
+    channelId: string,
+    conversationId: string,
+    customInstructions?: string
+  ): Promise<string> {
+    DetailedLogger.info('OpenAIService', `Gerando resumo para canal ${channelId}, conversa ${conversationId}`);
+    const openai = await this.getOpenAIInstance();
+    if (!openai) {
+      DetailedLogger.error('OpenAIService', 'Instância OpenAI não disponível para resumo.');
+      throw new Error('OpenAI não configurado.');
     }
 
-    return data || [];
-  }
-
-  /**
-   * Formatar mensagens para o prompt da OpenAI
-   */
-  private formatMessagesForPrompt(messages: ConversationMessage[]): string {
-    if (!messages.length) {
-      return 'Nenhuma mensagem encontrada na conversa.';
+    const messages = await this.getMessagesForConversation(channelId, conversationId);
+    if (messages.length === 0) {
+      DetailedLogger.info('OpenAIService', 'Nenhuma mensagem encontrada para resumir.');
+      return 'Não há mensagens nesta conversa para resumir.';
     }
 
-    const contactName = messages[0]?.nome_do_contato || 'Cliente';
-    let formattedMessages = `Conversa com ${contactName}:\n\n`;
+    const contactName = messages[0]?.nome_do_contato || conversationId;
+    let prompt = `Resuma a seguinte conversa com ${contactName}. Destaque os pontos principais e quaisquer ações pendentes. Seja conciso e direto.\n\n`;
+    if (customInstructions) {
+      prompt += `Instruções adicionais: ${customInstructions}\n\n`;
+    }
+    prompt += 'Conversa:\n';
 
-    messages.forEach((msg, index) => {
-      const sender = msg.tipo_remetente === 'customer' ? contactName : 'Atendente';
-      const timestamp = msg.read_at ? new Date(msg.read_at).toLocaleString('pt-BR') : 'Data não disponível';
-      
-      formattedMessages += `${index + 1}. [${timestamp}] ${sender}: ${msg.message}\n`;
+    messages.slice(-MAX_PROMPT_MESSAGES).forEach(msg => {
+      const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO' ? (msg.nome_do_contato || 'Cliente') : 'Atendente';
+      prompt += `${sender}: ${msg.message}\n`;
     });
 
-    return formattedMessages;
-  }
-
-  /**
-   * Gerar resumo da conversa usando OpenAI
-   */
-  async generateConversationSummary(channelId: string, sessionId: string): Promise<string> {
     try {
-      console.log(`🤖 [OPENAI_SERVICE] Gerando resumo para canal: ${channelId}, sessão: ${sessionId}`);
-
-      // Buscar mensagens da conversa
-      const messages = await this.getConversationMessages(channelId, sessionId);
-      
-      if (!messages.length) {
-        return 'Não há mensagens suficientes para gerar um resumo.';
-      }
-
-      // Formatar mensagens para o prompt
-      const conversationText = this.formatMessagesForPrompt(messages);
-      
-      // Criar prompt para a OpenAI
-      const prompt = `Analise a seguinte conversa de atendimento ao cliente e gere um resumo estruturado:
-
-${conversationText}
-
-Por favor, forneça um resumo que inclua:
-
-1. **Resumo Geral**: Breve descrição do que foi discutido
-2. **Pontos Principais**: Lista dos tópicos mais importantes abordados
-3. **Status da Conversa**: Se foi resolvida, está pendente, ou precisa de acompanhamento
-4. **Próximos Passos**: Ações recomendadas (se aplicável)
-5. **Sentimento do Cliente**: Satisfeito, neutro, ou insatisfeito
-
-Mantenha o resumo conciso mas informativo, em português brasileiro.`;
-
-      // Verificar se a API key está disponível
-      if (!this.apiKey) {
-        throw new Error('API key da OpenAI não configurada. Configure através do localStorage: localStorage.setItem("openai_api_key", "sua-chave-aqui")');
-      }
-
-      // Fazer chamada para a API da OpenAI
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'Você é um assistente especializado em análise de conversas de atendimento ao cliente. Gere resumos claros, objetivos e úteis.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 1000,
-          temperature: 0.3
-        })
+      DetailedLogger.info('OpenAIService', 'Enviando requisição de resumo para OpenAI...');
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo', 
+        messages: [
+          { role: 'system', content: 'Você é um assistente útil que resume conversas.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 200,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ [OPENAI_SERVICE] Erro na API da OpenAI:', errorData);
-        throw new Error(`Erro na API da OpenAI: ${response.status} - ${errorData.error?.message || 'Erro desconhecido'}`);
+      const summary = completion.choices[0]?.message?.content?.trim();
+      if (summary) {
+        DetailedLogger.info('OpenAIService', 'Resumo gerado com sucesso.');
+        return summary;
+      } else {
+        DetailedLogger.warn('OpenAIService', 'OpenAI retornou um resumo vazio.');
+        return 'Não foi possível gerar o resumo.';
       }
-
-      const data: OpenAIResponse = await response.json();
-      const summary = data.choices[0]?.message?.content || 'Não foi possível gerar o resumo.';
-
-      console.log('✅ [OPENAI_SERVICE] Resumo gerado com sucesso');
-      return summary;
-
     } catch (error) {
-      console.error('❌ [OPENAI_SERVICE] Erro ao gerar resumo:', error);
-      
-      if (error instanceof Error) {
+      DetailedLogger.error('OpenAIService', 'Erro ao chamar API da OpenAI para resumo:', error);
+      if (error instanceof OpenAI.APIError) {
+        throw new Error(`Erro da API OpenAI: ${error.status} ${error.name} ${error.message}`);
+      }
+      throw new Error('Falha ao gerar resumo da conversa.');
+    }
+  },
+
+  async getMessagesForConversation(
+    channelId: string,
+    conversationId: string
+  ): Promise<ConversationMessage[]> {
+    const tableName = getTableNameForChannel(channelId);
+    if (!tableName) {
+      DetailedLogger.error('OpenAIService', `Nome de tabela inválido para channelId: ${channelId}`);
+      return [];
+    }
+    DetailedLogger.info('OpenAIService', `Buscando mensagens da tabela '${tableName}' para conversa ${conversationId}`);
+
+    try {
+      const { data, error } = await supabase
+        .from(tableName as any) 
+        .select('*')
+        .eq('session_id', conversationId)
+        .order('read_at', { ascending: true }); // TROCA AQUI
+
+      if (error) {
+        DetailedLogger.error('OpenAIService', `Erro ao buscar mensagens da tabela '${tableName}':`, error);
         throw error;
       }
       
-      throw new Error('Erro desconhecido ao gerar resumo da conversa');
-    }
-  }
+      const typedData: ConversationMessage[] = (data || []).map((item: any): ConversationMessage => ({
+        id: String(item.id), // Ensure id is string
+        message: item.message || '',
+        nome_do_contato: item.nome_do_contato,
+        session_id: item.session_id,
+        tipo_remetente: item.tipo_remetente || 'unknown',
+        created_at: item.read_at || new Date().toISOString(), // read_at vira created_at no contexto deste service
+        mensagemtype: item.mensagemtype,
+        media_url: item.media_url || item.media_base64, // Handle both possible media fields
+        media_caption: item.media_caption,
+        is_read: item.is_read,
+      }));
 
-  /**
-   * Gerar resposta sugerida baseada no contexto da conversa
-   */
-  async generateSuggestedResponse(channelId: string, sessionId: string, lastMessages: number = 5): Promise<string> {
-    try {
-      console.log(`🤖 [OPENAI_SERVICE] Gerando resposta sugerida para canal: ${channelId}, sessão: ${sessionId}`);
-
-      // Buscar últimas mensagens da conversa
-      const allMessages = await this.getConversationMessages(channelId, sessionId);
-      const recentMessages = allMessages.slice(-lastMessages);
-      
-      if (!recentMessages.length) {
-        return 'Olá! Como posso ajudá-lo hoje?';
-      }
-
-      // Formatar mensagens para o prompt
-      const conversationText = this.formatMessagesForPrompt(recentMessages);
-      
-      // Criar prompt para gerar resposta sugerida
-      const prompt = `Com base no contexto da conversa abaixo, sugira uma resposta apropriada para o atendente:
-
-${conversationText}
-
-Gere uma resposta que seja:
-- Profissional e cordial
-- Relevante ao contexto da conversa
-- Útil para o cliente
-- Em português brasileiro
-- Concisa (máximo 2-3 frases)
-
-Resposta sugerida:`;
-
-      // Verificar se a API key está disponível
-      if (!this.apiKey) {
-        throw new Error('API key da OpenAI não configurada. Configure através do localStorage: localStorage.setItem("openai_api_key", "sua-chave-aqui")');
-      }
-
-      // Fazer chamada para a API da OpenAI
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'Você é um assistente de atendimento ao cliente especializado em gerar respostas profissionais e úteis.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 200,
-          temperature: 0.7
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ [OPENAI_SERVICE] Erro na API da OpenAI:', errorData);
-        throw new Error(`Erro na API da OpenAI: ${response.status} - ${errorData.error?.message || 'Erro desconhecido'}`);
-      }
-
-      const data: OpenAIResponse = await response.json();
-      const suggestedResponse = data.choices[0]?.message?.content || 'Obrigado pelo contato. Como posso ajudá-lo?';
-
-      console.log('✅ [OPENAI_SERVICE] Resposta sugerida gerada com sucesso');
-      return suggestedResponse.trim();
+      DetailedLogger.info('OpenAIService', `Mensagens encontradas para ${conversationId} em ${tableName}: ${typedData.length}`);
+      return typedData;
 
     } catch (error) {
-      console.error('❌ [OPENAI_SERVICE] Erro ao gerar resposta sugerida:', error);
-      
-      // Retornar resposta padrão em caso de erro
-      return 'Obrigado pelo contato. Como posso ajudá-lo hoje?';
+      DetailedLogger.error('OpenAIService', `Exceção ao buscar mensagens para ${conversationId} em ${tableName}:`, error);
+      return [];
+    }
+  },
+  
+  async generateSuggestedResponse(
+    channelId: string,
+    conversationId: string,
+    customInstructions?: string
+  ): Promise<string> {
+    DetailedLogger.info('OpenAIService', `Gerando resposta sugerida para canal ${channelId}, conversa ${conversationId}`);
+    const openai = await this.getOpenAIInstance();
+    if (!openai) {
+      DetailedLogger.error('OpenAIService', 'Instância OpenAI não disponível para resposta sugerida.');
+      throw new Error('OpenAI não configurado.');
+    }
+
+    const messages = await this.getMessagesForConversation(channelId, conversationId);
+    if (messages.length === 0) {
+      DetailedLogger.info('OpenAIService', 'Nenhuma mensagem na conversa para gerar sugestão.');
+      // Permitir resposta com mensagem padrão mesmo se vazio
+      return 'Nenhuma mensagem disponível nesta conversa.';
+    }
+
+    // O contexto completo da conversa
+    const contactName = messages[0]?.nome_do_contato || 'Cliente';
+    // Encontra a última mensagem do cliente (customer ou CONTATO_EXTERNO)
+    const lastMsgCliente = [...messages].reverse().find(
+      m => m.tipo_remetente === 'customer' || m.tipo_remetente === 'CONTATO_EXTERNO'
+    );
+    const lastMsgClienteTexto = lastMsgCliente?.message || messages[messages.length - 1].message || '';
+
+    // Prompt considera todo o histórico (máx 50) e pede resposta para a última do cliente
+    let prompt = `Você é um assistente de atendimento ao cliente.\n`;
+    prompt += `Baseando-se em todo o histórico da conversa abaixo, sugira uma resposta apropriada, breve e profissional para a ÚLTIMA mensagem enviada pelo cliente.\n\n`;
+    if (customInstructions) {
+      prompt += `Instruções adicionais: ${customInstructions}\n\n`;
+    }
+    prompt += 'Histórico da Conversa:\n';
+    messages.slice(-50).forEach(msg => {
+      const sender = msg.tipo_remetente === 'customer' || msg.tipo_remetente === 'CONTATO_EXTERNO'
+        ? (msg.nome_do_contato || contactName)
+        : 'Atendente';
+      prompt += `${sender}: ${msg.message}\n`;
+    });
+    prompt += `\nResponder a seguinte mensagem do cliente:\n"${lastMsgClienteTexto}"\nResposta:\n`;
+
+    try {
+      DetailedLogger.info('OpenAIService', 'Enviando requisição de sugestão de resposta para OpenAI...');
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: 'Você é um assistente prestativo que sugere respostas em um chat de atendimento.' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 100,
+        temperature: 0.7,
+      });
+
+      const suggestedResponse = completion.choices[0]?.message?.content?.trim();
+      if (suggestedResponse) {
+        DetailedLogger.info('OpenAIService', 'Resposta sugerida gerada com sucesso.');
+        return suggestedResponse;
+      } else {
+        DetailedLogger.warn('OpenAIService', 'OpenAI retornou uma sugestão vazia.');
+        return 'Não foi possível gerar uma sugestão no momento.';
+      }
+    } catch (error) {
+      DetailedLogger.error('OpenAIService', 'Erro ao chamar API da OpenAI para sugestão de resposta:', error);
+      if (error instanceof OpenAI.APIError) {
+        throw new Error(`Erro da API OpenAI: ${error.status} ${error.name} ${error.message}`);
+      }
+      throw new Error('Falha ao gerar sugestão de resposta.');
     }
   }
-}
-
-// Instância singleton do serviço
-export const openaiService = new OpenAIService();
-
+};

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -7,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
+import { useSupabaseAvatar } from "@/hooks/useSupabaseAvatar";
 
 interface MobileSidebarFooterProps {
   isDarkMode: boolean;
@@ -20,9 +20,17 @@ export const MobileSidebarFooter: React.FC<MobileSidebarFooterProps> = ({
   onUserClick
 }) => {
   const { user, logout } = useAuth();
+  const { getAvatarUrl } = useSupabaseAvatar();
   const { getProfile } = useUserProfile();
   const { theme } = useTheme();
+  const [avatarUrl, setAvatarUrl] = React.useState<string|null>(null);
   
+  React.useEffect(() => {
+    if (user?.id) {
+      getAvatarUrl().then((url) => setAvatarUrl(url || null));
+    }
+  }, [user?.id, getAvatarUrl]);
+
   const profile = getProfile();
 
   // Usar o tema real do ThemeProvider
@@ -56,7 +64,7 @@ export const MobileSidebarFooter: React.FC<MobileSidebarFooterProps> = ({
         className="w-full flex items-center space-x-3 px-3 py-3 rounded-md transition-colors cursor-pointer mobile-touch interactive-animate bg-accent hover:bg-accent/80"
       >
         <Avatar className="w-10 h-10">
-          <AvatarImage src={profile?.profileImage || undefined} alt={user?.name} />
+          <AvatarImage src={avatarUrl || profile?.profileImage || undefined} alt={user?.name} />
           <AvatarFallback className="bg-primary text-primary-foreground">
             {user?.name ? getInitials(user.name) : <User size={20} />}
           </AvatarFallback>

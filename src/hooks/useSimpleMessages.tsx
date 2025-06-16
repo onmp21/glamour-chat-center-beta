@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface SimpleMessage {
@@ -77,6 +76,15 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       if (rawData && rawData.length > 0) {
         console.log(`📋 [SIMPLE_MESSAGES] Primeira mensagem exemplo:`, rawData[0]);
       }
+
+      // [💡 ADICIONADO]: debug para checagem dos nome_do_contato
+      if (rawData && rawData.length > 0) {
+        rawData.forEach((m: any, idx: number) => {
+          if (!m.nome_do_contato) {
+            console.warn('⚠️ [SIMPLE_MESSAGES] Mensagem sem nome_do_contato - índice:', idx, m);
+          }
+        });
+      }
       
       const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
         id: row.id?.toString() || '',
@@ -100,6 +108,49 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let realtimeChannel: any = null;
+
+    if (channelId && sessionId && isAuthenticated) {
+      loadMessages();
+      const tableName = getTableName(channelId);
+
+      realtimeChannel = supabase
+        .channel(`public:${tableName}:${sessionId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: tableName, filter: `session_id=eq.${sessionId}` },
+          (payload) => {
+            if (payload && payload.new) {
+              const novo = payload.new;
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === (novo.id?.toString() || ''))) return prev;
+                return [...prev, {
+                  id: novo.id?.toString() || '',
+                  session_id: novo.session_id || '',
+                  message: novo.message || '',
+                  read_at: novo.read_at || new Date().toISOString(),
+                  tipo_remetente: novo.tipo_remetente,
+                  nome_do_contato: novo.nome_do_contato,
+                  mensagemtype: novo.mensagemtype,
+                  media_base64: novo.media_base64
+                }];
+              });
+            }
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          }
+        });
+    }
+
+    return () => {
+      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+    };
+  }, [channelId, sessionId, isAuthenticated, user?.name]);
 
   useEffect(() => {
     console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado:`, {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { User, UserRole } from '@/types/auth';
 import { UserEditForm } from './user-edit/UserEditForm';
 import { RoleSelector, rolePermissions } from './user-edit/RoleSelector';
-import { CityAssignments } from './user-edit/CityAssignments';
+import { ChannelAssignments } from './user-edit/ChannelAssignments';
 import { TabAssignments } from './user-edit/TabAssignments';
 
 interface UserEditModalProps {
@@ -30,7 +29,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     name: '',
     role: '' as UserRole,
     assignedTabs: [] as string[],
-    assignedCities: [] as string[]
+    assignedChannels: [] as string[] // <-- agora canais
   });
 
   useEffect(() => {
@@ -41,7 +40,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         name: user.name,
         role: user.role,
         assignedTabs: user.assignedTabs || [],
-        assignedCities: user.assignedCities || []
+        assignedChannels: user.assignedChannels || []
       });
     }
   }, [user]);
@@ -70,12 +69,12 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
     }));
   };
 
-  const handleCityToggle = (cityName: string) => {
+  const handleChannelToggle = (channelId: string) => {
     setFormData(prev => ({
       ...prev,
-      assignedCities: prev.assignedCities.includes(cityName)
-        ? prev.assignedCities.filter(city => city !== cityName)
-        : [...prev.assignedCities, cityName]
+      assignedChannels: prev.assignedChannels.includes(channelId)
+        ? prev.assignedChannels.filter(c => c !== channelId)
+        : [...prev.assignedChannels, channelId]
     }));
   };
 
@@ -86,14 +85,11 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
         name: formData.name,
         role: formData.role,
         assignedTabs: formData.assignedTabs,
-        assignedCities: formData.assignedCities
+        assignedChannels: formData.assignedChannels
       };
-      
-      // Só incluir senha se foi fornecida
       if (formData.password && formData.password.trim()) {
         updateData.password = formData.password;
       }
-      
       onUpdateUser(user.id, updateData);
       onClose();
     }
@@ -114,7 +110,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
             Editar Usuário
           </DialogTitle>
         </DialogHeader>
-        
         <div className="space-y-4">
           <UserEditForm
             formData={{
@@ -125,19 +120,16 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
             onChange={handleFormChange}
             isDarkMode={isDarkMode}
           />
-
           <RoleSelector
             selectedRole={formData.role}
             onRoleChange={handleRoleChange}
             isDarkMode={isDarkMode}
           />
-
-          <CityAssignments
-            assignedCities={formData.assignedCities}
-            onCityToggle={handleCityToggle}
+          <ChannelAssignments
+            assignedChannels={formData.assignedChannels}
+            onChannelToggle={handleChannelToggle}
             isDarkMode={isDarkMode}
           />
-
           <TabAssignments
             assignedTabs={formData.assignedTabs}
             userRole={formData.role}
@@ -145,12 +137,11 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
             isDarkMode={isDarkMode}
           />
         </div>
-
         <div className="flex justify-end space-x-2 pt-4">
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             style={{ backgroundColor: '#b5103c', color: 'white' }}
             className="hover:opacity-90"

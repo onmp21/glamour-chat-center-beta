@@ -27,7 +27,7 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
       'Souto Soares': 'souto-soares',
       'João Dourado': 'joao-dourado',
       'América Dourada': 'america-dourada',
-      'Gustavo Gerente das Lojas': 'gerente-lojas',
+      'Gerente das Lojas': 'gerente-lojas', // CORRETO
       'Andressa Gerente Externo': 'gerente-externo'
     };
     return nameToId[channel.name] || channel.id;
@@ -36,8 +36,8 @@ export const ChannelsSection: React.FC<ChannelsSectionProps> = ({
   const getChannelDisplayName = (channelName: string) => {
     const nameMappings: Record<string, string> = {
       'Yelena-AI': 'Óticas Villa Glamour',
-      'Gerente das Lojas': 'Gustavo Gerente das Lojas',
-      'Gerente do Externo': 'Andressa Gerente Externo'
+      'Gerente das Lojas': 'Gustavo', // Mostra "Gustavo" para o usuário
+      'Andressa Gerente Externo': 'Andressa'
     };
     return nameMappings[channelName] || channelName;
   };

@@ -1,12 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AuthState, LoginCredentials, UserRole, AuthContextType } from '@/types/auth';
-<<<<<<< HEAD
-import { supabase } from "@/integrations/supabase/client.js";
-=======
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client.ts';
 
->>>>>>> 19c16077c5bade03675ba87810862df6673ed4f0
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,26 +34,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
     try {
       console.log('🔐 [AUTH_PROVIDER] Tentando login:', credentials.username);
-      
-      // Login demo para testes
-      if (credentials.username === 'demo' && credentials.password === 'demo') {
-        const user: User = {
-          id: 'demo-user',
-          username: 'demo',
-          name: 'Usuário Demonstração',
-          role: 'admin' as UserRole,
-          assignedTabs: [],
-          assignedCities: [],
-          createdAt: new Date().toISOString()
-        };
 
-        setAuthState({ user, isAuthenticated: true });
-        localStorage.setItem('villa_glamour_user', JSON.stringify(user));
-        console.log('✅ [AUTH_PROVIDER] Login demo realizado com sucesso');
-        return true;
-      }
-      
-      // Login via Supabase
+      // Novo: login via função que retorna assigned_tabs/assigned_channels
       const { data: userData, error: userError } = await supabase.rpc('verify_user_credentials', {
         input_username: credentials.username,
         input_password: credentials.password
@@ -73,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: userInfo.user_name,
           role: userInfo.user_role as UserRole,
           assignedTabs: userInfo.user_assigned_tabs || [],
-          assignedCities: userInfo.user_assigned_cities || [],
+          assignedChannels: userInfo.user_assigned_channels || [],
           createdAt: new Date().toISOString()
         };
 
@@ -85,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('❌ [AUTH_PROVIDER] Credenciais inválidas');
       return false;
-      
+
     } catch (error) {
       console.error('❌ [AUTH_PROVIDER] Erro durante login:', error);
       return false;

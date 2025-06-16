@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_prompts: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          prompt_content: string
+          prompt_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          prompt_content: string
+          prompt_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          prompt_content?: string
+          prompt_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_providers: {
         Row: {
           advanced_settings: Json | null
@@ -151,15 +184,7 @@ export type Database = {
           user_id?: string | null
           user_name?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       canarana_conversas: {
         Row: {
@@ -196,45 +221,6 @@ export type Database = {
           tipo_remetente?: string | null
         }
         Relationships: []
-      }
-      channel_api_mappings: {
-        Row: {
-          api_instance_id: string
-          channel_id: string
-          created_at: string
-          id: string
-          updated_at: string
-        }
-        Insert: {
-          api_instance_id: string
-          channel_id: string
-          created_at?: string
-          id?: string
-          updated_at?: string
-        }
-        Update: {
-          api_instance_id?: string
-          channel_id?: string
-          created_at?: string
-          id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "channel_api_mappings_api_instance_id_fkey"
-            columns: ["api_instance_id"]
-            isOneToOne: false
-            referencedRelation: "api_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "channel_api_mappings_channel_id_fkey"
-            columns: ["channel_id"]
-            isOneToOne: true
-            referencedRelation: "channels"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       channel_instance_mappings: {
         Row: {
@@ -604,40 +590,72 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
-          assigned_cities: string[] | null
-          assigned_tabs: string[] | null
+          assigned_channels: string[]
+          assigned_tabs: string[]
           created_at: string
           id: string
           is_active: boolean
           name: string
           password_hash: string
-          role: Database["public"]["Enums"]["user_role"]
+          role: string
           updated_at: string
           username: string
         }
         Insert: {
-          assigned_cities?: string[] | null
-          assigned_tabs?: string[] | null
+          assigned_channels?: string[]
+          assigned_tabs?: string[]
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
           password_hash: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role: string
           updated_at?: string
           username: string
         }
         Update: {
-          assigned_cities?: string[] | null
-          assigned_tabs?: string[] | null
+          assigned_channels?: string[]
+          assigned_tabs?: string[]
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           password_hash?: string
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: string
           updated_at?: string
           username?: string
         }
@@ -646,6 +664,7 @@ export type Database = {
       yelena_ai_conversas: {
         Row: {
           id: number
+          is_read: boolean | null
           media_base64: string | null
           mensagemtype: string | null
           message: string
@@ -656,6 +675,7 @@ export type Database = {
         }
         Insert: {
           id?: number
+          is_read?: boolean | null
           media_base64?: string | null
           mensagemtype?: string | null
           message: string
@@ -666,6 +686,7 @@ export type Database = {
         }
         Update: {
           id?: number
+          is_read?: boolean | null
           media_base64?: string | null
           mensagemtype?: string | null
           message?: string
@@ -705,9 +726,9 @@ export type Database = {
           p_username: string
           p_password: string
           p_name: string
-          p_role: Database["public"]["Enums"]["user_role"]
+          p_role: string
           p_assigned_tabs: string[]
-          p_assigned_cities: string[]
+          p_assigned_channels: string[]
         }
         Returns: string
       }
@@ -824,9 +845,9 @@ export type Database = {
           p_username?: string
           p_password?: string
           p_name?: string
-          p_role?: Database["public"]["Enums"]["user_role"]
+          p_role?: string
           p_assigned_tabs?: string[]
-          p_assigned_cities?: string[]
+          p_assigned_channels?: string[]
         }
         Returns: undefined
       }
@@ -860,9 +881,9 @@ export type Database = {
           user_id: string
           user_username: string
           user_name: string
-          user_role: Database["public"]["Enums"]["user_role"]
+          user_role: string
           user_assigned_tabs: string[]
-          user_assigned_cities: string[]
+          user_assigned_channels: string[]
         }[]
       }
     }

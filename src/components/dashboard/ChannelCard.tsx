@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -123,7 +122,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
                 togglePin(channelId);
               }}
               className={cn(
-                "opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md",
+                "p-1 rounded-md",
                 channelIsPinned && "opacity-100",
                 isDarkMode ? "hover:bg-zinc-700" : "hover:bg-gray-200"
               )}

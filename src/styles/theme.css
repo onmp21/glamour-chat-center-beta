@@ -1,4 +1,3 @@
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -42,45 +41,42 @@
   }
 
   .dark {
-    /* CORES PADRONIZADAS - TEMA ESCURO PROFISSIONAL */
-    --background: 240 1% 13%; /* #212122 - Fundo principal */
-    --foreground: 0 0% 100%; /* #ffffff - Texto principal */
+    /* NOVA PALETA DE CORES - TEMA ESCURO REVISTA 14/06/2025 */
+    --background: 240 11% 4%;           /* #09090b - Fundo principal */
+    --foreground: 0 0% 100%;            /* #ffffff - Texto principal */
 
-    --card: 240 1% 15%; /* #272728 - Cards */
-    --card-foreground: 0 0% 100%; /* #ffffff - Texto dos cards */
+    --card: 240 9% 10%;                 /* #18181b - Cards */
+    --card-foreground: 0 0% 100%;       /* #ffffff */
 
-    --popover: 240 1% 15%; /* #272728 */
-    --popover-foreground: 0 0% 100%;
+    --popover: 240 9% 10%;              /* igual --card */
 
-    --primary: 345 84% 39%; /* #b5103c - COR VERMELHA CORRETA */
+    --primary: 345 84% 39%;             /* #b5103c - Vermelho Marca */
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 1% 15%; /* #272728 - Cinza escuro para elementos secundários */
+    --secondary: 240 4% 16%;            /* #27272a - elementos secundários */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 1% 15%; /* #272728 - Elementos com menos destaque */
-    --muted-foreground: 0 0% 67%; /* #ababab - Texto menos destacado */
+    --muted: 240 4% 16%;                /* #27272a - elementos menos destaque */
+    --muted-foreground: 220 9% 66%;     /* #9ca3af - subtexto */
 
-    --accent: 240 1% 15%; /* #272728 - Elementos de destaque */
+    --accent: 240 4% 16%;               /* #27272a */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 270 2% 21%; /* #363537 - Bordas */
-    --input: 240 1% 15%; /* #272728 - Campos de input */
-    --ring: 345 84% 39%; /* #b5103c */
+    --border: 270 2% 21%;               /* #363537 */
+    --input: 240 9% 10%;                /* igual --card para inputs */
+    --ring: 345 84% 39%;                /* #b5103c */
     
-    /* SIDEBAR COM CORES PADRONIZADAS */
-    --sidebar-background: 240 1% 13%; /* #212122 - Mesmo fundo principal */
-    --sidebar-foreground: 0 0% 100%; /* #ffffff - Texto branco */
-    --sidebar-primary: 345 84% 39%; /* #b5103c */
+    /* SIDEBAR */
+    --sidebar-background: 240 11% 4%;   /* #09090b */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 345 84% 39%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 1% 15%; /* #272728 - Elementos destacados */
+    --sidebar-accent: 240 4% 16%;       /* #27272a */
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 270 2% 21%; /* #363537 - Bordas */
-    --sidebar-ring: 345 84% 39%; /* #b5103c */
+    --sidebar-border: 270 2% 21%;
+    --sidebar-ring: 345 84% 39%;
   }
 }
-
-

@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { SidebarUserProfileButton } from './sidebar/SidebarUserProfileButton';
 
 interface SidebarProps {
   activeSection: string;
@@ -54,6 +54,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const userProfile = user ? getProfileByUserId(user.id) : null;
 
+  useEffect(() => {
+    if (user) {
+      console.log("👤 [SIDEBAR] userProfile.avatar_url:", userProfile?.avatar_url, "| user:", user);
+    }
+  }, [user, userProfile?.avatar_url]);
+
+  // Navega para alterar credenciais ao clicar no avatar
+  const handleProfileClick = () => {
+    onSectionChange('credentials');
+  };
+
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: BarChart3 },
     { id: 'mensagens', label: 'Mensagens', icon: MessageSquare },
@@ -78,10 +89,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
-
-  const handleUserProfileClick = () => {
-    onSectionChange('settings');
   };
 
   return (
@@ -180,53 +187,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </nav>
 
-        {/* Footer com Avatar e Usuário */}
+        {/* --- NOVO FOOTER --- */}
         <div className="p-4 border-t border-inherit">
-          {/* Avatar quando recolhido */}
-          {isCollapsed && user && (
-            <div className="flex flex-col items-center space-y-3 mb-4">
-              <button onClick={handleUserProfileClick}>
-                <Avatar className="w-12 h-12 hover:ring-2 hover:ring-[#b5103c]/50 transition-all">
-                  <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
-                  <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
-            </div>
-          )}
+          <SidebarUserProfileButton
+            user={user}
+            avatarUrl={userProfile?.avatar_url}
+            isDarkMode={isDarkMode}
+            isCollapsed={isCollapsed}
+            onProfileClick={() => onSectionChange('credentials')}
+          />
 
-          {/* Avatar quando expandido */}
-          {!isCollapsed && user && (
-            <button
-              onClick={handleUserProfileClick}
-              className="w-full mb-4 p-3 rounded-xl bg-[#b5103c]/5 border border-[#b5103c]/20 hover:bg-[#b5103c]/10 hover:border-[#b5103c]/30 transition-all duration-200"
-            >
-              <div className="flex items-center space-x-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={userProfile?.avatar_url || undefined} alt={user.name} />
-                  <AvatarFallback className="bg-[#b5103c] text-white text-sm font-semibold">
-                    {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className={cn(
-                    "text-sm font-semibold truncate",
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  )}>
-                    {user.name}
-                  </p>
-                  <p className={cn(
-                    "text-xs truncate",
-                    isDarkMode ? "text-[#a1a1aa]" : "text-gray-600"
-                  )}>
-                    {user.role === 'admin' ? 'Administrador' : 'Usuário'}
-                  </p>
-                </div>
-              </div>
-            </button>
-          )}
-          
+          {/* Controles de tema e logout */}
           <div className={cn(
             "space-y-2", 
             isCollapsed ? "flex flex-col items-center space-y-3" : ""
@@ -264,6 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Button>
           </div>
         </div>
+        {/* --- FIM DO FOOTER --- */}
       </div>
 
       {/* Logout Confirmation Dialog */}

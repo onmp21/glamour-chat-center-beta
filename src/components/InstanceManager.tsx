@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2, Eye, EyeOff, Copy, QrCode } from 'lucide-react';
+import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2, Eye, EyeOff, Copy, QrCode, Webhook } from 'lucide-react';
 import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
+import { N8nMessagingService } from '@/services/N8nMessagingService';
 import { DeleteInstanceModal } from '@/components/modals/DeleteInstanceModal';
 
 interface InstanceManagerProps {
@@ -29,6 +30,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<{ instanceName: string; qrCode: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; instanceName: string }>({ isOpen: false, instanceName: '' });
+  const [webhookStatus, setWebhookStatus] = useState<{ [key: string]: boolean }>({});
 
   const loadInstances = async () => {
     if (!apiConfig.baseUrl || !apiConfig.apiKey) {
@@ -73,6 +75,30 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     }
   };
 
+  const validateN8nWebhook = async () => {
+    try {
+      const result = await N8nMessagingService.validateWebhook();
+      if (result.success) {
+        toast({
+          title: "Webhook N8N",
+          description: "Webhook N8N está funcionando corretamente",
+        });
+      } else {
+        toast({
+          title: "Erro no Webhook N8N",
+          description: result.error || "Webhook N8N não está acessível",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Erro ao validar webhook N8N",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
     if (apiConfig.baseUrl && apiConfig.apiKey) {
       loadInstances();
@@ -100,7 +126,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       case 'connecting':
         return 'Conectando';
       case 'qr':
-        return 'Aguardando QR';
+        return 'QR Code';
       case 'close':
         return 'Desconectado';
       default:
@@ -108,71 +134,45 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
     }
   };
 
-  const getStatusIcon = (state: string) => {
-    switch (state) {
-      case 'open':
-        return <Wifi size={16} className="text-green-500" />;
-      case 'connecting':
-      case 'qr':
-        return <Settings size={16} className="text-yellow-500 animate-spin" />;
-      case 'close':
-        return <WifiOff size={16} className="text-red-500" />;
-      default:
-        return <WifiOff size={16} className="text-gray-500" />;
-    }
-  };
-
-  const handleInstanceSelect = async (instanceName: string) => {
+  const handleInstanceSelect = (instanceName: string) => {
     setSelectedInstance(instanceName);
     onInstanceSelect?.(instanceName);
-    
-    // Configurar webhook automaticamente ao selecionar a instância
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado",
+      description: "Texto copiado para a área de transferência",
+    });
+  };
+
+  const generateQRCode = async (instanceName: string) => {
     try {
       const service = new EvolutionApiService({
         baseUrl: apiConfig.baseUrl,
         apiKey: apiConfig.apiKey,
-        instanceName: instanceName
+        instanceName
       });
+
+      const result = await service.getQRCodeForInstance();
       
-      // URL do webhook para onde os eventos serão enviados
-      const webhookUrl = `${window.location.protocol}//${window.location.hostname}:3000/webhook`;
-      
-      // Lista de eventos que queremos receber
-      const events = [
-        'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'CONNECTION_UPDATE',
-        'QRCODE_UPDATED',
-        'MESSAGES_SET',
-        'CONTACTS_UPSERT',
-        'CHATS_UPSERT'
-      ];
-      
-      console.log('🔗 [INSTANCE_MANAGER] Configurando webhook automaticamente:', webhookUrl);
-      
-      const result = await service.setWebhook(webhookUrl, events, instanceName);
-      
-      if (result.success) {
-        toast({
-          title: "Webhook configurado",
-          description: `Webhook configurado automaticamente para a instância ${instanceName}`,
-        });
+      if (result.success && result.qrCode) {
+        setQrCodeModal({ instanceName, qrCode: result.qrCode });
       } else {
-        throw new Error(result.error || 'Erro ao configurar webhook');
+        toast({
+          title: "Erro",
+          description: result.error || "Erro ao gerar QR Code",
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('❌ [INSTANCE_MANAGER] Erro ao configurar webhook:', error);
       toast({
-        title: "Aviso",
-        description: `A instância foi selecionada, mas houve um erro ao configurar o webhook: ${error}`,
+        title: "Erro",
+        description: "Erro ao gerar QR Code",
         variant: "destructive"
       });
     }
-    
-    toast({
-      title: "Instância selecionada",
-      description: `Instância ${instanceName} foi selecionada para este canal`,
-    });
   };
 
   const deleteInstance = async (instanceName: string) => {
@@ -180,327 +180,245 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
       const service = new EvolutionApiService({
         baseUrl: apiConfig.baseUrl,
         apiKey: apiConfig.apiKey,
-        instanceName: instanceName
+        instanceName
       });
 
-      const result = await service.deleteInstance(instanceName);
+      const result = await service.deleteInstance();
       
       if (result.success) {
         toast({
-          title: "Instância deletada",
-          description: `Instância ${instanceName} foi deletada com sucesso`,
+          title: "Sucesso",
+          description: "Instância deletada com sucesso",
         });
-        
-        await loadInstances();
+        loadInstances(); // Recarregar lista
       } else {
-        throw new Error(result.error || 'Erro ao deletar instância');
+        toast({
+          title: "Erro",
+          description: result.error || "Erro ao deletar instância",
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('❌ [INSTANCE_MANAGER] Erro ao deletar:', error);
       toast({
         title: "Erro",
-        description: `Erro ao deletar instância: ${error}`,
+        description: "Erro ao deletar instância",
         variant: "destructive"
       });
     }
-  };
-
-  const handleDeleteClick = (instanceName: string) => {
-    setDeleteModal({ isOpen: true, instanceName });
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (deleteModal.instanceName) {
-      await deleteInstance(deleteModal.instanceName);
-      setDeleteModal({ isOpen: false, instanceName: '' });
-    }
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteModal({ isOpen: false, instanceName: '' });
-  };
-
-  const showQRCode = async (instanceName: string) => {
-    try {
-      const service = new EvolutionApiService({
-        baseUrl: apiConfig.baseUrl,
-        apiKey: apiConfig.apiKey,
-        instanceName: instanceName
-      });
-
-      const result = await service.getQRCodeForInstance(instanceName);
-      
-      if (result.success && result.qrCode) {
-        setQrCodeModal({ instanceName, qrCode: result.qrCode });
-      } else {
-        throw new Error(result.error || 'Erro ao obter QR Code');
-      }
-    } catch (error) {
-      console.error('❌ [INSTANCE_MANAGER] Erro ao obter QR Code:', error);
-      toast({
-        title: "Erro",
-        description: `Erro ao obter QR Code: ${error}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const copyApiKey = () => {
-    navigator.clipboard.writeText(apiConfig.apiKey);
-    toast({
-      title: "API Key copiada",
-      description: "A API Key foi copiada para a área de transferência",
-    });
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header com informações da API */}
+    <div className="space-y-6">
+      {/* Header com controles */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Gerenciador de Instâncias</h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Gerencie suas instâncias da Evolution API com webhooks N8N
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={validateN8nWebhook}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Webhook className="h-4 w-4" />
+            Validar N8N
+          </Button>
+          <Button
+            onClick={loadInstances}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Atualizar
+          </Button>
+        </div>
+      </div>
+
+      {/* Status do Webhook N8N */}
       <Card className={cn(
-        isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
+        "border-2",
+        isDarkMode ? "bg-[#18181b] border-gray-800" : "bg-white border-gray-200"
       )}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Configuração da Evolution API</CardTitle>
-              <CardDescription>
-                URL: {apiConfig.baseUrl || 'Não configurada'}
-              </CardDescription>
-            </div>
-            <Button
-              onClick={loadInstances}
-              disabled={loading}
-              variant="outline"
-              size="sm"
-            >
-              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-              Atualizar
-            </Button>
-          </div>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Webhook className="h-5 w-5 text-[#b5103c]" />
+            Status do Sistema N8N
+          </CardTitle>
+          <CardDescription>
+            Sistema de webhooks migrado para N8N para melhor performance
+          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">API Key:</span>
-            <code className={cn(
-              "px-2 py-1 rounded text-xs font-mono",
-              isDarkMode ? "bg-secondary" : "bg-gray-100"
-            )}>
-              {showApiKey ? apiConfig.apiKey : '••••••••••••••••'}
-            </code>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowApiKey(!showApiKey)}
-            >
-              {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={copyApiKey}
-            >
-              <Copy size={14} />
-            </Button>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+              ✅ Sistema N8N Ativo
+            </Badge>
+            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+              🔄 Webhooks Automáticos
+            </Badge>
+            <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+              📤 Envio Universal
+            </Badge>
           </div>
         </CardContent>
       </Card>
 
-      {/* Header da lista de instâncias */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Instâncias Disponíveis</h3>
-          <p className={cn(
-            "text-sm",
-            isDarkMode ? "text-muted-foreground" : "text-gray-600"
+      {/* Lista de instâncias */}
+      <div className="grid gap-4">
+        {instances.length === 0 && !loading ? (
+          <Card className={cn(
+            "text-center py-8",
+            isDarkMode ? "bg-[#18181b] border-gray-800" : "bg-white border-gray-200"
           )}>
-            Clique em uma instância para vinculá-la a este canal
-          </p>
-        </div>
-      </div>
-
-      {/* Lista de Instâncias em Cards */}
-      {instances.length === 0 ? (
-        <Card className={cn(
-          isDarkMode ? "bg-card border-border" : "bg-white border-gray-200"
-        )}>
-          <CardContent className="text-center py-8">
-            <div className="text-4xl mb-4">📱</div>
-            <h4 className="font-medium mb-2">Nenhuma instância encontrada</h4>
-            <p className={cn(
-              "text-sm mb-4",
-              isDarkMode ? "text-muted-foreground" : "text-gray-600"
-            )}>
-              {loading ? "Carregando instâncias..." : "Não há instâncias disponíveis na Evolution API"}
-            </p>
-            {!loading && (
-              <Button onClick={loadInstances} variant="outline">
-                <RefreshCw size={16} />
-                Tentar novamente
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {instances.map((instance) => (
+            <CardContent>
+              <p className="text-gray-500 dark:text-gray-400">
+                Nenhuma instância encontrada
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          instances.map((instance) => (
             <Card
               key={instance.instanceName}
               className={cn(
-                "transition-all duration-200 hover:shadow-lg cursor-pointer border-2",
-                isDarkMode ? "bg-card border-border hover:border-accent" : "bg-white border-gray-200 hover:border-gray-300",
-                selectedInstance === instance.instanceName && "ring-2 ring-primary border-primary"
+                "cursor-pointer transition-all hover:shadow-md",
+                selectedInstance === instance.instanceName && "ring-2 ring-[#b5103c]",
+                isDarkMode ? "bg-[#18181b] border-gray-800 hover:bg-[#27272a]" : "bg-white border-gray-200 hover:bg-gray-50"
               )}
               onClick={() => handleInstanceSelect(instance.instanceName)}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      {instance.connectionStatus === 'open' ? (
+                        <Wifi className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <WifiOff className="h-5 w-5 text-red-500" />
+                      )}
+                      {instance.instanceName}
+                    </CardTitle>
+                    <CardDescription>
+                      {instance.profileName || 'Sem nome de perfil'}
+                    </CardDescription>
+                  </div>
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(instance.status)}
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      getStatusColor(instance.status)
-                    )} />
+                    <Badge
+                      className={cn(
+                        "text-white",
+                        getStatusColor(instance.connectionStatus)
+                      )}
+                    >
+                      {getStatusText(instance.connectionStatus)}
+                    </Badge>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                      N8N
+                    </Badge>
                   </div>
-                  <Badge 
-                    variant="outline"
-                    className={cn(
-                      "text-xs",
-                      instance.status === 'open' && "border-green-500 text-green-600",
-                      instance.status === 'connecting' && "border-yellow-500 text-yellow-600",
-                      instance.status === 'close' && "border-destructive text-destructive"
-                    )}
-                  >
-                    {getStatusText(instance.status)}
-                  </Badge>
                 </div>
-                <CardTitle className="text-base truncate">
-                  {instance.instanceName}
-                </CardTitle>
-                {instance.profileName && (
-                  <CardDescription className="truncate">
-                    {instance.profileName}
-                  </CardDescription>
-                )}
               </CardHeader>
-              
-              <CardContent className="pt-0">
-                {instance.number && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs text-muted-foreground">Número:</span>
-                    <code className={cn(
-                      "text-xs px-1 py-0.5 rounded",
-                      isDarkMode ? "bg-secondary" : "bg-gray-100"
-                    )}>
-                      {instance.number}
-                    </code>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Servidor:</span>
+                      <p className="text-gray-600 dark:text-gray-400 truncate">
+                        {instance.serverUrl}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Integração:</span>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {instance.integration}
+                      </p>
+                    </div>
                   </div>
-                )}
-                
-                <div className="flex gap-2">
-                  {instance.status !== 'open' && (
+
+                  <div className="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          generateQRCode(instance.instanceName);
+                        }}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(instance.instanceName);
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <Button
-                      variant="outline"
                       size="sm"
+                      variant="destructive"
                       onClick={(e) => {
                         e.stopPropagation();
-                        showQRCode(instance.instanceName);
+                        setDeleteModal({ isOpen: true, instanceName: instance.instanceName });
                       }}
-                      className="flex-1"
                     >
-                      <QrCode size={14} />
-                      QR Code
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
-                  
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClick(instance.instanceName);
-                    }}
-                    className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 dark:hover:bg-destructive/20"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {/* Instância selecionada */}
-      {selectedInstance && (
-        <Card className={cn(
-          "border-primary bg-card dark:border-primary dark:bg-card"
-        )}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-primary rounded-full" />
-              <span className="text-sm font-medium">
-                Instância vinculada: {selectedInstance}
-              </span>
-            </div>
-            <p className="text-xs text-primary mt-1">
-              Esta instância será usada para enviar e receber mensagens neste canal
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Modal do QR Code */}
+      {/* Modal de QR Code */}
       {qrCodeModal && (
-        <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className={cn(
-            "p-6 rounded-lg shadow-lg max-w-md w-full mx-4",
-            isDarkMode ? "bg-card" : "bg-white"
+            "bg-white dark:bg-[#18181b] p-6 rounded-lg max-w-md w-full mx-4",
+            "border border-gray-200 dark:border-gray-800"
           )}>
-            <h3 className="text-lg font-medium mb-4 text-center">
-              Conectar {qrCodeModal.instanceName}
+            <h3 className="text-lg font-semibold mb-4">
+              QR Code - {qrCodeModal.instanceName}
             </h3>
-            
-            <div className="text-center">
-              <p className="mb-4 text-sm">
-                Escaneie o QR Code abaixo com o WhatsApp para conectar esta instância:
-              </p>
-              <div className="mb-4 flex justify-center">
-                <img 
-                  src={`data:image/png;base64,${qrCodeModal.qrCode}`} 
-                  alt="QR Code" 
-                  className="w-64 h-64 border rounded-lg"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setQrCodeModal(null)}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Fechar
-                </Button>
-                <Button
-                  onClick={() => showQRCode(qrCodeModal.instanceName)}
-                  variant="default"
-                  className="flex-1"
-                >
-                  <RefreshCw size={16} />
-                  Atualizar QR
-                </Button>
-              </div>
+            <div className="flex justify-center mb-4">
+              <img
+                src={`data:image/png;base64,${qrCodeModal.qrCode}`}
+                alt="QR Code"
+                className="max-w-full h-auto"
+              />
             </div>
+            <Button
+              onClick={() => setQrCodeModal(null)}
+              className="w-full"
+            >
+              Fechar
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* Modal de confirmação de exclusão */}
       <DeleteInstanceModal
         isOpen={deleteModal.isOpen}
-        onClose={handleDeleteCancel}
-        onConfirm={handleDeleteConfirm}
         instanceName={deleteModal.instanceName}
-        isDarkMode={isDarkMode}
+        onClose={() => setDeleteModal({ isOpen: false, instanceName: '' })}
+        onConfirm={() => {
+          deleteInstance(deleteModal.instanceName);
+          setDeleteModal({ isOpen: false, instanceName: '' });
+        }}
       />
     </div>
   );
 };
+

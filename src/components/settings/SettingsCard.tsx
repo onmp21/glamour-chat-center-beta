@@ -29,27 +29,27 @@ export const SettingsCard: React.FC<SettingsCardProps> = ({
       )}
       onClick={onClick}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
+      <CardContent className="p-6">
+        <div className="flex items-start gap-4">
           <div className={cn(
-            "p-2 rounded-lg flex-shrink-0",
+            "p-3 rounded-xl flex-shrink-0",
             isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
           )}>
-            <Icon size={20} className="text-[#b5103c]" />
+            <Icon size={24} className="text-[#b5103c]" />
           </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className={cn("font-medium text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className={cn("font-semibold text-base", isDarkMode ? "text-white" : "text-gray-900")}>
                 {title}
               </h3>
               {badge && (
-                <span className="bg-[#b5103c] text-white text-xs px-2 py-1 rounded-full">
+                <span className="bg-[#b5103c] text-white text-xs px-3 py-1 rounded-full font-bold">
                   {badge}
                 </span>
               )}
             </div>
-            <p className={cn("text-xs leading-relaxed", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+            <p className={cn("text-sm leading-relaxed", isDarkMode ? "text-gray-400" : "text-gray-600")}>
               {description}
             </p>
           </div>

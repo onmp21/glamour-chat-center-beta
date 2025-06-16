@@ -1,4 +1,5 @@
-import { supabase } from '@/integrations/supabase/client';
+
+import { supabase } from '@/integrations/supabase/client.ts';
 import { BaseRepository } from './BaseRepository';
 import { RawMessage } from '@/types/messages';
 import { TableName } from '@/utils/channelMapping';

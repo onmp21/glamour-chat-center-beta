@@ -1,8 +1,7 @@
-
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
-import { MediaRenderer } from './MediaRenderer';
+import { MediaRendererFixed } from './MediaRendererFixed';
 import { MediaMigrationService } from '@/services/MediaMigrationService';
 
 interface SimpleMessageHistoryProps {
@@ -11,6 +10,12 @@ interface SimpleMessageHistoryProps {
   isDarkMode: boolean;
   className?: string;
 }
+
+// ADICIONAR: função para truncar nome do cliente para 2 primeiros nomes
+const truncateName = (name: string = ''): string => {
+  const parts = (name || '').split(' ').filter(Boolean);
+  return parts.slice(0, 2).join(' ') || name || 'Cliente';
+};
 
 export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
   channelId,
@@ -21,12 +26,12 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
   const { messages, loading, error } = useSimpleMessages(channelId, conversationId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll para o final
+  // Scroll automático melhorado para sempre mostrar última mensagem nova
   useEffect(() => {
     if (messages.length > 0 && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages.length]);
 
   // Função melhorada para detectar se é mídia
   const isMediaMessage = (message: any) => {
@@ -122,7 +127,17 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
           const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai';
           const contactName = message.nome_do_contato || 'Cliente';
           const isMedia = isMediaMessage(message);
-          
+
+          // ADICIONAR: Formatar hora para HH:mm
+          const hora = new Date(message.read_at).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          // ADICIONAR: Truncar nome só nos balões
+          const nomeExibido = truncateName(contactName);
+
+          // ADICIONAR: Mostrar nome do canal no balão (mas só como informação, sem mexer layout)
           return (
             <div
               key={`${message.id}-${index}`}
@@ -144,11 +159,15 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                       : "bg-white text-gray-900 border border-gray-200"
                 )}>
                   {isMedia ? (
-                    <MediaRenderer 
+                    <MediaRendererFixed 
                       content={getMediaContent(message)}
                       messageType={message.mensagemtype || 'text'}
-                      messageId={message.id}
-                      channelId={channelId}
+                      messageId={message.id?.toString?.() || String(message.id)}
+                      fileName={
+                        (message.media_base64 && message.media_base64.startsWith('data:') ? 'Arquivo' 
+                          : (message.message && message.message.length < 60 ? message.message : undefined)
+                        ) || undefined
+                      }
                       isDarkMode={isDarkMode}
                       balloonColor={isAgent ? 'sent' : 'received'}
                     />
@@ -164,14 +183,15 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                   isAgent ? "flex-row-reverse space-x-reverse" : "flex-row",
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 )}>
+                  {/* Nome do canal aqui, sem alterar layout */}
+                  <span>
+                    {channelId === "chat" || channelId === "yelena_ai_conversas" ? "Yelena AI" : channelId}
+                  </span>
                   <span className="font-medium">
-                    {isAgent ? 'Agente' : contactName}
+                    {isAgent ? 'Agente' : nomeExibido}
                   </span>
                   <span>
-                    {new Date(message.read_at).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {hora}
                   </span>
                 </div>
               </div>

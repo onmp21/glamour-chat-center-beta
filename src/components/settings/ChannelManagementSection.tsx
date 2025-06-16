@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +16,7 @@ interface ChannelManagementSectionProps {
 }
 
 export const ChannelManagementSection: React.FC<ChannelManagementSectionProps> = ({ isDarkMode }) => {
-  const { channels, loading, updateChannelStatus } = useChannels();
+  const { channels, loading, updateChannelStatus, refetch } = useChannels();
   const { profiles, getProfileByUserId } = useUserProfiles();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'general' | 'store' | 'manager' | 'admin'>('all');
@@ -46,7 +45,12 @@ export const ChannelManagementSection: React.FC<ChannelManagementSectionProps> =
 
   const handleToggleChannel = async (channelId: string, isActive: boolean) => {
     try {
+      // Atualiza o canal no backend
       await updateChannelStatus(channelId, isActive);
+
+      // Refaz a consulta dos canais para garantir UI atualizada
+      await refetch();
+
       toast({
         title: 'Sucesso',
         description: `Canal ${isActive ? 'ativado' : 'desativado'} com sucesso.`

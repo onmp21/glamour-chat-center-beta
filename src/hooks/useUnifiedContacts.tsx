@@ -1,79 +1,38 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { OptimizedContactService, OptimizedContact } from '@/services/OptimizedContactService';
-
-interface ContactCache {
-  data: OptimizedContact[];
-  timestamp: number;
-  channelKey: string;
-}
-
-const CACHE_TTL = 60000; // 60 segundos
-const DEBOUNCE_DELAY = 300; // 300ms
 
 export const useUnifiedContacts = () => {
   const [contacts, setContacts] = useState<OptimizedContact[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [cache, setCache] = useState<ContactCache | null>(null);
   
   const { channels } = useChannels();
   const { getAccessibleChannels } = usePermissions();
+  const { user } = useAuth();
 
-  // Memoizar mapeamento de canais para evitar recálculos
-  const channelMapping = useMemo(() => ({
-    'Yelena-AI': 'chat',
-    'Canarana': 'canarana',
-    'Souto Soares': 'souto-soares',
-    'João Dourado': 'joao-dourado',
-    'América Dourada': 'america-dourada',
-    'Gustavo Gerente das Lojas': 'gerente-lojas',
-    'Andressa Gerente Externo': 'gerente-externo'
-  }), []);
-
-  // Memoizar canais ativos e acessíveis
-  const activeChannelIds = useMemo(() => {
-    const accessibleChannels = getAccessibleChannels();
-    const channelIds = channels
-      .filter(c => c.isActive)
-      .map(c => channelMapping[c.name as keyof typeof channelMapping])
-      .filter(id => id && accessibleChannels.includes(id));
+  // Mapeamento de canais para IDs do sistema
+  const getChannelMapping = () => {
+    const mapping: Record<string, string> = {
+      'Yelena-AI': 'chat',
+      'Canarana': 'canarana',
+      'Souto Soares': 'souto-soares',
+      'João Dourado': 'joao-dourado',
+      'América Dourada': 'america-dourada',
+      'Gustavo Gerente das Lojas': 'gerente-lojas',
+      'Andressa Gerente Externo': 'gerente-externo'
+    };
     
-    console.log('🔍 [UNIFIED_CONTACTS] Active channel IDs:', channelIds);
-    return channelIds;
-  }, [channels, getAccessibleChannels, channelMapping]);
+    return mapping;
+  };
 
-  // Criar chave de cache baseada nos canais ativos
-  const cacheKey = useMemo(() => {
-    return activeChannelIds.sort().join('-');
-  }, [activeChannelIds]);
-
-  // Verificar se o cache ainda é válido
-  const isCacheValid = useCallback(() => {
-    if (!cache) return false;
-    if (cache.channelKey !== cacheKey) return false;
-    return Date.now() - cache.timestamp < CACHE_TTL;
-  }, [cache, cacheKey]);
-
-  const loadContacts = useCallback(async (forceRefresh = false) => {
-    console.log('🚀 [UNIFIED_CONTACTS] Starting loadContacts', { 
-      forceRefresh, 
-      cacheValid: isCacheValid(),
-      activeChannels: activeChannelIds.length 
-    });
-    
-    // Verificar cache se não é refresh forçado
-    if (!forceRefresh && isCacheValid() && cache) {
-      console.log('✅ [UNIFIED_CONTACTS] Using cached data');
-      setContacts(cache.data);
-      return;
-    }
-
-    if (activeChannelIds.length === 0) {
-      console.log('⚠️ [UNIFIED_CONTACTS] No active channels');
+  const loadContacts = async () => {
+    if (!user || !user.name) {
+      console.log('⚠️ [UNIFIED_CONTACTS] Usuário não autenticado');
       setContacts([]);
       setLoading(false);
       return;
@@ -84,25 +43,42 @@ export const useUnifiedContacts = () => {
     setLoadingProgress(10);
     
     try {
+      const channelMapping = getChannelMapping();
+      let activeChannelIds: string[] = [];
+
+      if (user.role === 'admin') {
+        // Admin pode ver todos os canais ativos, exceto Pedro
+        activeChannelIds = channels
+          .filter(c => c.isActive && c.name && c.name.toLowerCase() !== 'pedro')
+          .map(c => channelMapping[c.name as keyof typeof channelMapping])
+          .filter(id => id);
+      } else {
+        // Usuário comum vê apenas canais acessíveis
+        const accessibleChannels = getAccessibleChannels();
+        activeChannelIds = channels
+          .filter(c => c.isActive && c.name && c.name.toLowerCase() !== 'pedro')
+          .map(c => channelMapping[c.name as keyof typeof channelMapping])
+          .filter(id => id && accessibleChannels.includes(id));
+      }
+
+      console.log('🔍 [UNIFIED_CONTACTS] Loading contacts for channels:', activeChannelIds);
+      
+      if (activeChannelIds.length === 0) {
+        console.log('⚠️ [UNIFIED_CONTACTS] Nenhum canal ativo encontrado');
+        setContacts([]);
+        setLoading(false);
+        return;
+      }
+
       setLoadingProgress(30);
       
-      // Usar o serviço otimizado
-      const optimizedContacts = await OptimizedContactService.getContactsForChannels(activeChannelIds);
+      const unifiedContacts = await OptimizedContactService.getContactsForChannels(activeChannelIds);
       
       setLoadingProgress(80);
-      
-      // Atualizar cache
-      const newCache: ContactCache = {
-        data: optimizedContacts,
-        timestamp: Date.now(),
-        channelKey: cacheKey
-      };
-      setCache(newCache);
-      
-      setContacts(optimizedContacts);
+      setContacts(unifiedContacts);
       setLoadingProgress(100);
       
-      console.log('✅ [UNIFIED_CONTACTS] Contacts loaded and cached:', optimizedContacts.length);
+      console.log(`✅ [UNIFIED_CONTACTS] Loaded ${unifiedContacts.length} unified contacts`);
       
     } catch (err) {
       console.error('❌ [UNIFIED_CONTACTS] Error loading contacts:', err);
@@ -112,35 +88,24 @@ export const useUnifiedContacts = () => {
       setLoading(false);
       setTimeout(() => setLoadingProgress(0), 500);
     }
-  }, [activeChannelIds, isCacheValid, cache, cacheKey]);
+  };
 
-  // Debounced load effect
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (activeChannelIds.length > 0) {
-        loadContacts();
-      } else {
-        setContacts([]);
-        setLoading(false);
-      }
-    }, DEBOUNCE_DELAY);
+    if (channels.length > 0) {
+      loadContacts();
+    }
+  }, [channels, user?.role, user?.name]);
 
-    return () => clearTimeout(timeoutId);
-  }, [activeChannelIds, loadContacts]);
-
-  const refetch = useCallback(() => {
-    console.log('🔄 [UNIFIED_CONTACTS] Manual refetch triggered');
+  const refetch = () => {
     OptimizedContactService.clearCache();
-    setCache(null);
-    loadContacts(true);
-  }, [loadContacts]);
+    loadContacts();
+  };
 
   return { 
     contacts, 
     loading, 
     error, 
     loadingProgress,
-    refetch,
-    hasChannels: activeChannelIds.length > 0
+    refetch
   };
 };

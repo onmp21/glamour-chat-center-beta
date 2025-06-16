@@ -78,6 +78,13 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     prompt_template: '',
     suggested_filters: ['channels', 'date_range', 'message_types', 'contact_names'],
     category: 'custom'
-  }
+  },
+  {
+    id: 'exams',
+    name: 'Análise de Exames',
+    description: 'Gera estatísticas e análises sobre os exames agendados e realizados.',
+    prompt_template: 'Analise os exames registrados, identificando padrões de agendamento, tipos de exames mais realizados, cidades atendidas e sugerindo melhorias para a operação.',
+    suggested_filters: ['date_range', 'city', 'exam_type'],
+    category: 'analytics'
+  },
 ];
-

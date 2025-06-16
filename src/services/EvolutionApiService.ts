@@ -1,4 +1,3 @@
-
 // Mantendo toda funcionalidade existente da API Evolution
 export interface EvolutionApiConfig {
   baseUrl: string;
@@ -41,12 +40,68 @@ export interface InstanceInfo {
 export class EvolutionApiService {
   private config: EvolutionApiConfig;
 
+  // Mapeamento dos Webhooks N8N por Canal
+  private static readonly N8N_WEBHOOK_MAPPINGS: { [key: string]: string } = {
+    "Yelena": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd1w13we",
+    "Canarana": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd21",
+    "Souto Soares": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd23",
+    "João Dourado": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd123",
+    "Gerente das Lojas": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd12345",
+    "Gerente do Externo": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd324",
+    "América Dourada": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd34",
+  };
+
   constructor(config: EvolutionApiConfig) {
     this.config = {
       ...config,
       baseUrl: config.baseUrl.replace(/\/$/, '') // Remove trailing slash
     };
   }
+
+  /**
+   * Configura o webhook para um canal específico na Evolution API.
+   */
+  setWebhookForChannel = async (channelName: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const webhookUrl = EvolutionApiService.N8N_WEBHOOK_MAPPINGS[channelName];
+      if (!webhookUrl) {
+        return { success: false, error: `Webhook URL não encontrado para o canal: ${channelName}` };
+      }
+
+      console.log(`🔗 [EVOLUTION_API] Configurando webhook para o canal ${channelName}: ${webhookUrl}`);
+
+      const url = `${this.config.baseUrl}/webhook/set/${this.config.instanceName}`;
+      const payload = {
+        webhookUrl: webhookUrl,
+        events: ["WEBHOOK_BASE64", "MESSAGES_UPSERT", "GROUPS_UPSERT"],
+        enabled: true,
+        webhookBase64: true // Habilitar WEBHOOK_BASE64
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', response.status, errorText);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log('✅ [EVOLUTION_API] Webhook configurado com sucesso:', result);
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  };
 
   /**
    * Envia uma mensagem de texto usando a API Evolution v2
@@ -135,32 +190,37 @@ export class EvolutionApiService {
    */
   sendMediaMessage = async (
     phoneNumber: string, 
-    mediaUrl: string, 
+    media: string, 
     caption: string = '', 
-    mediaType: 'image' | 'audio' | 'video' | 'document' = 'image'
+    mediaType: 'image' | 'audio' | 'video' | 'document',
+    mimetype: string = '', // agora explicitamente recebido ou derivado pelo chamador
+    fileName: string = ''  // agora explicitamente recebido ou derivado pelo chamador
   ): Promise<SendMessageResult> => {
     try {
       console.log('🎥 [EVOLUTION_API] Enviando mensagem de mídia:', {
         instanceName: this.config.instanceName,
         phoneNumber,
         mediaType,
-        captionLength: caption.length
+        captionLength: caption.length,
+        mimetype,
+        fileName
       });
 
       const url = `${this.config.baseUrl}/message/sendMedia/${this.config.instanceName}`;
       
-      // Formato correto conforme especificação
+      // Payload EXATO conforme documentação da Evolution API v2
       const payload = {
         number: phoneNumber,
-        mediaMessage: {
-          media: mediaUrl,
-          caption: caption,
-          mediatype: mediaType
-        }
+        mediatype: mediaType,
+        mimetype,
+        caption,
+        media,
+        fileName
+        // Campos extras opcionais (delay, linkPreview etc) podem ser adicionados se necessário
       };
 
       console.log('🎥 [EVOLUTION_API] URL:', url);
-      console.log('🎥 [EVOLUTION_API] Payload:', payload);
+      console.log('🎥 [EVOLUTION_API] Payload:', JSON.stringify(payload));
 
       const response = await fetch(url, {
         method: 'POST',
@@ -565,195 +625,72 @@ export class EvolutionApiService {
       const result = await response.json();
       console.log('📋 [EVOLUTION_API] Resultado:', result);
 
-      return Array.isArray(result) ? result : [];
+      if (result.status === 'error') {
+        console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', result.message);
+        return [];
+      }
+
+      return result.results || [];
 
     } catch (error) {
       console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', error);
       return [];
     }
-  }
+  };
 
   /**
-   * Valida a conexão com a API Evolution
+   * Obtém informações detalhadas de uma instância
    */
-  validateApi = async (): Promise<{ success: boolean; error?: string }> => {
-    try {
-      console.log('🔍 [EVOLUTION_API] Validando conexão com a API...');
-
-      const url = `${this.config.baseUrl}/instance/fetchInstances`;
-      console.log('🔍 [EVOLUTION_API] URL de validação:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': this.config.apiKey
-        }
-      });
-
-      console.log('🔍 [EVOLUTION_API] Status da resposta de validação:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro na validação:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-      console.log('✅ [EVOLUTION_API] API validada com sucesso:', result);
-
-      return {
-        success: true
-      };
-
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao validar API:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
-    }
-  }
-  
-  /**
-   * Lista todas as instâncias com informações detalhadas
-   */
-  listInstances = async (): Promise<{ success: boolean; instances?: InstanceInfo[]; error?: string }> => {
-    try {
-      console.log('📋 [EVOLUTION_API] Listando instâncias detalhadas...');
-
-      const url = `${this.config.baseUrl}/instance/fetchInstances`;
-      console.log('📋 [EVOLUTION_API] URL:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': this.config.apiKey
-        }
-      });
-
-      console.log('📋 [EVOLUTION_API] Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-      console.log('📋 [EVOLUTION_API] Resultado bruto:', result);
-
-      // Processar o resultado para extrair informações das instâncias
-      let instances: InstanceInfo[] = [];
-
-      if (Array.isArray(result)) {
-        instances = result.map(instance => {
-          // Debug: verificar estrutura dos dados
-          console.log('🔍 [DEBUG] Estrutura da instância:', JSON.stringify(instance, null, 2));
-          
-          // Verificar múltiplos campos para determinar o status real
-          const state = instance.instance?.state || instance.state || 'close';
-          const connectionStatus = instance.instance?.connectionStatus || instance.connectionStatus || 'close';
-          
-          // Priorizar connectionStatus se disponível, senão usar state
-          const finalStatus = connectionStatus !== 'close' ? connectionStatus : state;
-          
-          // Obter o nome da instância - verificar múltiplos campos possíveis
-          const instanceName = instance.instance?.instanceName || 
-                              instance.instanceName || 
-                              instance.name ||
-                              instance.instance?.name ||
-                              instance.instanceId ||
-                              instance.instance?.instanceId;
-          
-          console.log('🔍 [DEBUG] Nome extraído:', instanceName);
-          
-          return {
-            instanceName: instanceName || 'unknown',
-            status: finalStatus,
-            serverUrl: instance.instance?.serverUrl || instance.serverUrl || this.config.baseUrl,
-            apikey: instance.instance?.apikey || instance.apikey || this.config.apiKey,
-            owner: instance.instance?.owner || instance.owner || 'unknown',
-            profileName: instance.instance?.profileName || instance.profileName || '',
-            profilePictureUrl: instance.instance?.profilePictureUrl || instance.profilePictureUrl || '',
-            integration: instance.instance?.integration || instance.integration || 'WHATSAPP-BAILEYS',
-            number: instance.instance?.number || instance.number || '',
-            connectionStatus: finalStatus
-          };
-        }).filter(instance => {
-          // Filtrar apenas instâncias que realmente não têm nome válido
-          console.log('🔍 [DEBUG] Verificando instância:', instance.instanceName);
-          const hasValidName = instance.instanceName && 
-                              instance.instanceName.trim() !== '' && 
-                              instance.instanceName !== 'unknown' &&
-                              instance.instanceName.length > 2; // Nome deve ter pelo menos 3 caracteres
-          console.log('🔍 [DEBUG] Nome válido?', hasValidName, 'para:', instance.instanceName);
-          return hasValidName;
-        });
-      } else if (result.instance) {
-        // Caso seja uma única instância
-        const state = result.instance.state || 'close';
-        const connectionStatus = result.instance.connectionStatus || 'close';
-        const finalStatus = connectionStatus !== 'close' ? connectionStatus : state;
-        
-        instances = [{
-          instanceName: result.instance.instanceName || 'unknown',
-          status: finalStatus,
-          serverUrl: result.instance.serverUrl || this.config.baseUrl,
-          apikey: result.instance.apikey || this.config.apiKey,
-          owner: result.instance.owner || 'unknown',
-          profileName: result.instance.profileName || '',
-          profilePictureUrl: result.instance.profilePictureUrl || '',
-          integration: result.instance.integration || 'WHATSAPP-BAILEYS',
-          number: result.instance.number || '',
-          connectionStatus: finalStatus
-        }];
-      }
-
-      console.log('📋 [EVOLUTION_API] Instâncias processadas:', instances);
-
-      return {
-        success: true,
-        instances
-      };
-
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
-    }
-  }
-
-  /**
-   * Configura webhook para uma instância
-   */
-  setWebhook = async (webhookUrl: string, events: string[], instanceName?: string): Promise<{ success: boolean; error?: string }> => {
+  getInstanceInfo = async (instanceName?: string): Promise<InstanceInfo | null> => {
     try {
       const instance = instanceName || this.config.instanceName;
-      console.log('🔗 [EVOLUTION_API] Configurando webhook para instância:', instance);
-      console.log('🔗 [EVOLUTION_API] URL do webhook:', webhookUrl);
-      console.log('🔗 [EVOLUTION_API] Eventos:', events);
+      console.log('ℹ️ [EVOLUTION_API] Obtendo informações da instância:', instance);
+
+      const url = `${this.config.baseUrl}/instance/fetchInstances`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': this.config.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        console.error('❌ [EVOLUTION_API] Erro ao obter informações da instância:', response.status);
+        return null;
+      }
+
+      const result = await response.json();
+      console.log('ℹ️ [EVOLUTION_API] Resultado:', result);
+
+      if (result.status === 'error') {
+        console.error('❌ [EVOLUTION_API] Erro ao obter informações da instância:', result.message);
+        return null;
+      }
+
+      const instances: InstanceInfo[] = result.results || [];
+      const foundInstance = instances.find(inst => inst.instanceName === instance);
+
+      return foundInstance || null;
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao obter informações da instância:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Desabilita o webhook de uma instância
+   */
+  disableWebhook = async (instanceName?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const instance = instanceName || this.config.instanceName;
+      console.log('🚫 [EVOLUTION_API] Desabilitando webhook para:', instance);
 
       const url = `${this.config.baseUrl}/webhook/set/${instance}`;
-      console.log('🔗 [EVOLUTION_API] URL da API:', url);
-
       const payload = {
-        webhook: {
-          url: webhookUrl,
-          enabled: true,
-          events: events,
-          webhook_by_events: false
-        }
+        enabled: false
       };
-
-      console.log('🔗 [EVOLUTION_API] Payload:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(url, {
         method: 'POST',
@@ -764,76 +701,21 @@ export class EvolutionApiService {
         body: JSON.stringify(payload)
       });
 
-      console.log('🔗 [EVOLUTION_API] Status da resposta:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
+        console.error('❌ [EVOLUTION_API] Erro ao desabilitar webhook:', response.status, errorText);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
       }
 
       const result = await response.json();
-      console.log('🔗 [EVOLUTION_API] Resultado:', result);
-
-      return {
-        success: true
-      };
+      console.log('✅ [EVOLUTION_API] Webhook desabilitado com sucesso:', result);
+      return { success: true };
 
     } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
+      console.error('❌ [EVOLUTION_API] Erro ao desabilitar webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
     }
-  }
-
-  /**
-   * Obtém configuração do webhook de uma instância
-   */
-  getWebhook = async (instanceName?: string): Promise<{ success: boolean; webhook?: any; error?: string }> => {
-    try {
-      const instance = instanceName || this.config.instanceName;
-      console.log('📋 [EVOLUTION_API] Obtendo webhook da instância:', instance);
-
-      const url = `${this.config.baseUrl}/webhook/find/${instance}`;
-      console.log('📋 [EVOLUTION_API] URL:', url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': this.config.apiKey
-        }
-      });
-
-      console.log('📋 [EVOLUTION_API] Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro ao obter webhook:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-      console.log('📋 [EVOLUTION_API] Resultado:', result);
-
-      return {
-        success: true,
-        webhook: result
-      };
-
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao obter webhook:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
-    }
-  }
+  };
 }
+
+

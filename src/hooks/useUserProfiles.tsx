@@ -1,16 +1,14 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface UserProfile {
   id: string;
-  user_id: string;
   avatar_url: string | null;
   bio: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export const useUserProfiles = () => {
@@ -19,37 +17,38 @@ export const useUserProfiles = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const getProfileByUserId = (userId: string): UserProfile | null => {
+  const getProfileByUserId = useCallback((userId: string): UserProfile | null => {
     return profiles[userId] || null;
-  };
+  }, [profiles]);
 
-  const loadProfile = async (userId: string) => {
-    if (profiles[userId]) return profiles[userId];
-
+  // Carrega perfil real do Supabase pelo id
+  const loadProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
+    if (!userId) return null;
+    setLoading(true);
     try {
-      // Since user_profiles table doesn't exist, return mock data based on users table
-      const mockProfile: UserProfile = {
-        id: userId,
-        user_id: userId,
-        avatar_url: null,
-        bio: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-      setProfiles(prev => ({
-        ...prev,
-        [userId]: mockProfile
-      }));
-      
-      return mockProfile;
-    } catch (error) {
-      console.error('Error loading profile:', error);
+      if (error) {
+        console.error('Erro ao carregar perfil:', error);
+        return null;
+      }
+
+      if (data) {
+        setProfiles(prev => ({ ...prev, [userId]: data }));
+        return data as UserProfile;
+      }
       return null;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const uploadAvatar = async (file: File): Promise<string | null> => {
+  // Upload do avatar (usa bucket avatars)
+  const uploadAvatar = useCallback(async (file: File): Promise<string | null> => {
     if (!user) {
       toast({
         title: "Erro",
@@ -58,69 +57,64 @@ export const useUserProfiles = () => {
       });
       return null;
     }
-
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      
+      const ext = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${ext}`;
+      // 1. Upload arquivo no bucket
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // 2. Recupera URL pública
+      const { data: urlData } = supabase
+        .storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      return publicUrl;
+      return urlData?.publicUrl || null;
     } catch (error) {
-      console.error('Error uploading avatar:', error);
+      console.error('Erro ao fazer upload do avatar:', error);
       toast({
         title: "Erro",
-        description: "Erro ao fazer upload da imagem",
+        description: "Erro ao fazer upload do avatar",
         variant: "destructive"
       });
       return null;
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (!user) return null;
-
+  // Atualiza avatar_url e/ou bio no perfil
+  const updateProfile = useCallback(async (updates: Partial<Pick<UserProfile, "avatar_url" | "bio">>) => {
+    if (!user?.id) return null;
+    setLoading(true);
     try {
-      setLoading(true);
-
-      // Since we don't have user_profiles table, just update local state
-      const updatedProfile: UserProfile = {
+      // Build payload ensuring id is present and not optional
+      const payload: { id: string; avatar_url?: string | null; bio?: string | null; updated_at: string } = {
         id: user.id,
-        user_id: user.id,
-        avatar_url: updates.avatar_url || null,
-        bio: updates.bio || null,
-        created_at: new Date().toISOString(),
+        ...updates,
         updated_at: new Date().toISOString()
       };
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .upsert(payload, { onConflict: 'id' })
+        .select()
+        .maybeSingle();
 
-      setProfiles(prev => ({
-        ...prev,
-        [user.id]: updatedProfile
-      }));
+      if (error) throw error;
 
+      setProfiles(prev => ({ ...prev, [user.id]: data as UserProfile }));
       toast({
         title: "Sucesso",
         description: "Perfil atualizado com sucesso",
       });
-
-      return updatedProfile;
+      return data as UserProfile;
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Erro ao atualizar perfil:', error);
       toast({
         title: "Erro",
         description: "Erro ao atualizar perfil",
@@ -130,14 +124,33 @@ export const useUserProfiles = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
+
+  // Remove avatar no perfil
+  const removeAvatar = useCallback(async () => {
+    return await updateProfile({ avatar_url: null });
+  }, [updateProfile]);
+
+  // Atualiza bio
+  const updateBio = useCallback(async (bio: string) => {
+    return await updateProfile({ bio });
+  }, [updateProfile]);
+
+  // Carrega perfil do usuário autenticado (atalho)
+  const loadCurrentUserProfile = useCallback(async () => {
+    if (!user?.id) return null;
+    return await loadProfile(user.id);
+  }, [user?.id, loadProfile]);
 
   return {
     profiles,
     loading,
     getProfileByUserId,
     loadProfile,
+    loadCurrentUserProfile,
     uploadAvatar,
-    updateProfile
+    updateProfile,
+    updateBio,
+    removeAvatar,
   };
 };

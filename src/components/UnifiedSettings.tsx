@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,14 +17,47 @@ interface UnifiedSettingsProps {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   isMobile?: boolean;
+  initialSection?: string; // NOVO
 }
 
 export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   isDarkMode,
   toggleDarkMode,
-  isMobile = false
+  isMobile = false,
+  initialSection
 }) => {
   const [activeSection, setActiveSection] = useState<string>('main');
+
+  // Quando for inicializado, pular para a subseção se for passada
+  useEffect(() => {
+    // Só atualiza se inicializando e initialSection for válida
+    const SUBSECTIONS = [
+      'credentials',
+      'notifications',
+      'users',
+      'channels',
+      'audit',
+      'ai',
+      'evolution',
+      'system',
+      'backup',
+    ];
+    if (initialSection && SUBSECTIONS.includes(initialSection)) {
+      setActiveSection(initialSection);
+    }
+  // Só rodar na montagem ou se initialSection mudar
+  }, [initialSection]);
+
+  // Listagem das principais seções da aba configurações:
+  // 1. credentials: Alterar Credenciais
+  // 2. notifications: Configurações de Notificação
+  // 3. users: Gerenciamento de Usuários
+  // 4. channels: Gerenciar Canais
+  // 5. audit: Histórico de Auditoria
+  // 6. ai: Configurações de IA
+  // 7. evolution: API Evolution
+  // 8. system: Sistema
+  // 9. backup: Backup e Dados
 
   const handleBack = () => {
     if (activeSection === 'main') {
@@ -62,6 +94,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   const renderSection = () => {
     switch (activeSection) {
       case 'users':
+        // Use apenas o componente compacto padronizado (sem títulos internos)
         return <UserManagementCompact isDarkMode={isDarkMode} />;
       case 'audit':
         return <AuditHistoryCompact isDarkMode={isDarkMode} />;
@@ -85,40 +118,56 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   };
 
   return (
-    <div className={cn("h-full flex flex-col", isDarkMode ? "bg-background" : "bg-gray-50")}>
-      {/* Header - apenas quando não está na seção principal */}
-      <div className={cn("flex items-center gap-4 p-6 mb-6", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+    <div className={cn(
+      "h-full flex flex-col min-h-screen w-full",
+      isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+    )}>
+      {/* Header único */}
+      <div className={cn(
+        "flex items-center gap-4 p-6 mb-6 border-b",
+        isDarkMode ? "text-[#ffffff] border-[#18181b] bg-[#09090b]" : "text-gray-900 border-gray-200 bg-gray-50"
+      )}>
         {activeSection !== 'main' && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleBack} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleBack}
             className={cn(
-              "rounded-full", 
-              isDarkMode ? "text-muted-foreground hover:bg-accent" : "text-gray-600 hover:bg-gray-100"
+              "rounded-full",
+              isDarkMode ? "text-[#9ca3af] hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100"
             )}
           >
             <ArrowLeft size={20} />
           </Button>
         )}
-        
         <div className="flex items-center gap-4">
-          <div className="p-3 rounded-full bg-primary/10">
-            <Settings className="h-6 w-6 text-primary" />
+          <div className={cn(
+            "p-3 rounded-full",
+            isDarkMode ? "bg-[#27272a]" : "bg-[#b5103c]/10"
+          )}>
+            <Settings className="h-6 w-6 text-[#b5103c]" />
           </div>
           <div>
-            <h1 className={cn("text-3xl font-bold", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
+            <h1 className={cn(
+              "text-3xl font-bold",
+              isDarkMode ? "text-[#ffffff]" : "text-gray-900"
+            )}>
               {getSectionTitle()}
             </h1>
-            <p className={cn("text-lg", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+            <p className={cn(
+              "text-lg",
+              isDarkMode ? "text-[#9ca3af]" : "text-gray-600"
+            )}>
               {activeSection === 'main' ? 'Gerencie suas preferências e configurações do sistema' : 'Configure e personalize suas opções'}
             </p>
           </div>
         </div>
       </div>
-
       {/* Conteúdo principal */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className={cn(
+        "flex-1 overflow-y-auto px-6 pb-6",
+        isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
+      )}>
         {renderSection()}
       </div>
     </div>

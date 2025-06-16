@@ -1,10 +1,10 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { MessageSenderService } from '@/services/MessageSenderService';
 import { FileService } from '@/services/FileService';
 import { FileData, RawMessage } from '@/types/messageTypes';
 import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
+import { getContactDisplayName } from "@/utils/getContactDisplayName";
 
 export interface ExtendedMessageData {
   conversationId: string;
@@ -27,70 +27,49 @@ export const useMessageSenderExtended = () => {
   ): Promise<boolean> => {
     setSending(true);
     console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
-    
     try {
       let phoneNumber = messageData.conversationId;
-      console.log('[useMessageSenderExtended] conversationId original:', messageData.conversationId);
-      
       if (phoneNumber.includes("_")) {
         phoneNumber = phoneNumber.split("_")[0];
-        console.log('[useMessageSenderExtended] phoneNumber após extração:', phoneNumber);
       }
-
       const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
-      console.log('[useMessageSenderExtended] channelId processado para UUID:', processedChannelId);
 
       let resultMessage: RawMessage;
 
-      if (messageData.fileData) {
-        console.log('[useMessageSenderExtended] Detectado envio de mídia.');
-        const fileType = FileService.getFileType(messageData.fileData.mimeType);
-        console.log('[useMessageSenderExtended] Tipo de arquivo detectado:', fileType);
+      const senderType = messageData.sender;
+      const contactNameRefined = getContactDisplayName({
+        sender: senderType,
+        contactName: messageData.agentName
+      });
 
+      if (messageData.fileData) {
+        const fileType = FileService.getFileType(messageData.fileData.mimeType);
         let mediaContent = messageData.fileData.base64;
         if (!mediaContent.startsWith("data:")) {
           mediaContent = `data:${messageData.fileData.mimeType};base64,${mediaContent}`;
-          console.log('[useMessageSenderExtended] Adicionado prefixo data: ao base64.');
         }
-
         resultMessage = await messageSenderService.sendMediaMessage(
           processedChannelId || messageData.channelId,
           phoneNumber,
           mediaContent,
           messageData.content || messageData.fileData.fileName,
-          fileType as "image" | "audio" | "video" | "document"
+          fileType as "image" | "audio" | "video" | "document",
+          senderType,
+          messageData.agentName
         );
-        console.log('[useMessageSenderExtended] Resultado de sendMediaMessage:', resultMessage);
       } else {
-        console.log('[useMessageSenderExtended] Detectado envio de texto.');
         resultMessage = await messageSenderService.sendTextMessage(
           processedChannelId || messageData.channelId,
           phoneNumber,
-          messageData.content
+          messageData.content,
+          senderType,
+          messageData.agentName
         );
-        console.log('[useMessageSenderExtended] Resultado de sendTextMessage:', resultMessage);
       }
 
       if (addMessageToState && resultMessage) {
         addMessageToState(resultMessage);
-        console.log('[useMessageSenderExtended] Mensagem adicionada ao estado.');
       }
-
-      const messageType = messageData.messageType || "text";
-      const typeMessages: Record<string, string> = {
-        text: "Mensagem enviada",
-        file: "Arquivo enviado",
-        audio: "Áudio enviado",
-        image: "Imagem enviada",
-        video: "Vídeo enviado"
-      };
-
-      toast({
-        title: "Sucesso",
-        description: typeMessages[messageType] + " com sucesso",
-      });
-      console.log('[useMessageSenderExtended] Toast de sucesso exibido.');
-
       return true;
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);

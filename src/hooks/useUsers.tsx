@@ -1,59 +1,70 @@
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
 import { User, UserRole, DatabaseUser } from '@/types/auth';
 
 export const useUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('Carregando usuários...');
+      console.log('🔍 [useUsers] Carregando usuários da tabela users...');
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
+      console.log('🔍 [useUsers] Resposta do Supabase:', { data, error });
+
       if (error) {
-        console.error('Erro ao carregar usuários:', error);
+        console.error('❌ [useUsers] Erro ao carregar usuários:', error);
         return;
       }
 
-      console.log('Dados recebidos do Supabase:', data);
+      console.log('🔍 [useUsers] Dados brutos recebidos:', data);
+      console.log('🔍 [useUsers] Quantidade de usuários encontrados:', data?.length || 0);
 
-      const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => ({
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role as UserRole,
-        assignedTabs: user.assigned_tabs || [],
-        assignedCities: user.assigned_cities || [],
-        createdAt: user.created_at
-      }));
+      // Adaptado para nova estrutura: assigned_channels, assigned_tabs
+      const formattedUsers: User[] = (data as DatabaseUser[] || []).map(user => {
+        console.log('🔍 [useUsers] Formatando usuário:', user);
+        return {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role as UserRole,
+          assignedTabs: user.assigned_tabs || [],
+          assignedChannels: user.assigned_channels || [],
+          // assignedSettingsSections: user.assigned_settings_sections || [], // Not present in DB
+          createdAt: user.created_at
+        };
+      });
 
-      console.log('Usuários formatados:', formattedUsers);
+      console.log('🔍 [useUsers] Usuários formatados:', formattedUsers);
       setUsers(formattedUsers);
     } catch (error) {
-      console.error('Erro ao carregar usuários:', error);
+      console.error('❌ [useUsers] Erro inesperado ao carregar usuários:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
+  // Novo: cria usuário para nova estrutura (assigned_channels passa direto)
   const createUser = async (userData: {
     username: string;
     password: string;
     name: string;
     role: UserRole;
     assignedTabs: string[];
-    assignedCities: string[];
+    assignedChannels: string[];
+    // assignedSettingsSections?: string[]; // <-- Removido: não suportado pela API/backend
   }) => {
     try {
       console.log('Criando usuário:', userData);
@@ -63,7 +74,8 @@ export const useUsers = () => {
         p_name: userData.name,
         p_role: userData.role as any,
         p_assigned_tabs: userData.assignedTabs,
-        p_assigned_cities: userData.assignedCities
+        p_assigned_channels: userData.assignedChannels
+        // p_assigned_settings_sections: userData.assignedSettingsSections || [] // <-- Não suportado pela função
       });
 
       if (error) {
@@ -71,8 +83,6 @@ export const useUsers = () => {
         throw error;
       }
 
-      console.log('Usuário criado com sucesso:', data);
-      // Forçar recarregamento da lista
       await loadUsers();
       return data;
     } catch (error) {
@@ -81,11 +91,10 @@ export const useUsers = () => {
     }
   };
 
+  // Atualizar campo assignedChannels ao salvar usuário
   const updateUser = async (userId: string, userData: Partial<User & { password?: string }>) => {
     try {
       console.log('Atualizando usuário:', userId, userData);
-      
-      // Se uma senha foi fornecida, usar a função update_user_with_hash
       if (userData.password && userData.password.trim()) {
         const { error } = await supabase.rpc('update_user_with_hash', {
           p_user_id: userId,
@@ -94,7 +103,8 @@ export const useUsers = () => {
           p_name: userData.name || null,
           p_role: userData.role as any || null,
           p_assigned_tabs: userData.assignedTabs || null,
-          p_assigned_cities: userData.assignedCities || null
+          p_assigned_channels: userData.assignedChannels || null
+          // p_assigned_settings_sections: userData.assignedSettingsSections || null // <-- Não suportado pela função
         });
 
         if (error) {
@@ -102,14 +112,14 @@ export const useUsers = () => {
           throw error;
         }
       } else {
-        // Se não há senha, usar UPDATE normal (sem alterar password_hash)
         const updateData: any = {};
-        
+
         if (userData.username) updateData.username = userData.username;
         if (userData.name) updateData.name = userData.name;
         if (userData.role) updateData.role = userData.role;
         if (userData.assignedTabs) updateData.assigned_tabs = userData.assignedTabs;
-        if (userData.assignedCities) updateData.assigned_cities = userData.assignedCities;
+        if (userData.assignedChannels) updateData.assigned_channels = userData.assignedChannels;
+        // if (userData.assignedSettingsSections) updateData.assigned_settings_sections = userData.assignedSettingsSections; // <-- Não suportado pela tabela
 
         const { error } = await supabase
           .from('users')
@@ -122,8 +132,7 @@ export const useUsers = () => {
         }
       }
 
-      console.log('Usuário atualizado com sucesso');
-      await loadUsers(); // Recarregar lista
+      await loadUsers();
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
       throw error;
@@ -132,21 +141,17 @@ export const useUsers = () => {
 
   const deleteUser = async (userId: string) => {
     try {
-      console.log('Excluindo usuário:', userId);
       const { error } = await supabase
         .from('users')
         .update({ is_active: false })
         .eq('id', userId);
 
       if (error) {
-        console.error('Erro ao excluir usuário:', error);
         throw error;
       }
 
-      console.log('Usuário excluído com sucesso');
-      await loadUsers(); // Recarregar lista
+      await loadUsers();
     } catch (error) {
-      console.error('Erro ao excluir usuário:', error);
       throw error;
     }
   };
@@ -160,3 +165,4 @@ export const useUsers = () => {
     refreshUsers: loadUsers
   };
 };
+

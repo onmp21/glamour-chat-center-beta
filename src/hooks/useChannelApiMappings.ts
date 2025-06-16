@@ -1,17 +1,21 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface ChannelApiMapping {
+export interface ChannelInstanceMapping {
   id?: string;
   channel_id: string;
-  api_instance_id: string;
+  instance_id: string;
+  channel_name: string;
+  instance_name: string;
+  base_url: string;
+  api_key: string;
   created_at?: string;
   updated_at?: string;
+  is_active?: boolean;
 }
 
 export function useChannelApiMappings() {
-  const [mappings, setMappings] = useState<ChannelApiMapping[]>([]);
+  const [mappings, setMappings] = useState<ChannelInstanceMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +27,7 @@ export function useChannelApiMappings() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -32,50 +36,100 @@ export function useChannelApiMappings() {
       setMappings(data || []);
       setError(null);
     } catch (err) {
-      console.error('Error loading channel API mappings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load mappings');
+      console.error('Error loading channel instance mappings:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load instance mappings');
     } finally {
       setLoading(false);
     }
   };
 
-  const upsertMapping = async (channelId: string, apiInstanceId: string) => {
+  /**
+   * When upserting, fetch all required data columns beforehand.
+   */
+  const upsertMapping = async (channelId: string, instanceId: string) => {
     try {
+      // Get channel object with name
+      const { data: channelData, error: channelError } = await supabase
+        .from('channels')
+        .select('id, name')
+        .eq('id', channelId)
+        .maybeSingle();
+
+      if (channelError || !channelData) throw channelError || new Error("Canal não encontrado");
+
+      // Get instance object with all required fields
+      const { data: instanceData, error: instanceError } = await supabase
+        .from('api_instances')
+        .select('id, instance_name, base_url, api_key')
+        .eq('id', instanceId)
+        .maybeSingle();
+
+      if (instanceError || !instanceData) throw instanceError || new Error("Instância não encontrada");
+
       // First check if mapping exists
       const { data: existing } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .select('*')
         .eq('channel_id', channelId)
-        .single();
+        .maybeSingle();
 
+      const mappingPayload = {
+        channel_id: channelId,
+        channel_name: channelData.name,
+        instance_id: instanceId,
+        instance_name: instanceData.instance_name,
+        base_url: instanceData.base_url,
+        api_key: instanceData.api_key,
+        is_active: true,
+      };
+
+      let data, error;
       if (existing) {
-        // Update existing
-        const { data, error } = await supabase
-          .from('channel_api_mappings')
-          .update({ api_instance_id: apiInstanceId })
+        // Update existing (all columns for simplicity)
+        ({ data, error } = await supabase
+          .from('channel_instance_mappings')
+          .update(mappingPayload)
           .eq('channel_id', channelId)
           .select()
-          .single();
-
+          .maybeSingle());
         if (error) throw error;
-        
-        setMappings(prev => prev.map(m => m.channel_id === channelId ? data : m));
-        return data;
+        setMappings(prev => prev.map(m => m.channel_id === channelId ? { ...m, ...data } : m));
       } else {
-        // Create new
-        const { data, error } = await supabase
-          .from('channel_api_mappings')
-          .insert([{ channel_id: channelId, api_instance_id: apiInstanceId }])
+        // Insert full mapping row
+        ({ data, error } = await supabase
+          .from('channel_instance_mappings')
+          .insert([mappingPayload])
           .select()
-          .single();
-
+          .maybeSingle());
         if (error) throw error;
-
         setMappings(prev => [data, ...prev]);
-        return data;
       }
+
+      // Configurar webhook N8N automaticamente após criar/atualizar mapping
+      try {
+        console.log(`🔗 [CHANNEL_MAPPING] Configurando webhook N8N para canal: ${channelId}`);
+        
+        const { EvolutionApiService } = await import('@/services/EvolutionApiService');
+        const apiService = new EvolutionApiService({
+          baseUrl: instanceData.base_url,
+          apiKey: instanceData.api_key,
+          instanceName: instanceData.instance_name
+        });
+
+        const webhookResult = await apiService.setWebhookForChannel(channelData.name);
+        
+        if (webhookResult.success) {
+          console.log(`✅ [CHANNEL_MAPPING] Webhook N8N configurado com sucesso para canal: ${channelId}`);
+        } else {
+          console.error(`❌ [CHANNEL_MAPPING] Erro ao configurar webhook N8N:`, webhookResult.error);
+        }
+      } catch (webhookError) {
+        console.error('❌ [CHANNEL_MAPPING] Erro ao configurar webhook N8N:', webhookError);
+      }
+
+      return data;
     } catch (err) {
-      console.error('Error upserting mapping:', err);
+      console.error('Error upserting instance mapping:', err);
       throw err;
     }
   };
@@ -83,7 +137,7 @@ export function useChannelApiMappings() {
   const deleteMapping = async (channelId: string) => {
     try {
       const { error } = await supabase
-        .from('channel_api_mappings')
+        .from('channel_instance_mappings')
         .delete()
         .eq('channel_id', channelId);
 
@@ -91,7 +145,7 @@ export function useChannelApiMappings() {
 
       setMappings(prev => prev.filter(m => m.channel_id !== channelId));
     } catch (err) {
-      console.error('Error deleting mapping:', err);
+      console.error('Error deleting instance mapping:', err);
       throw err;
     }
   };

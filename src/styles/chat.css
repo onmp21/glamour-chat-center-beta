@@ -18,7 +18,7 @@
     overscroll-behavior: contain;
     overflow-anchor: none;
     position: relative;
-    background-image: url('/lovable-uploads/ea397861-5fcd-451b-872e-727208c03a67.png');
+    background-image: url('/lovable-uploads/d4a12cb9-e503-4df2-a74b-ee3f756b0647.png');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -33,7 +33,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(255, 255, 255, 0.40); /* Opacidade menor para aparecer melhor o fundo */
     pointer-events: none;
     z-index: 0;
   }
@@ -546,4 +546,3 @@
     background-color: rgba(181, 16, 60, 0.2);
   }
 }
-
