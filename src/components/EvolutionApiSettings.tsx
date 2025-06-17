@@ -425,8 +425,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         instanceName: selectedInstance.instanceName
       });
 
-      // Seta o webhook individual do canal
-      const webhookResult = await service.setWebhook(webhookUrl, events, selectedInstance.instanceName);
+      // Fix: Use webhook with events array properly
+      const webhookResult = await service.setWebhook(webhookUrl, events);
 
       if (webhookResult.success) {
         console.log('✅ [WEBHOOK] Webhook canal configurado:', webhookUrl);

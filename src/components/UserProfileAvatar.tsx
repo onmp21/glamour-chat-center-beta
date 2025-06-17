@@ -33,7 +33,7 @@ export const UserProfileAvatar: React.FC<UserProfileAvatarProps> = ({
   return (
     <Avatar className={`${sizeClasses[size]} ${className}`}>
       <AvatarImage 
-        src={user?.profile_picture_url || ''} 
+        src={user?.avatar_url || ''} 
         alt={user?.name || 'Usuário'} 
       />
       <AvatarFallback className="bg-[#b5103c] text-white">
