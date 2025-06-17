@@ -41,21 +41,36 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ [API_INSTANCES] Erro ao carregar:', error);
+        console.error('❌ [API_INSTANCES] Erro ao carregar instâncias:', error);
+        console.error('❌ [API_INSTANCES] Detalhes do erro:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
         toast({
           title: "Erro",
-          description: "Erro ao carregar instâncias da API",
+          description: "Erro ao carregar instâncias da API: " + error.message,
           variant: "destructive"
         });
         return;
       }
 
       console.log('✅ [API_INSTANCES] Instâncias carregadas:', data?.length || 0);
-      console.log('📊 [API_INSTANCES] Dados:', data);
+      console.log('📊 [API_INSTANCES] Dados completos:', JSON.stringify(data, null, 2));
+      
+      if (!data || data.length === 0) {
+        console.log('⚠️ [API_INSTANCES] Nenhuma instância encontrada na tabela api_instances');
+      }
       
       setInstances(data || []);
     } catch (error) {
-      console.error('❌ [API_INSTANCES] Erro inesperado:', error);
+      console.error('❌ [API_INSTANCES] Erro inesperado ao carregar:', error);
+      toast({
+        title: "Erro",
+        description: "Erro inesperado ao carregar instâncias",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
