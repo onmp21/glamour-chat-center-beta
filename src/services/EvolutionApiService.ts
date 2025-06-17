@@ -1,4 +1,8 @@
+
 // Mantendo toda funcionalidade existente da API Evolution
+import { supabase } from '@/integrations/supabase/client';
+import { N8nMessagingService } from './N8nMessagingService';
+
 export interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
@@ -127,11 +131,12 @@ export class EvolutionApiService {
   /**
    * Configura webhook genérico
    */
-  setWebhook = async (webhookUrl: string, events: string[]): Promise<{ success: boolean; error?: string }> => {
+  setWebhook = async (webhookUrl: string, events: string[], instanceName?: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      const instance = instanceName || this.config.instanceName;
       console.log('🔗 [EVOLUTION_API] Configurando webhook:', webhookUrl);
 
-      const url = `${this.config.baseUrl}/webhook/set/${this.config.instanceName}`;
+      const url = `${this.config.baseUrl}/webhook/set/${instance}`;
       const payload = {
         webhookUrl: webhookUrl,
         events: events,
