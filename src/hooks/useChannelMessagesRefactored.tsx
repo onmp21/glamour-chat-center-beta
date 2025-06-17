@@ -17,8 +17,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
     setError(null);
 
     try {
-      // Simular método getChannelMessages se não existir
-      const result = { success: true, messages: [], error: undefined }; // Placeholder para compatibilidade
+      const result = await evolutionService.getChannelMessages(channelId, conversationId);
       
       if (result.success && result.messages) {
         setMessages(result.messages);

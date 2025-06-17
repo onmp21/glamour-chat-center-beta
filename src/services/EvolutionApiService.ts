@@ -1,4 +1,3 @@
-
 // Mantendo toda funcionalidade existente da API Evolution
 import { supabase } from '@/integrations/supabase/client';
 import { N8nMessagingService } from './N8nMessagingService';
@@ -54,6 +53,9 @@ export class EvolutionApiService {
     "Gerente do Externo": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd324",
     "América Dourada": "https://n8n.estudioonmp.com/webhook/ff428473-8d5a-468a-885a-865ec1e474a2wwd34",
   };
+
+  // WEBHOOK UNIVERSAL PARA TODOS OS CANAIS
+  private static readonly UNIVERSAL_WEBHOOK = 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
 
   constructor(config: EvolutionApiConfig) {
     this.config = {
@@ -129,17 +131,20 @@ export class EvolutionApiService {
   };
 
   /**
-   * Configura webhook genérico
+   * Configura webhook universal para TODOS os canais
    */
-  setWebhook = async (webhookUrl: string, events: string[], instanceName?: string): Promise<{ success: boolean; error?: string }> => {
+  setWebhook = async (webhookUrl?: string, events?: string[]): Promise<{ success: boolean; error?: string }> => {
     try {
-      const instance = instanceName || this.config.instanceName;
-      console.log('🔗 [EVOLUTION_API] Configurando webhook:', webhookUrl);
+      // Usar webhook universal se não especificado
+      const finalWebhookUrl = webhookUrl || EvolutionApiService.UNIVERSAL_WEBHOOK;
+      const finalEvents = events || ["WEBHOOK_BASE64", "MESSAGES_UPSERT", "GROUPS_UPSERT"];
+      
+      console.log('🔗 [EVOLUTION_API] Configurando webhook universal:', finalWebhookUrl);
 
-      const url = `${this.config.baseUrl}/webhook/set/${instance}`;
+      const url = `${this.config.baseUrl}/webhook/set/${this.config.instanceName}`;
       const payload = {
-        webhookUrl: webhookUrl,
-        events: events,
+        webhookUrl: finalWebhookUrl,
+        events: finalEvents,
         enabled: true,
         webhookBase64: true
       };
@@ -160,7 +165,7 @@ export class EvolutionApiService {
       }
 
       const result = await response.json();
-      console.log('✅ [EVOLUTION_API] Webhook configurado com sucesso:', result);
+      console.log('✅ [EVOLUTION_API] Webhook universal configurado com sucesso:', result);
       return { success: true };
 
     } catch (error) {

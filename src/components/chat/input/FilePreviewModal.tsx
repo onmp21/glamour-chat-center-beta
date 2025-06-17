@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -5,7 +6,7 @@ import { X, Send, FileText, Image, Music, Video, Play, Pause } from 'lucide-reac
 import { FileData } from '@/types/messageTypes';
 
 interface FilePreviewModalProps {
-  fileData: any;
+  fileData: FileData;
   isDarkMode?: boolean;
   onSend: (caption?: string) => void;
   onCancel: () => void;
@@ -18,40 +19,117 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   onCancel
 }) => {
   const [caption, setCaption] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      await onSend(caption.trim() || undefined);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) return <Image size={24} />;
+    if (mimeType.startsWith('audio/')) return <Music size={24} />;
+    if (mimeType.startsWith('video/')) return <Video size={24} />;
+    return <FileText size={24} />;
+  };
+
+  const isImage = fileData.mimeType.startsWith('image/');
+  const isVideo = fileData.mimeType.startsWith('video/');
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex items-center justify-center", isDarkMode ? "bg-black/80" : "bg-black/40")}>
-      <div className={cn("rounded-lg shadow-lg w-full max-w-md p-6", isDarkMode ? "bg-[#18181b] text-white" : "bg-white")}>
-        <div className="mb-4">
-          <div className="font-semibold text-base">Pré-visualização do arquivo</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className={cn(
+        "rounded-lg shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto",
+        isDarkMode ? "bg-zinc-900 text-white" : "bg-white"
+      )}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-lg">Enviar Arquivo</h3>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            <X size={20} />
+          </Button>
         </div>
+
         <div className="mb-4">
-          <div className="bg-gray-100 text-gray-700 rounded p-3">
-            <span>{fileData?.name || "Arquivo"}</span>
-            <div className="text-xs mt-1">{fileData?.mimeType}</div>
-          </div>
+          {isImage ? (
+            <img
+              src={fileData.base64}
+              alt={fileData.fileName}
+              className="w-full max-h-64 object-contain rounded"
+            />
+          ) : isVideo ? (
+            <video
+              src={fileData.base64}
+              controls
+              className="w-full max-h-64 rounded"
+            />
+          ) : (
+            <div className={cn(
+              "flex items-center gap-3 p-4 rounded border",
+              isDarkMode ? "bg-zinc-800 border-zinc-700" : "bg-gray-50 border-gray-200"
+            )}>
+              <div className={cn(
+                "flex items-center justify-center w-12 h-12 rounded",
+                isDarkMode ? "bg-zinc-700 text-zinc-300" : "bg-gray-200 text-gray-600"
+              )}>
+                {getFileIcon(fileData.mimeType)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{fileData.fileName}</p>
+                <p className={cn(
+                  "text-sm",
+                  isDarkMode ? "text-zinc-400" : "text-gray-500"
+                )}>
+                  {fileData.mimeType}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
+
         <textarea
           placeholder="Adicionar uma legenda (opcional)..."
           value={caption}
           onChange={e => setCaption(e.target.value)}
-          className={cn("w-full mb-4 p-2 rounded border", isDarkMode ? "bg-[#18181b] border-zinc-700 text-white" : "bg-white border-gray-300 text-gray-900")}
-          rows={2}
+          className={cn(
+            "w-full mb-4 p-3 rounded border resize-none",
+            isDarkMode 
+              ? "bg-zinc-800 border-zinc-700 text-white placeholder-zinc-400" 
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+          )}
+          rows={3}
+          disabled={sending}
         />
+
         <div className="flex justify-end gap-2">
           <Button
             variant="outline"
-            className={isDarkMode ? "border-[#b5103c] text-white" : "border-[#b5103c] text-[#b5103c]"}
             onClick={onCancel}
+            disabled={sending}
+            className={isDarkMode ? "border-zinc-700 text-white hover:bg-zinc-800" : ""}
           >
             Cancelar
           </Button>
-          {/* Corrigir: garantir que chama corretamente a prop */}
           <Button
-            className="bg-[#b5103c] text-white"
-            onClick={() => onSend(caption)}
+            onClick={handleSend}
+            disabled={sending}
+            className="bg-[#b5103c] hover:bg-[#a00f36] text-white"
           >
-            Enviar
+            {sending ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Enviando...
+              </div>
+            ) : (
+              <>
+                <Send size={16} className="mr-2" />
+                Enviar
+              </>
+            )}
           </Button>
         </div>
       </div>

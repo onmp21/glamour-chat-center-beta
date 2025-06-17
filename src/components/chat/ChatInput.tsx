@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { YelenaChatInput } from './YelenaChatInput';
@@ -46,20 +47,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
   const [isLoadingSuggestion, setIsLoadingSuggestion] = useState(false);
 
-  // --- NEW: Use backend sender ---
   const { sendMessage, sending } = useMessageSenderExtended();
   const { user } = useAuth();
 
   const [message, setMessage] = useState('');
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [isSending, setIsSending] = useState(false); // NOVO
 
   const handleSendMessage = async (caption?: string) => {
-    if (isSending) return;
     if ((!message.trim() && !fileData) || sending || !user) return;
-    setIsSending(true);
-    // Build out full message data for sender
+
     const payload = {
       conversationId,
       channelId,
@@ -73,20 +70,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         : fileData.mimeType.startsWith('video')
         ? 'video'
         : fileData.mimeType === 'application/pdf' || fileData.mimeType.startsWith('application/')
-        ? 'file'
+        ? 'document'
         : 'text') as any : 'text' as any,
       fileData: fileData || undefined,
-      nome_do_contato: undefined // Nunca enviar para envio
     };
-    const ok = await sendMessage(payload, addMessageToState);
-    if (ok) {
+
+    const success = await sendMessage(payload, addMessageToState);
+    
+    if (success) {
+      // Limpar tudo após envio bem-sucedido
       setMessage('');
       setFileData(null);
       setShowFilePreview(false);
       setSuggestedReply(null);
-      if (onMessageSent) onMessageSent();
+      setError(null);
+      
+      if (onMessageSent) {
+        onMessageSent();
+      }
     }
-    setIsSending(false);
   };
 
   const handleEmojiSelect = (emoji: string) => {
