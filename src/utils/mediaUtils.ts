@@ -1,4 +1,17 @@
 
+export const extractPureBase64 = (mediaContent: string): string => {
+  if (!mediaContent) return '';
+  
+  // Se já é data URL, extrair apenas o base64
+  if (mediaContent.startsWith('data:')) {
+    const parts = mediaContent.split(',');
+    return parts.length > 1 ? parts[1] : '';
+  }
+  
+  // Se já é base64 puro, retornar como está
+  return mediaContent;
+};
+
 export const processMediaBase64 = (mediaBase64: string, messageType: string): string => {
   if (!mediaBase64) return '';
   
@@ -58,6 +71,26 @@ export const processMediaBase64 = (mediaBase64: string, messageType: string): st
   console.log('✅ [MEDIA_UTILS] Base64 processado com sucesso para N8N:', mimeType);
   
   return dataUrl;
+};
+
+export const getFileFormatFromMimeType = (mimeType: string): string => {
+  const mimeToFormat: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png', 
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/wav': 'wav',
+    'audio/ogg': 'ogg',
+    'video/mp4': 'mp4',
+    'video/webm': 'webm',
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx'
+  };
+  
+  return mimeToFormat[mimeType] || 'bin';
 };
 
 export const isValidBase64 = (str: string): boolean => {

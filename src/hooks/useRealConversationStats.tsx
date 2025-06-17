@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
-import { usePermissions } from '@/hooks/usePermissions';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { MessageService } from '@/services/MessageService';
 
@@ -34,17 +33,14 @@ export const useRealConversationStats = () => {
   const [loading, setLoading] = useState(true);
   const [lastActivity, setLastActivity] = useState<string | null>(null);
   const { channels } = useChannels();
-  const { getAccessibleChannels } = usePermissions();
   const { getConversationStatus } = useConversationStatusEnhanced();
 
-  const loadRealStats = async () => {
+  const loadGlobalStats = async () => {
     try {
       setLoading(true);
-      console.log('🔍 [REAL_STATS] Starting optimized conversation statistics calculation');
+      console.log('🌍 [GLOBAL_STATS] Starting global conversation statistics calculation');
       
-      const accessibleChannels = getAccessibleChannels();
-      console.log('🔐 [REAL_STATS] Accessible channels:', accessibleChannels);
-      
+      // Mapear TODOS os canais (sem filtro de permissão para estatísticas globais)
       const channelMapping = {
         'Yelena-AI': 'chat',
         'Canarana': 'canarana',
@@ -59,24 +55,22 @@ export const useRealConversationStats = () => {
       const allConversations: ConversationData[] = [];
       let mostRecentActivity: string | null = null;
 
-      console.log('🔄 [REAL_STATS] Processing channels with delay to avoid overwhelming database...');
+      console.log('🔄 [GLOBAL_STATS] Processing ALL channels for global statistics...');
 
-      // Processar canais sequencialmente com delay para evitar sobrecarga
+      // Processar todos os canais ativos (sem restrição de permissão)
       for (let i = 0; i < channels.length; i++) {
         const channel = channels[i];
-        if (!channel.isActive) continue;
+        if (!channel.isActive) {
+          console.log(`⏭️ [GLOBAL_STATS] Skipping inactive channel: ${channel.name}`);
+          continue;
+        }
 
         const channelId = channelMapping[channel.name as keyof typeof channelMapping];
         
-        console.log(`📊 [REAL_STATS] Processing channel ${i + 1}/${channels.length}: ${channel.name} -> ${channelId}`);
+        console.log(`📊 [GLOBAL_STATS] Processing channel ${i + 1}/${channels.length}: ${channel.name} -> ${channelId}`);
         
         if (!channelId) {
-          console.log(`⚠️ [REAL_STATS] Channel ${channel.name} not found in mapping, skipping`);
-          continue;
-        }
-        
-        if (!accessibleChannels.includes(channelId)) {
-          console.log(`🔒 [REAL_STATS] Channel ${channelId} not accessible, skipping`);
+          console.log(`⚠️ [GLOBAL_STATS] Channel ${channel.name} not found in mapping, skipping`);
           continue;
         }
 
@@ -84,14 +78,14 @@ export const useRealConversationStats = () => {
           const messageService = new MessageService(channelId);
           
           // Usar limite menor para conversas para evitar timeouts
-          const conversations = await messageService.getConversations(15);
+          const conversations = await messageService.getConversations(20);
           
-          console.log(`📈 [REAL_STATS] Channel ${channelId}: found ${conversations.length} conversations`);
+          console.log(`📈 [GLOBAL_STATS] Channel ${channelId}: found ${conversations.length} conversations`);
           
           // Processar conversas do canal atual
           conversations.forEach(conversation => {
             const phone = conversation.contact_phone;
-            console.log(`📞 [REAL_STATS] Processing conversation: ${phone} - ${conversation.contact_name} in channel ${channelId}`);
+            console.log(`📞 [GLOBAL_STATS] Processing conversation: ${phone} - ${conversation.contact_name} in channel ${channelId}`);
             
             const status = getConversationStatus(channelId, conversation.id);
             
@@ -115,28 +109,28 @@ export const useRealConversationStats = () => {
               status
             });
             
-            console.log(`✅ [REAL_STATS] Added conversation: ${uniqueConversationId} for ${phone} in ${channelId}`);
+            console.log(`✅ [GLOBAL_STATS] Added conversation: ${uniqueConversationId} for ${phone} in ${channelId}`);
           });
 
           // Delay entre canais para não sobrecarregar o banco
           if (i < channels.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
 
         } catch (error) {
-          console.error(`❌ [REAL_STATS] Error loading stats for channel ${channelId}:`, error);
+          console.error(`❌ [GLOBAL_STATS] Error loading stats for channel ${channelId}:`, error);
           // Continue with other channels instead of failing completely
         }
       }
 
-      // Calcular estatísticas finais baseadas em todas as conversas
+      // Calcular estatísticas finais baseadas em todas as conversas de todos os canais
       let pendingCount = 0;
       let inProgressCount = 0;
       let resolvedCount = 0;
       let unreadMessages = 0;
 
       allConversations.forEach((conv) => {
-        console.log(`📊 [REAL_STATS] Final processing for ${conv.id}: phone=${conv.phone}, status=${conv.status}, channel=${conv.channel}`);
+        console.log(`📊 [GLOBAL_STATS] Final processing for ${conv.id}: phone=${conv.phone}, status=${conv.status}, channel=${conv.channel}`);
         
         switch (conv.status) {
           case 'unread':
@@ -159,8 +153,8 @@ export const useRealConversationStats = () => {
 
       const totalConversations = allConversations.length;
 
-      console.log('📊 [REAL_STATS] Final count summary:');
-      console.log(`  🔢 Total conversations across all channels: ${totalConversations}`);
+      console.log('🌍 [GLOBAL_STATS] Global count summary:');
+      console.log(`  🔢 Total conversations across ALL channels: ${totalConversations}`);
       console.log(`  ⏳ Pending: ${pendingCount}`);
       console.log(`  🔄 In Progress: ${inProgressCount}`);
       console.log(`  ✅ Resolved: ${resolvedCount}`);
@@ -175,12 +169,12 @@ export const useRealConversationStats = () => {
         unreadMessages
       };
 
-      console.log('📊 [REAL_STATS] Final statistics:', finalStats);
+      console.log('🌍 [GLOBAL_STATS] Final global statistics:', finalStats);
       setStats(finalStats);
       setLastActivity(mostRecentActivity);
 
     } catch (error) {
-      console.error('❌ [REAL_STATS] Error loading real conversation statistics:', error);
+      console.error('❌ [GLOBAL_STATS] Error loading global conversation statistics:', error);
       // Set default stats on error to prevent UI issues
       setStats({
         total: 0,
@@ -196,10 +190,10 @@ export const useRealConversationStats = () => {
 
   useEffect(() => {
     if (channels.length > 0) {
-      loadRealStats();
+      loadGlobalStats();
       
-      // Auto refresh a cada 5 minutos (aumentado de 2 minutos)
-      const interval = setInterval(loadRealStats, 300000);
+      // Auto refresh a cada 5 minutos para estatísticas globais
+      const interval = setInterval(loadGlobalStats, 300000);
       return () => clearInterval(interval);
     }
   }, [channels]);
@@ -208,6 +202,6 @@ export const useRealConversationStats = () => {
     stats,
     loading,
     lastActivity,
-    refreshStats: loadRealStats
+    refreshStats: loadGlobalStats
   };
 };
