@@ -59,6 +59,145 @@ export class EvolutionApiService {
   }
 
   /**
+   * Lista todas as instâncias
+   */
+  listInstances = async (): Promise<{ success: boolean; instances?: InstanceInfo[]; error?: string }> => {
+    try {
+      console.log('📋 [EVOLUTION_API] Listando instâncias');
+
+      const url = `${this.config.baseUrl}/instance/fetchInstances`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': this.config.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', response.status, errorText);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log('📋 [EVOLUTION_API] Resultado:', result);
+
+      if (result.status === 'error') {
+        return { success: false, error: result.message || 'Erro ao listar instâncias' };
+      }
+
+      return { success: true, instances: result.results || [] };
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao listar instâncias:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  };
+
+  /**
+   * Valida a conexão com a API
+   */
+  validateApi = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log('🔍 [EVOLUTION_API] Validando API');
+
+      const url = `${this.config.baseUrl}/instance/fetchInstances`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': this.config.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao validar API:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  };
+
+  /**
+   * Configura webhook genérico
+   */
+  setWebhook = async (webhookUrl: string, events: string[]): Promise<{ success: boolean; error?: string }> => {
+    try {
+      console.log('🔗 [EVOLUTION_API] Configurando webhook:', webhookUrl);
+
+      const url = `${this.config.baseUrl}/webhook/set/${this.config.instanceName}`;
+      const payload = {
+        webhookUrl: webhookUrl,
+        events: events,
+        enabled: true,
+        webhookBase64: true
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': this.config.apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', response.status, errorText);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log('✅ [EVOLUTION_API] Webhook configurado com sucesso:', result);
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao configurar webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  };
+
+  /**
+   * Obtém configuração atual do webhook
+   */
+  getWebhook = async (): Promise<{ success: boolean; webhook?: any; error?: string }> => {
+    try {
+      console.log('🔍 [EVOLUTION_API] Obtendo webhook');
+
+      const url = `${this.config.baseUrl}/webhook/find/${this.config.instanceName}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': this.config.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [EVOLUTION_API] Erro ao obter webhook:', response.status, errorText);
+        return { success: false, error: `HTTP ${response.status}: ${errorText}` };
+      }
+
+      const result = await response.json();
+      console.log('🔍 [EVOLUTION_API] Webhook:', result);
+
+      return { success: true, webhook: result };
+
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API] Erro ao obter webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    }
+  };
+
+  /**
    * Configura o webhook para um canal específico na Evolution API.
    */
   setWebhookForChannel = async (channelName: string): Promise<{ success: boolean; error?: string }> => {
@@ -613,5 +752,3 @@ export class EvolutionApiService {
     }
   };
 }
-
-
