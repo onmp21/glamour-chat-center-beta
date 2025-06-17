@@ -41,9 +41,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       }
     }
     
-    // Truncar nome muito longo
-    if (name.length > 50) {
-      return name.substring(0, 47) + '...';
+    // Truncar nome muito longo - reduzindo limite para 30 caracteres
+    if (name.length > 30) {
+      return name.substring(0, 27) + '...';
     }
     
     return name;

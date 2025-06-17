@@ -21,7 +21,7 @@ export const MobileChatView: React.FC<MobileChatViewProps> = ({
   onBack,
   channelId,
 }) => {
-  const { addMessage } = useChannelMessagesRefactored(channelId || '', mobileConversationId || '');
+  const { addMessage } = useChannelMessagesRefactored(channelId || '');
 
   const conversationName = "Nome do Contato"; 
   const conversationPhone = mobileConversationId || "";

@@ -13,7 +13,7 @@ interface ProcessResult {
 export class MediaProcessor {
   static async processAsync(content: string, messageType?: string): Promise<ProcessResult> {
     try {
-      if (!content || content.length < 20) {
+      if (!content || content.length < 5) {
         return { isProcessed: false, error: 'Conteúdo muito pequeno' };
       }
 
@@ -54,7 +54,7 @@ export class MediaProcessor {
             mimeType: this.getMimeTypeFromUrl(uploadResult.url)
           }
         } else {
-          return { isProcessed: false, error: uploadResult.error || 'Erro ao enviar base64 ao storage' };
+          return { isProcessed: false, error: 'Erro ao enviar base64 ao storage' };
         }
       }
 
@@ -87,6 +87,41 @@ export class MediaProcessor {
     if (messageType && messageType !== 'text') {
       return messageType;
     }
+    
+    // Para URLs (completas ou relativas), detectar pelo nome do arquivo
+    if (content.startsWith('https://')) {
+      const extension = content.split('.').pop()?.toLowerCase();
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+        case 'png':
+        case 'gif':
+        case 'webp':
+          return 'image';
+        case 'mp3':
+        case 'ogg':
+        case 'wav':
+        case 'm4a':
+          return 'audio';
+        case 'mp4':
+        case 'avi':
+        case 'mov':
+        case 'webm':
+          return 'video';
+        case 'pdf':
+        case 'doc':
+        case 'docx':
+        case 'txt':
+          return 'document';
+        default:
+          // Se não tem extensão, tentar detectar pelo nome do arquivo
+          if (content.includes('audio') || content.includes('Audio')) return 'audio';
+          if (content.includes('video') || content.includes('Video')) return 'video';
+          if (content.includes('image') || content.includes('Image')) return 'image';
+          return 'document';
+      }
+    }
+    
     if (content.startsWith('data:')) {
       const mimeMatch = content.match(/data:([^;]+)/);
       if (mimeMatch) {
@@ -140,6 +175,9 @@ export class MediaProcessor {
       case 'video': return '🎥';
       case 'document': return '📄';
       default: return '📎';
+    }
+  }
+}eturn '📎';
     }
   }
 }

@@ -31,6 +31,12 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
     return msg.length > max ? msg.slice(0, max - 3) + "..." : msg;
   };
 
+  // Truncar nome do contato para não passar das margens do card
+  const truncateContactName = (name: string, max = 25) => {
+    if (!name) return 'Cliente';
+    return name.length > max ? name.slice(0, max - 3) + "..." : name;
+  };
+
   return (
     <Card
       key={conversation.id}
@@ -54,7 +60,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
               ? "text-red-600" 
               : (isDarkMode ? "text-white" : "text-gray-900")
           )}>
-            {conversation.contact_name}
+            {truncateContactName(conversation.contact_name)}
           </h4>
           {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (
             <Badge className="bg-[#b5103c] text-white text-xs ml-2">

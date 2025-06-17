@@ -1,99 +1,127 @@
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { MessageSenderService } from '@/services/MessageSenderService';
-import { FileService } from '@/services/FileService';
-import { FileData, RawMessage } from '@/types/messageTypes';
-import { ChannelApiMappingService } from '@/services/ChannelApiMappingService';
-import { getContactDisplayName } from "@/utils/getContactDisplayName";
 
-export interface ExtendedMessageData {
+import { useState } from 'react';
+import { toast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { RawMessage, FileData } from '@/types/messageTypes';
+import { N8nMessagingService } from '@/services/N8nMessagingService';
+import { supabase } from '@/integrations/supabase/client';
+
+interface MessagePayload {
   conversationId: string;
   channelId: string;
   content: string;
-  sender: 'customer' | 'agent';
+  sender: 'agent';
   agentName?: string;
-  messageType?: 'text' | 'file' | 'audio' | 'image' | 'video';
+  messageType: 'text' | 'image' | 'audio' | 'video' | 'document';
   fileData?: FileData;
 }
 
 export const useMessageSenderExtended = () => {
   const [sending, setSending] = useState(false);
-  const { toast } = useToast();
-  const messageSenderService = new MessageSenderService();
+  const { user } = useAuth();
 
   const sendMessage = async (
-    messageData: ExtendedMessageData, 
+    payload: MessagePayload,
     addMessageToState?: (message: RawMessage) => void
   ): Promise<boolean> => {
+    if (!user) {
+      console.error('❌ [MESSAGE_SENDER] Usuário não autenticado');
+      return false;
+    }
+
     setSending(true);
-    console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
+    
     try {
-      let phoneNumber = messageData.conversationId;
-      if (phoneNumber.includes("_")) {
-        phoneNumber = phoneNumber.split("_")[0];
+      console.log('📤 [MESSAGE_SENDER] Enviando mensagem via webhook universal:', payload);
+
+      // Buscar mapping do canal
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', payload.channelId)
+        .maybeSingle();
+
+      if (mappingError || !mapping) {
+        console.error('❌ [MESSAGE_SENDER] Mapping não encontrado para canal:', payload.channelId);
+        toast({
+          title: "Erro",
+          description: "Canal não configurado",
+          variant: "destructive"
+        });
+        return false;
       }
-      const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
 
-      let resultMessage: RawMessage;
+      // Preparar dados para o webhook universal
+      let result;
+      
+      if (payload.fileData) {
+        // Enviar mídia
+        result = await N8nMessagingService.sendMediaMessage(
+          mapping.channel_name,
+          mapping.instance_name,
+          payload.conversationId,
+          payload.fileData.base64,
+          payload.content,
+          payload.messageType as any,
+          payload.fileData.fileName
+        );
+      } else {
+        // Enviar texto
+        result = await N8nMessagingService.sendTextMessage(
+          mapping.channel_name,
+          mapping.instance_name,
+          payload.conversationId,
+          payload.content
+        );
+      }
 
-      const senderType = messageData.sender;
-      const contactNameRefined = getContactDisplayName({
-        sender: senderType,
-        contactName: messageData.agentName
-      });
-
-      if (messageData.fileData) {
-        const fileType = FileService.getFileType(messageData.fileData.mimeType);
-        let mediaContent = messageData.fileData.base64;
-        if (!mediaContent.startsWith("data:")) {
-          mediaContent = `data:${messageData.fileData.mimeType};base64,${mediaContent}`;
+      if (result.success) {
+        console.log('✅ [MESSAGE_SENDER] Mensagem enviada com sucesso via webhook universal');
+        
+        // Adicionar mensagem ao estado local (não salvar no Supabase)
+        if (addMessageToState) {
+          const localMessage: RawMessage = {
+            id: `temp_${Date.now()}`,
+            content: payload.content,
+            sender: 'agent',
+            timestamp: new Date().toISOString(),
+            conversation_id: payload.conversationId,
+            channel_id: payload.channelId,
+            agent_name: payload.agentName || user.name,
+            message_type: payload.messageType,
+            file_data: payload.fileData || null
+          };
+          
+          addMessageToState(localMessage);
         }
-        resultMessage = await messageSenderService.sendMediaMessage(
-          processedChannelId || messageData.channelId,
-          phoneNumber,
-          mediaContent,
-          messageData.content || messageData.fileData.fileName,
-          fileType as "image" | "audio" | "video" | "document",
-          senderType,
-          messageData.agentName
-        );
-      } else {
-        resultMessage = await messageSenderService.sendTextMessage(
-          processedChannelId || messageData.channelId,
-          phoneNumber,
-          messageData.content,
-          senderType,
-          messageData.agentName
-        );
-      }
 
-      if (addMessageToState && resultMessage) {
-        addMessageToState(resultMessage);
-      }
-      return true;
-    } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
-      if (error instanceof Error) {
-        console.error("Detalhes do erro:", error.message);
-        console.error("Pilha de chamadas (stack):", error.stack);
+        toast({
+          title: "Sucesso",
+          description: "Mensagem enviada com sucesso",
+        });
+        
+        return true;
       } else {
-        console.error("Erro desconhecido:", error);
+        console.error('❌ [MESSAGE_SENDER] Erro ao enviar mensagem:', result.error);
+        toast({
+          title: "Erro",
+          description: result.error || "Erro ao enviar mensagem",
+          variant: "destructive"
+        });
+        return false;
       }
+    } catch (error) {
+      console.error('❌ [MESSAGE_SENDER] Erro:', error);
       toast({
         title: "Erro",
-        description: "Erro ao enviar mensagem",
+        description: "Erro inesperado ao enviar mensagem",
         variant: "destructive"
       });
-      console.log('[useMessageSenderExtended] Toast de erro exibido.');
       return false;
     } finally {
       setSending(false);
-      console.log('[useMessageSenderExtended] Finalizando sendMessage. setSending(false).');
     }
   };
 
-  return {
-    sendMessage,
-    sending
-  };
+  return { sendMessage, sending };
 };

@@ -1,49 +1,89 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText, Download, Calendar, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ReportsProps {
   isDarkMode: boolean;
 }
 
-// Simple ReportService mock for now
-const ReportService = {
-  generateReport: async (query: string) => {
-    return {
-      id: Date.now().toString(),
-      title: 'Relatório Gerado',
-      content: `Relatório baseado na consulta: ${query}`,
-      created_at: new Date().toISOString()
-    };
-  },
-  getReportHistory: async () => {
-    return [];
-  }
-};
-
 export const Reports: React.FC<ReportsProps> = ({ isDarkMode }) => {
   const [query, setQuery] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      toast({
+        title: "Erro",
+        description: "Digite uma consulta para gerar o relatório",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setGenerating(true);
+    
     try {
-      const report = await ReportService.generateReport(query);
-      console.log('Report generated:', report);
+      console.log('🔄 [REPORTS] Gerando relatório com query:', query);
+      
+      // Buscar dados mockados para o relatório
+      const mockData = {
+        conversations: [],
+        channels: [],
+        query: query.trim()
+      };
+
+      // Chamar a função de geração de relatório
+      const { data, error } = await supabase.functions.invoke('generate-report', {
+        body: {
+          provider_id: 'default',
+          report_type: 'custom',
+          data: mockData,
+          custom_prompt: query.trim(),
+          filters: {}
+        }
+      });
+
+      if (error) {
+        console.error('❌ [REPORTS] Erro ao gerar relatório:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao gerar relatório: " + error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data?.report) {
+        console.log('✅ [REPORTS] Relatório gerado com sucesso');
+        setGeneratedReport(data.report);
+        toast({
+          title: "Sucesso",
+          description: "Relatório gerado com sucesso",
+        });
+      } else {
+        throw new Error('Nenhum relatório retornado');
+      }
     } catch (error) {
-      console.error('Error generating report:', error);
+      console.error('❌ [REPORTS] Erro ao gerar relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório",
+        variant: "destructive"
+      });
     } finally {
       setGenerating(false);
     }
   };
 
   return (
-    <div className={cn("h-full flex flex-col", isDarkMode ? "bg-[#212121]" : "bg-gray-50")}>
+    <div className={cn("h-full flex flex-col", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
       {/* Header alinhado à esquerda */}
-      <div className={cn("p-6", isDarkMode ? "bg-[#212121]" : "bg-gray-50")}>
+      <div className={cn("p-6", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
         <div className="flex items-center gap-4">
           <div className={cn("p-3 rounded-full", isDarkMode ? "bg-[#27272a]" : "bg-[#b5103c]/10")}>
             <TrendingUp size={32} className="text-[#b5103c]" strokeWidth={1.5} />
@@ -101,12 +141,45 @@ export const Reports: React.FC<ReportsProps> = ({ isDarkMode }) => {
             <Button 
               onClick={handleGenerate} 
               disabled={generating || !query.trim()}
-              className="bg-[#b5103c] hover:bg-[#940d31]"
+              className="bg-[#b5103c] hover:bg-[#940d31] text-white"
             >
-              {generating ? 'Gerando...' : 'Gerar Relatório'}
+              {generating ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Gerando...
+                </div>
+              ) : (
+                'Gerar Relatório'
+              )}
             </Button>
           </div>
         </div>
+        
+        {/* Relatório Gerado */}
+        {generatedReport && (
+          <div className={cn(
+            "rounded-lg border p-6 mb-6",
+            isDarkMode ? "bg-[#18181b] border-[#27272a]" : "bg-white border-gray-200"
+          )}>
+            <h2 className={cn(
+              "text-xl font-semibold mb-4",
+              isDarkMode ? "text-white" : "text-gray-900"
+            )}>
+              Relatório Gerado
+            </h2>
+            <div className={cn(
+              "prose prose-sm max-w-none",
+              isDarkMode ? "prose-invert" : ""
+            )}>
+              <pre className={cn(
+                "whitespace-pre-wrap text-sm",
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              )}>
+                {generatedReport}
+              </pre>
+            </div>
+          </div>
+        )}
         
         <div className={cn(
           "rounded-lg border p-6",

@@ -287,15 +287,16 @@ export class MessageSenderService {
         instanceName: mapping.instance_name,
         phoneNumber: formattedNumber,
         mediaType,
-        fileName: `media_${Date.now()}.${fileExtension}`
+        fileName: `media_${Date.now()}.${fileExtension}`,
+        base64IsPure: !base64Content.includes('data:')
       });
 
-      // Enviar via N8N
+      // Enviar via N8N com base64 puro
       const result = await N8nMessagingService.sendMediaMessage(
         mapping.channel_name,
         mapping.instance_name,
         formattedNumber,
-        `data:${mimeType};base64,${base64Content}`,
+        base64Content, // Base64 puro (sem prefixo data:)
         caption || "",
         mediaType,
         `media_${Date.now()}.${fileExtension}`
@@ -361,4 +362,3 @@ export class MessageSenderService {
     }
   }
 }
-

@@ -94,29 +94,40 @@ export const RecentActivitiesSection: React.FC<RecentActivitiesSectionProps> = (
               const IconComponent = getActivityIcon(activity.type);
               
               return (
-                <div key={activity.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-red-50 transition-colors">
-                  <div className="p-2 rounded-full bg-[#b5103c]/10 text-[#b5103c]">
+                <div key={activity.id} className={cn(
+                  "flex items-start space-x-3 p-3 rounded-lg transition-colors",
+                  isDarkMode ? "hover:bg-[#27272a]" : "hover:bg-gray-50"
+                )}>
+                  <div className="p-2 rounded-full bg-[#b5103c]/10 text-[#b5103c] flex-shrink-0">
                     <IconComponent size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className={cn(
+                        "text-sm font-medium truncate",
+                        isDarkMode ? "text-white" : "text-gray-900"
+                      )}>
+                        {activity.title}
+                      </p>
+                      <span className={cn(
+                        "text-xs flex-shrink-0 ml-2",
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      )}>
+                        {activity.time}
+                      </span>
+                    </div>
                     <p className={cn(
-                      "text-sm font-medium truncate",
-                      isDarkMode ? "text-white" : "text-gray-900"
+                      "text-xs mb-1",
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
                     )}>
-                      {activity.title}
+                      {activity.description}
                     </p>
                     <p className={cn(
                       "text-xs truncate",
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                      isDarkMode ? "text-zinc-300" : "text-gray-600"
                     )}>
-                      {activity.description} • {activity.channelName}
+                      {activity.lastMessage}
                     </p>
-                  </div>
-                  <div className={cn(
-                    "text-xs flex-shrink-0",
-                    isDarkMode ? "text-gray-400" : "text-gray-500"
-                  )}>
-                    {activity.time}
                   </div>
                 </div>
               );

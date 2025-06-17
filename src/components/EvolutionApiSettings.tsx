@@ -85,20 +85,22 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
   const loadSavedApiConnection = () => {
     try {
-      const saved = localStorage.getItem('evolution_api_connection');
+      const saved = localStorage.getItem("evolution_api_connection");
       if (saved) {
         const connection = JSON.parse(saved);
-        console.log('📂 [EVOLUTION_API_SETTINGS] Conexão salva carregada:', connection);
+        console.log("📂 [EVOLUTION_API_SETTINGS] Conexão salva carregada:", connection);
         setApiConnection(connection);
         
         // Se já validado, carregar instâncias
         if (connection.isValidated) {
-          console.log('📂 [EVOLUTION_API_SETTINGS] Conexão validada, carregando instâncias...');
+          console.log("📂 [EVOLUTION_API_SETTINGS] Conexão validada, carregando instâncias...");
           loadInstances(connection.baseUrl, connection.apiKey);
         }
+      } else {
+        console.log("📂 [EVOLUTION_API_SETTINGS] Nenhuma conexão salva encontrada.");
       }
     } catch (error) {
-      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao carregar conexão:', error);
+      console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar conexão:", error);
     }
   };
 
@@ -133,18 +135,28 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
       
       const result = await service.listInstances();
-      console.log('📋 [EVOLUTION_API_SETTINGS] Resultado de listInstances:', result);
+      console.log("📋 [EVOLUTION_API_SETTINGS] Resultado de listInstances:", result);
       if (result.success && result.instances) {
-        console.log('✅ [EVOLUTION_API_SETTINGS] Instâncias carregadas:', result.instances);
+        console.log("✅ [EVOLUTION_API_SETTINGS] Instâncias carregadas:", result.instances);
         setApiConnection(prev => ({
           ...prev,
           instances: result.instances || []
         }));
       } else {
-        console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias, resultado:', result);
+        console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias, resultado:", result);
+        toast({
+          title: "Erro",
+          description: `Erro ao carregar instâncias: ${result.error || "Erro desconhecido"}`,
+          variant: "destructive"
+        });
       }
     } catch (error) {
-      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias:', error);
+      console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias:", error);
+      toast({
+        title: "Erro",
+        description: `Erro ao carregar instâncias: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -425,8 +437,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         instanceName: selectedInstance.instanceName
       });
 
-      // Seta o webhook individual do canal
-      const webhookResult = await service.setWebhook(webhookUrl, events, selectedInstance.instanceName);
+      // Fix: Use webhook with events array properly
+      const webhookResult = await service.setWebhook(webhookUrl, events);
 
       if (webhookResult.success) {
         console.log('✅ [WEBHOOK] Webhook canal configurado:', webhookUrl);

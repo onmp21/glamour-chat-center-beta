@@ -40,14 +40,15 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   };
 
   const loadMessages = async () => {
+    console.log("🐛 [SIMPLE_MESSAGES] loadMessages chamado com:", { channelId, sessionId, isAuthenticated, user: user?.name });
     if (!channelId || !sessionId) {
-      console.log('⚠️ [SIMPLE_MESSAGES] Parâmetros insuficientes:', { channelId, sessionId });
+      console.log("⚠️ [SIMPLE_MESSAGES] Parâmetros insuficientes para carregar mensagens:", { channelId, sessionId });
       setMessages([]);
       return;
     }
 
     if (!isAuthenticated) {
-      console.log('⚠️ [SIMPLE_MESSAGES] Usuário não autenticado');
+      console.log("⚠️ [SIMPLE_MESSAGES] Usuário não autenticado para carregar mensagens.");
       setMessages([]);
       return;
     }
@@ -61,12 +62,12 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select('id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64')
-        .eq('session_id', sessionId)
-        .order('read_at', { ascending: true });
+        .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64, media_url") // Adicionado media_url
+        .eq("session_id", sessionId)
+        .order("read_at", { ascending: true });
 
       if (queryError) {
-        console.error('❌ [SIMPLE_MESSAGES] Erro na query:', queryError);
+        console.error("❌ [SIMPLE_MESSAGES] Erro na query:", queryError);
         setError(queryError.message);
         return;
       }
@@ -77,32 +78,24 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         console.log(`📋 [SIMPLE_MESSAGES] Primeira mensagem exemplo:`, rawData[0]);
       }
 
-      // [💡 ADICIONADO]: debug para checagem dos nome_do_contato
-      if (rawData && rawData.length > 0) {
-        rawData.forEach((m: any, idx: number) => {
-          if (!m.nome_do_contato) {
-            console.warn('⚠️ [SIMPLE_MESSAGES] Mensagem sem nome_do_contato - índice:', idx, m);
-          }
-        });
-      }
-      
       const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
-        id: row.id?.toString() || '',
-        session_id: row.session_id || '',
-        message: row.message || '',
+        id: row.id?.toString() || "",
+        session_id: row.session_id || "",
+        message: row.message || "",
         read_at: row.read_at || new Date().toISOString(),
         tipo_remetente: row.tipo_remetente,
         nome_do_contato: row.nome_do_contato,
         mensagemtype: row.mensagemtype,
-        media_base64: row.media_base64
+        media_base64: row.media_base64,
+        media_url: row.media_url
       }));
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
       setMessages(processedMessages);
 
     } catch (err) {
-      console.error('❌ [SIMPLE_MESSAGES] Erro inesperado:', err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      console.error("❌ [SIMPLE_MESSAGES] Erro inesperado:", err);
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
       setMessages([]);
     } finally {
       setLoading(false);
@@ -113,7 +106,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     let realtimeChannel: any = null;
 
     if (channelId && sessionId && isAuthenticated) {
-      loadMessages();
+      loadMessages(); // Carrega as mensagens iniciais
       const tableName = getTableName(channelId);
 
       realtimeChannel = supabase
@@ -142,31 +135,23 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         )
         .subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
+            console.log(`✅ [SIMPLE_MESSAGES] Realtime subscription for ${tableName}:${sessionId} SUBSCRIBED`);
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error(`❌ [SIMPLE_MESSAGES] Realtime subscription error for ${tableName}:${sessionId}:`, err);
           }
         });
-    }
-
-    return () => {
-      if (realtimeChannel) supabase.removeChannel(realtimeChannel);
-    };
-  }, [channelId, sessionId, isAuthenticated, user?.name]);
-
-  useEffect(() => {
-    console.log(`🚀 [SIMPLE_MESSAGES] Effect acionado:`, {
-      channelId,
-      sessionId,
-      isAuthenticated,
-      user: user?.name
-    });
-    
-    if (isAuthenticated && channelId && sessionId) {
-      loadMessages();
     } else {
-      console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros necessários...');
+      console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros necessários para carregar mensagens ou autenticação...');
       setMessages([]);
       setError(null);
     }
+
+    return () => {
+      if (realtimeChannel) {
+        console.log(`🗑️ [SIMPLE_MESSAGES] Removendo canal realtime para ${tableName}:${sessionId}`);
+        supabase.removeChannel(realtimeChannel);
+      }
+    };
   }, [channelId, sessionId, isAuthenticated, user?.name]);
 
   return {
