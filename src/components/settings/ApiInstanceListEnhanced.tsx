@@ -19,12 +19,25 @@ interface ApiInstance {
   connection_status?: 'connected' | 'disconnected' | 'connecting';
 }
 
+interface EvolutionInstance {
+  instanceName: string;
+  instanceId: string;
+  owner?: string;
+  profileName?: string;
+  profilePictureUrl?: string;
+  profileStatus?: string;
+  status: string;
+  serverUrl: string;
+  apikey: string;
+}
+
 interface ApiInstanceListEnhancedProps {
   isDarkMode?: boolean;
 }
 
 export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = ({ isDarkMode = false }) => {
   const [instances, setInstances] = useState<ApiInstance[]>([]);
+  const [evolutionInstances, setEvolutionInstances] = useState<EvolutionInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; instance?: ApiInstance }>({ isOpen: false });
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; channelId?: string }>({ isOpen: false });
@@ -64,6 +77,9 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
       }
       
       setInstances(data || []);
+      
+      // Buscar instâncias do Evolution API
+      await fetchEvolutionInstances(data || []);
     } catch (error) {
       console.error('❌ [API_INSTANCES] Erro inesperado ao carregar:', error);
       toast({
@@ -73,6 +89,43 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvolutionInstances = async (apiInstances: ApiInstance[]) => {
+    console.log('🔄 [EVOLUTION_INSTANCES] Buscando instâncias do Evolution API...');
+    
+    for (const apiInstance of apiInstances) {
+      try {
+        console.log(`📡 [EVOLUTION_INSTANCES] Verificando instâncias para: ${apiInstance.base_url}`);
+        
+        const response = await fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
+          method: 'GET',
+          headers: {
+            'apikey': apiInstance.api_key,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${response.status} para ${apiInstance.base_url}`);
+          continue;
+        }
+
+        const data = await response.json();
+        console.log(`✅ [EVOLUTION_INSTANCES] Instâncias recebidas de ${apiInstance.base_url}:`, data);
+        
+        if (Array.isArray(data)) {
+          const formattedInstances = data.map((item: any) => ({
+            ...item.instance,
+            apiInstanceId: apiInstance.id
+          }));
+          
+          setEvolutionInstances(prev => [...prev, ...formattedInstances]);
+        }
+      } catch (error) {
+        console.error(`❌ [EVOLUTION_INSTANCES] Erro ao buscar instâncias de ${apiInstance.base_url}:`, error);
+      }
     }
   };
 
@@ -173,6 +226,71 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
         </Button>
       </div>
 
+      {evolutionInstances.length > 0 && (
+        <div className="space-y-4">
+          <h4 className={cn("text-md font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+            Instâncias do Evolution API ({evolutionInstances.length})
+          </h4>
+          
+          <div className="grid gap-4">
+            {evolutionInstances.map((evolutionInstance, index) => (
+              <Card key={`${evolutionInstance.instanceId}-${index}`} className={cn(
+                "transition-all duration-200",
+                isDarkMode ? "bg-[#18181b] border-[#27272a] hover:border-[#3f3f46]" : "bg-white border-gray-200 hover:border-gray-300"
+              )}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className={cn("text-base", isDarkMode ? "text-white" : "text-gray-900")}>
+                      {evolutionInstance.instanceName}
+                    </CardTitle>
+                    <Badge variant={evolutionInstance.status === 'open' ? 'default' : 'destructive'}>
+                      {evolutionInstance.status === 'open' ? (
+                        <Wifi className="h-3 w-3 mr-1" />
+                      ) : (
+                        <WifiOff className="h-3 w-3 mr-1" />
+                      )}
+                      {evolutionInstance.status === 'open' ? 'Conectado' : 'Desconectado'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <div>
+                      <span className={cn("text-sm font-medium", isDarkMode ? "text-zinc-300" : "text-gray-700")}>
+                        ID da Instância:
+                      </span>
+                      <p className={cn("text-sm font-mono", isDarkMode ? "text-zinc-400" : "text-gray-600")}>
+                        {evolutionInstance.instanceId}
+                      </p>
+                    </div>
+                    {evolutionInstance.profileName && (
+                      <div>
+                        <span className={cn("text-sm font-medium", isDarkMode ? "text-zinc-300" : "text-gray-700")}>
+                          Nome do Perfil:
+                        </span>
+                        <p className={cn("text-sm", isDarkMode ? "text-zinc-400" : "text-gray-600")}>
+                          {evolutionInstance.profileName}
+                        </p>
+                      </div>
+                    )}
+                    {evolutionInstance.owner && (
+                      <div>
+                        <span className={cn("text-sm font-medium", isDarkMode ? "text-zinc-300" : "text-gray-700")}>
+                          Proprietário:
+                        </span>
+                        <p className={cn("text-sm", isDarkMode ? "text-zinc-400" : "text-gray-600")}>
+                          {evolutionInstance.owner}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {instances.length === 0 ? (
         <Card className={cn(isDarkMode ? "bg-[#18181b] border-[#27272a]" : "bg-white border-gray-200")}>
           <CardContent className="py-8">
@@ -184,6 +302,9 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
         </Card>
       ) : (
         <div className="grid gap-4">
+          <h4 className={cn("text-md font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+            Configurações da API ({instances.length})
+          </h4>
           {instances.map((instance) => (
             <Card key={instance.id} className={cn(
               "transition-all duration-200",

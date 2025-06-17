@@ -1,11 +1,10 @@
 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { MessageSenderService } from '@/services/MessageSenderService';
-import { FileService } from '@/services/FileService';
 import { FileData, RawMessage } from '@/types/messageTypes';
-import { ChannelApiMappingService } from '@/services/ChannelApiMappingServiceRefactored';
-import { getContactDisplayName } from "@/utils/getContactDisplayName";
+import { N8nMessagingService } from '@/services/N8nMessagingService';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ExtendedMessageData {
   conversationId: string;
@@ -20,7 +19,7 @@ export interface ExtendedMessageData {
 export const useMessageSenderExtended = () => {
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
-  const messageSenderService = new MessageSenderService();
+  const { user } = useAuth();
 
   const sendMessage = async (
     messageData: ExtendedMessageData, 
@@ -28,69 +27,99 @@ export const useMessageSenderExtended = () => {
   ): Promise<boolean> => {
     setSending(true);
     console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
+    
     try {
+      // Extrair número de telefone do conversationId
       let phoneNumber = messageData.conversationId;
       if (phoneNumber.includes("_")) {
         phoneNumber = phoneNumber.split("_")[0];
       }
-      const processedChannelId = await ChannelApiMappingService.getChannelUuid(messageData.channelId);
 
-      let resultMessage: RawMessage;
+      // Buscar mapping do canal
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', messageData.channelId)
+        .maybeSingle();
 
-      const senderType = messageData.sender;
-      const contactNameRefined = getContactDisplayName({
-        sender: senderType,
-        contactName: messageData.agentName
-      });
+      if (mappingError || !mapping) {
+        console.error('❌ [MESSAGE_SENDER] Mapping não encontrado para canal:', messageData.channelId);
+        toast({
+          title: "Erro",
+          description: "Canal não configurado para envio",
+          variant: "destructive"
+        });
+        return false;
+      }
+
+      let result;
 
       if (messageData.fileData) {
-        const fileType = FileService.getFileType(messageData.fileData.mimeType);
-        let mediaContent = messageData.fileData.base64;
-        // Garantir prefixo 'data:' sempre
-        if (!mediaContent.startsWith("data:")) {
-          mediaContent = `data:${messageData.fileData.mimeType};base64,${mediaContent}`;
-        }
-        resultMessage = await messageSenderService.sendMediaMessage(
-          processedChannelId || messageData.channelId,
+        // Enviar mídia via webhook universal
+        result = await N8nMessagingService.sendMediaMessage(
+          mapping.channel_name,
+          mapping.instance_name,
           phoneNumber,
-          mediaContent,
+          messageData.fileData.base64,
           messageData.content || messageData.fileData.fileName,
-          fileType as "image" | "audio" | "video" | "document",
-          senderType,
-          messageData.agentName
+          messageData.messageType as any,
+          messageData.fileData.fileName
         );
       } else {
-        resultMessage = await messageSenderService.sendTextMessage(
-          processedChannelId || messageData.channelId,
+        // Enviar texto via webhook universal
+        result = await N8nMessagingService.sendTextMessage(
+          mapping.channel_name,
+          mapping.instance_name,
           phoneNumber,
-          messageData.content,
-          senderType,
-          messageData.agentName
+          messageData.content
         );
       }
 
-      if (addMessageToState && resultMessage) {
-        addMessageToState(resultMessage);
-      }
-      return true;
-    } catch (error) {
-      console.error("Erro ao enviar mensagem:", error);
-      if (error instanceof Error) {
-        console.error("Detalhes do erro:", error.message);
-        console.error("Pilha de chamadas (stack):", error.stack);
+      if (result.success) {
+        console.log('✅ [MESSAGE_SENDER] Mensagem enviada com sucesso via webhook universal');
+        
+        // IMPORTANTE: NÃO SALVAR NO SUPABASE - apenas adicionar ao estado local
+        if (addMessageToState) {
+          const localMessage: RawMessage = {
+            id: `temp_${Date.now()}`,
+            content: messageData.content,
+            sender: 'agent',
+            timestamp: new Date().toISOString(),
+            conversation_id: messageData.conversationId,
+            channel_id: messageData.channelId,
+            agent_name: messageData.agentName || user?.name || 'Agente',
+            message_type: messageData.messageType || 'text',
+            file_data: messageData.fileData || null
+          };
+          
+          addMessageToState(localMessage);
+        }
+
+        toast({
+          title: "Sucesso",
+          description: "Mensagem enviada com sucesso",
+        });
+        
+        return true;
       } else {
-        console.error("Erro desconhecido:", error);
+        console.error('❌ [MESSAGE_SENDER] Erro ao enviar mensagem:', result.error);
+        toast({
+          title: "Erro",
+          description: result.error || "Erro ao enviar mensagem",
+          variant: "destructive"
+        });
+        return false;
       }
+    } catch (error) {
+      console.error("❌ [MESSAGE_SENDER] Erro:", error);
       toast({
         title: "Erro",
-        description: "Erro ao enviar mensagem",
+        description: "Erro inesperado ao enviar mensagem",
         variant: "destructive"
       });
-      console.log('[useMessageSenderExtended] Toast de erro exibido.');
       return false;
     } finally {
       setSending(false);
-      console.log('[useMessageSenderExtended] Finalizando sendMessage. setSending(false).');
     }
   };
 

@@ -25,6 +25,7 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
   const reportTypes = [
     { value: 'conversations', label: 'Análise de Conversas', icon: MessageSquare },
     { value: 'channels', label: 'Performance de Canais', icon: BarChart3 },
+    { value: 'exams', label: 'Relatório de Exames', icon: Users },
     { value: 'custom', label: 'Relatório Personalizado', icon: FileText },
   ];
 
@@ -43,11 +44,62 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
     try {
       console.log('🤖 [AI_REPORTS] Gerando relatório inteligente:', { query, reportType });
 
+      // Buscar dados dependendo do tipo de relatório
+      let reportData = {};
+      
+      if (reportType === 'conversations') {
+        // Buscar dados de todas as tabelas de conversas
+        const conversationTables = [
+          'yelena_ai_conversas',
+          'canarana_conversas', 
+          'souto_soares_conversas',
+          'joao_dourado_conversas',
+          'america_dourada_conversas',
+          'gerente_lojas_conversas',
+          'gerente_externo_conversas'
+        ];
+        
+        const conversationData = [];
+        for (const table of conversationTables) {
+          try {
+            const { data, error } = await supabase
+              .from(table)
+              .select('*')
+              .limit(100);
+            
+            if (!error && data) {
+              conversationData.push({
+                table,
+                messages: data.length,
+                data: data.slice(0, 10) // Apenas uma amostra
+              });
+            }
+          } catch (err) {
+            console.warn(`Erro ao buscar dados de ${table}:`, err);
+          }
+        }
+        
+        reportData = { conversations: conversationData };
+      } else if (reportType === 'channels') {
+        const { data: channelsData } = await supabase
+          .from('channels')
+          .select('*');
+        
+        reportData = { channels: channelsData || [] };
+      } else if (reportType === 'exams') {
+        const { data: examsData } = await supabase
+          .from('exams')
+          .select('*')
+          .limit(100);
+        
+        reportData = { exams: examsData || [] };
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: 'default',
           report_type: reportType,
-          data: {},
+          data: reportData,
           custom_prompt: query.trim(),
           filters: {}
         }
@@ -63,12 +115,14 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
           title: "Sucesso",
           description: "Relatório inteligente gerado com sucesso!",
         });
+      } else {
+        throw new Error('Nenhum relatório foi retornado');
       }
     } catch (error) {
       console.error('❌ [AI_REPORTS] Erro:', error);
       toast({
         title: "Erro",
-        description: "Erro ao gerar relatório inteligente",
+        description: "Erro ao gerar relatório inteligente: " + (error instanceof Error ? error.message : 'Erro desconhecido'),
         variant: "destructive"
       });
     } finally {
@@ -126,7 +180,7 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
                       key={type.value} 
                       value={type.value}
                       className={cn(
-                        isDarkMode ? "text-white hover:bg-[#3f3f46]" : "text-gray-900 hover:bg-gray-100"
+                        isDarkMode ? "text-white hover:bg-[#3f3f46] focus:bg-[#3f3f46]" : "text-gray-900 hover:bg-gray-100"
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -221,6 +275,27 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
                 <p className="text-sm mt-1">Use o gerador de relatórios para começar</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Relatórios Recentes */}
+      <div className="mt-8">
+        <Card className={cn(isDarkMode ? "bg-[#18181b] border-[#27272a]" : "bg-white border-gray-200")}>
+          <CardHeader>
+            <CardTitle className={cn("text-xl font-semibold", isDarkMode ? "text-white" : "text-gray-900")}>
+              Relatórios Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              "text-center py-8",
+              isDarkMode ? "text-zinc-400" : "text-gray-500"
+            )}>
+              <FileText className="mx-auto h-12 w-12 opacity-30 mb-3" />
+              <p>Nenhum relatório gerado recentemente</p>
+              <p className="text-sm mt-1">Gere um novo relatório para visualizá-lo aqui</p>
+            </div>
           </CardContent>
         </Card>
       </div>

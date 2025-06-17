@@ -8,7 +8,7 @@ import { FileData } from '@/types/messageTypes';
 interface FilePreviewModalProps {
   fileData: FileData;
   isDarkMode?: boolean;
-  onSend: (caption?: string) => void;
+  onSend: (caption?: string) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -23,11 +23,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 
   const handleSend = async () => {
     if (sending) return;
+    
     setSending(true);
     try {
+      console.log('📤 [FILE_PREVIEW] Enviando arquivo:', fileData.fileName);
       await onSend(caption.trim() || undefined);
+      console.log('✅ [FILE_PREVIEW] Arquivo enviado com sucesso');
+    } catch (error) {
+      console.error('❌ [FILE_PREVIEW] Erro ao enviar arquivo:', error);
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      handleSend();
     }
   };
 
@@ -49,7 +60,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       )}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-lg">Enviar Arquivo</h3>
-          <Button variant="ghost" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={sending}>
             <X size={20} />
           </Button>
         </div>
@@ -86,15 +97,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 )}>
                   {fileData.mimeType}
                 </p>
+                <p className={cn(
+                  "text-xs",
+                  isDarkMode ? "text-zinc-500" : "text-gray-400"
+                )}>
+                  {(fileData.size / 1024 / 1024).toFixed(2)} MB
+                </p>
               </div>
             </div>
           )}
         </div>
 
         <textarea
-          placeholder="Adicionar uma legenda (opcional)..."
+          placeholder="Adicionar uma legenda (opcional)... Pressione Ctrl+Enter para enviar"
           value={caption}
           onChange={e => setCaption(e.target.value)}
+          onKeyPress={handleKeyPress}
           className={cn(
             "w-full mb-4 p-3 rounded border resize-none",
             isDarkMode 
