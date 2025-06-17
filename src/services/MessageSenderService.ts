@@ -1,6 +1,6 @@
-
 import { supabase } from '../integrations/supabase/client';
 import { ChannelApiMappingService } from './ChannelApiMappingServiceRefactored';
+import { N8nMessagingService } from './N8nMessagingService';
 import { RawMessage } from '@/types/messageTypes';
 import { AudioCompressor } from './AudioCompressor';
 import { VideoCompressor } from './VideoCompressor';
@@ -110,27 +110,19 @@ export class MessageSenderService {
   async sendTextMessage(channelId: string, to: string, text: string, senderType: "customer" | "agent" = "agent", contactName?: string | null): Promise<RawMessage> {
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
-      this.logger.info(`Iniciando envio de mensagem de texto`, { channelId, to });
-      const isConfigured = await this.validateApiConfiguration(realChannelId);
-      if (!isConfigured) {
-        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
-        if (apiInstance) {
-          const reconnected = await this.reconnectInstance(
-            apiInstance.base_url, 
-            apiInstance.api_key, 
-            apiInstance.instance_name
-          );
-          if (!reconnected) {
-            throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
-          }
-        } else {
-          throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
-        }
+      this.logger.info(`Iniciando envio de mensagem de texto via N8N`, { channelId, to });
+      
+      // Buscar mapping do canal para obter informações da instância
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', realChannelId)
+        .maybeSingle();
+
+      if (mappingError || !mapping) {
+        throw new Error(`Mapping não encontrado para o canal ${realChannelId}`);
       }
-      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
-      if (!apiInstance) {
-        throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
-      }
+
       const formattedNumber = this.formatPhoneNumber(to);
 
       let nomeDoContato: string | null = getContactDisplayName({
@@ -138,37 +130,26 @@ export class MessageSenderService {
         contactName: contactName,
       });
 
-      const payload = {
-        number: formattedNumber,
-        text: text
-      };
-
-      this.logger.debug('Enviando texto para API Evolution', { 
-        endpoint: `${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`,
-        payload 
+      this.logger.debug('Enviando texto via N8N', { 
+        channel: mapping.channel_name,
+        instanceName: mapping.instance_name,
+        phoneNumber: formattedNumber,
+        message: text
       });
 
-      const response = await fetch(`${apiInstance.base_url}/message/sendText/${apiInstance.instance_name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': apiInstance.api_key
-        },
-        body: JSON.stringify(payload)
-      });
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendTextMessage(
+        mapping.channel_name,
+        mapping.instance_name,
+        formattedNumber,
+        text
+      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error('Erro na resposta da API Evolution', { 
-          status: response.status, 
-          statusText: response.statusText, 
-          body: errorText 
-        });
-        throw new Error(`Falha ao enviar mensagem: ${response.statusText} - ${errorText}`);
+      if (!result.success) {
+        throw new Error(`Falha ao enviar mensagem via N8N: ${result.error}`);
       }
 
-      const result = await response.json();
-      this.logger.debug('Resposta da API Evolution', { result });
+      this.logger.debug('Resposta do N8N', { result });
 
       // Sempre usar valores válidos para data e nome_do_contato (NUNCA NÚMERO)
       const nowIso = new Date().toISOString();
@@ -180,7 +161,7 @@ export class MessageSenderService {
         nome_do_contato: nomeDoContato,
         mensagemtype: 'conversation',
         tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
-        id: result.key?.id || result.messageId || Date.now().toString(),
+        id: Date.now().toString(),
         sender: senderType,
         timestamp: nowIso,
         content: text,
@@ -195,7 +176,7 @@ export class MessageSenderService {
       // Tenta salvar a mensagem e lança erro se falhar
       await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
 
-      this.logger.info('Mensagem de texto enviada com sucesso', { messageId: result.key?.id });
+      this.logger.info('Mensagem de texto enviada com sucesso via N8N');
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -244,28 +225,17 @@ export class MessageSenderService {
   ): Promise<RawMessage> {
     const realChannelId = await ChannelApiMappingService.getChannelUuid(channelId) || channelId;
     return await RetryManager.executeWithRetry(async () => {
-      this.logger.info(`Iniciando envio de mídia ${mediaType}`, { channelId, to, mediaType });
+      this.logger.info(`Iniciando envio de mídia ${mediaType} via N8N`, { channelId, to, mediaType });
 
-      const isConfigured = await this.validateApiConfiguration(realChannelId);
-      if (!isConfigured) {
-        const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
-        if (apiInstance) {
-          const reconnected = await this.reconnectInstance(
-            apiInstance.base_url, 
-            apiInstance.api_key, 
-            apiInstance.instance_name
-          );
-          if (!reconnected) {
-            throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
-          }
-        } else {
-          throw new Error(`API Evolution não configurada ou não conectada para o canal ${realChannelId}`);
-        }
-      }
+      // Buscar mapping do canal para obter informações da instância
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('channel_id', realChannelId)
+        .maybeSingle();
 
-      const apiInstance = await ChannelApiMappingService.getApiInstanceForChannel(realChannelId);
-      if (!apiInstance) {
-        throw new Error(`Falha ao obter instância da API para canal ${realChannelId}`);
+      if (mappingError || !mapping) {
+        throw new Error(`Mapping não encontrado para o canal ${realChannelId}`);
       }
 
       const formattedNumber = this.formatPhoneNumber(to);
@@ -312,44 +282,30 @@ export class MessageSenderService {
         }
       }
 
-      const endpoint = `/message/sendMedia/${apiInstance.instance_name}`;
-      
-      const payload = {
-        number: formattedNumber,
-        mediatype: mediaType,
-        mimetype: mimeType,
-        caption: caption || "",
-        media: `data:${mimeType};base64,${base64Content}`,
-        fileName: `media_${Date.now()}.${fileExtension}`
-      };
-
-      this.logger.debug('Enviando mídia para API Evolution', { 
-        endpoint: `${apiInstance.base_url}${endpoint}`, 
+      this.logger.debug('Enviando mídia via N8N', { 
+        channel: mapping.channel_name,
+        instanceName: mapping.instance_name,
+        phoneNumber: formattedNumber,
         mediaType,
-        payload: { ...payload, media: '[BASE64_DATA]' }
+        fileName: `media_${Date.now()}.${fileExtension}`
       });
 
-      const response = await fetch(`${apiInstance.base_url}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": apiInstance.api_key
-        },
-        body: JSON.stringify(payload)
-      });
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendMediaMessage(
+        mapping.channel_name,
+        mapping.instance_name,
+        formattedNumber,
+        `data:${mimeType};base64,${base64Content}`,
+        caption || "",
+        mediaType,
+        `media_${Date.now()}.${fileExtension}`
+      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error('Erro na resposta da API Evolution', { 
-          status: response.status, 
-          statusText: response.statusText, 
-          body: errorText 
-        });
-        throw new Error(`Falha ao enviar mensagem de mídia: ${response.statusText} - ${errorText}`);
+      if (!result.success) {
+        throw new Error(`Falha ao enviar mensagem de mídia via N8N: ${result.error}`);
       }
 
-      const result = await response.json();
-      this.logger.debug('Resposta da API Evolution para mídia', { result });
+      this.logger.debug('Resposta do N8N para mídia', { result });
 
       // Data padrão
       const nowIso = new Date().toISOString();
@@ -366,7 +322,7 @@ export class MessageSenderService {
         nome_do_contato: nomeDoContato,
         mensagemtype: mediaType,
         tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
-        id: result.key?.id || result.messageId || Date.now().toString(),
+        id: Date.now().toString(),
         sender: senderType,
         timestamp: nowIso,
         content: `data:${mimeType};base64,${base64Content}`,
@@ -380,7 +336,7 @@ export class MessageSenderService {
 
       await ChannelApiMappingService.saveMessageToChannel(realChannelId, messageData);
 
-      this.logger.info('Mensagem de mídia enviada com sucesso', { messageId: result.key?.id, mediaType });
+      this.logger.info('Mensagem de mídia enviada com sucesso via N8N', { mediaType });
       return messageData;
     }, {
       maxRetries: this.retryCount,
@@ -405,3 +361,4 @@ export class MessageSenderService {
     }
   }
 }
+

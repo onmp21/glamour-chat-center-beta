@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { N8nMessagingService } from './N8nMessagingService';
 import { DatabaseHelpers } from './DatabaseHelpers';
 
 export class MessageSenderEnhanced {
@@ -12,28 +13,34 @@ export class MessageSenderEnhanced {
 
   async sendTextMessage(instanceName: string, phoneNumber: string, message: string): Promise<boolean> {
     try {
-      console.log('📱 [MESSAGE_SENDER] Enviando texto:', {
+      console.log('📱 [MESSAGE_SENDER] Enviando texto via N8N:', {
         instanceName,
         phoneNumber,
         messageLength: message.length
       });
 
-      const response = await fetch(`${this.baseUrl}/message/sendText/${instanceName}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.apiKey
-        },
-        body: JSON.stringify({
-          number: phoneNumber,
-          text: message
-        })
-      });
+      // Buscar mapping para obter nome do canal
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('instance_name', instanceName)
+        .maybeSingle();
 
-      const result = await response.json();
-      console.log('📱 [MESSAGE_SENDER] Resposta da API:', result);
+      if (mappingError || !mapping) {
+        console.error('❌ [MESSAGE_SENDER] Mapping não encontrado para instância:', instanceName);
+        return false;
+      }
 
-      return response.ok && result.status !== 'error';
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendTextMessage(
+        mapping.channel_name,
+        instanceName,
+        phoneNumber,
+        message
+      );
+
+      console.log('📱 [MESSAGE_SENDER] Resposta do N8N:', result);
+      return result.success;
     } catch (error) {
       console.error('❌ [MESSAGE_SENDER] Erro ao enviar texto:', error);
       return false;
@@ -48,7 +55,7 @@ export class MessageSenderEnhanced {
     mediaType: 'image' | 'audio' | 'video' | 'document'
   ): Promise<boolean> {
     try {
-      console.log('🎥 [MESSAGE_SENDER] Enviando mídia:', {
+      console.log('🎥 [MESSAGE_SENDER] Enviando mídia via N8N:', {
         instanceName,
         phoneNumber,
         mediaType,
@@ -56,27 +63,30 @@ export class MessageSenderEnhanced {
         hasMediaUrl: mediaUrl.length > 0
       });
 
-      const endpoint = `${this.baseUrl}/message/sendMedia/${instanceName}`;
-      const payload = {
-        number: phoneNumber,
-        media: mediaUrl,
-        caption: caption || '',
-        mediatype: mediaType
-      };
+      // Buscar mapping para obter nome do canal
+      const { data: mapping, error: mappingError } = await supabase
+        .from('channel_instance_mappings')
+        .select('*')
+        .eq('instance_name', instanceName)
+        .maybeSingle();
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.apiKey
-        },
-        body: JSON.stringify(payload)
-      });
+      if (mappingError || !mapping) {
+        console.error('❌ [MESSAGE_SENDER] Mapping não encontrado para instância:', instanceName);
+        return false;
+      }
 
-      const result = await response.json();
-      console.log('🎥 [MESSAGE_SENDER] Resposta da API:', result);
+      // Enviar via N8N
+      const result = await N8nMessagingService.sendMediaMessage(
+        mapping.channel_name,
+        instanceName,
+        phoneNumber,
+        mediaUrl,
+        caption || '',
+        mediaType
+      );
 
-      return response.ok && result.status !== 'error';
+      console.log('🎥 [MESSAGE_SENDER] Resposta do N8N:', result);
+      return result.success;
     } catch (error) {
       console.error('❌ [MESSAGE_SENDER] Erro ao enviar mídia:', error);
       return false;
@@ -241,3 +251,4 @@ export class MessageSenderEnhanced {
     }
   }
 }
+

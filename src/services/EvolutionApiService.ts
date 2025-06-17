@@ -104,183 +104,79 @@ export class EvolutionApiService {
   };
 
   /**
-   * Envia uma mensagem de texto usando a API Evolution v2
+   * Envia uma mensagem de texto usando N8N (método legado mantido para compatibilidade)
+   * @deprecated Use N8nMessagingService.sendTextMessage diretamente
    */
   sendTextMessage = async (phoneNumber: string, message: string): Promise<SendMessageResult> => {
-    try {
-      console.log('📱 [EVOLUTION_API] Enviando mensagem de texto:', {
-        instanceName: this.config.instanceName,
-        phoneNumber,
-        messageLength: message.length
-      });
+    console.warn('⚠️ [EVOLUTION_API] Método legado sendTextMessage chamado, redirecionando para N8N');
+    
+    // Buscar mapping para obter nome do canal
+    const { data: mapping, error: mappingError } = await supabase
+      .from('channel_instance_mappings')
+      .select('*')
+      .eq('instance_name', this.config.instanceName)
+      .maybeSingle();
 
-      const url = `${this.config.baseUrl}/message/sendText/${this.config.instanceName}`;
-      
-      // Formato correto conforme especificação
-      const payload = {
-        number: phoneNumber,
-        text: message
-      };
-
-      console.log('📱 [EVOLUTION_API] URL:', url);
-      console.log('📱 [EVOLUTION_API] Payload:', payload);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.config.apiKey
-        },
-        body: JSON.stringify(payload)
-      });
-
-      console.log('📱 [EVOLUTION_API] Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro na resposta:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-      console.log('📱 [EVOLUTION_API] Resultado:', result);
-
-      // Verificar se a resposta está no formato esperado
-      if (Array.isArray(result) && result.length > 0 && result[0].success) {
-        return {
-          success: true,
-          messageId: result[0].data?.key?.id
-        };
-      }
-
-      // Formato alternativo de resposta
-      if (result.success) {
-        return {
-          success: true,
-          messageId: result.data?.key?.id || result.key?.id
-        };
-      }
-
-      if (result.status === 'error') {
-        return {
-          success: false,
-          error: result.message || 'Erro desconhecido'
-        };
-      }
-
-      return {
-        success: true,
-        messageId: result.key?.id || result.messageId
-      };
-
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao enviar mensagem:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
+    if (mappingError || !mapping) {
+      console.error('❌ [EVOLUTION_API] Mapping não encontrado para instância:', this.config.instanceName);
+      return { success: false, error: 'Mapping não encontrado para a instância' };
     }
-  }
+
+    // Redirecionar para N8N
+    const result = await N8nMessagingService.sendTextMessage(
+      mapping.channel_name,
+      this.config.instanceName,
+      phoneNumber,
+      message
+    );
+
+    return {
+      success: result.success,
+      messageId: result.success ? Date.now().toString() : undefined,
+      error: result.error
+    };
+  };
 
   /**
-   * Envia uma mensagem de mídia usando a API Evolution v2
+   * Envia uma mensagem de mídia usando N8N (método legado mantido para compatibilidade)
+   * @deprecated Use N8nMessagingService.sendMediaMessage diretamente
    */
   sendMediaMessage = async (
-    phoneNumber: string, 
-    media: string, 
-    caption: string = '', 
-    mediaType: 'image' | 'audio' | 'video' | 'document',
-    mimetype: string = '', // agora explicitamente recebido ou derivado pelo chamador
-    fileName: string = ''  // agora explicitamente recebido ou derivado pelo chamador
+    phoneNumber: string,
+    mediaUrl: string,
+    caption: string,
+    mediaType: 'image' | 'audio' | 'video' | 'document'
   ): Promise<SendMessageResult> => {
-    try {
-      console.log('🎥 [EVOLUTION_API] Enviando mensagem de mídia:', {
-        instanceName: this.config.instanceName,
-        phoneNumber,
-        mediaType,
-        captionLength: caption.length,
-        mimetype,
-        fileName
-      });
+    console.warn('⚠️ [EVOLUTION_API] Método legado sendMediaMessage chamado, redirecionando para N8N');
+    
+    // Buscar mapping para obter nome do canal
+    const { data: mapping, error: mappingError } = await supabase
+      .from('channel_instance_mappings')
+      .select('*')
+      .eq('instance_name', this.config.instanceName)
+      .maybeSingle();
 
-      const url = `${this.config.baseUrl}/message/sendMedia/${this.config.instanceName}`;
-      
-      // Payload EXATO conforme documentação da Evolution API v2
-      const payload = {
-        number: phoneNumber,
-        mediatype: mediaType,
-        mimetype,
-        caption,
-        media,
-        fileName
-        // Campos extras opcionais (delay, linkPreview etc) podem ser adicionados se necessário
-      };
-
-      console.log('🎥 [EVOLUTION_API] URL:', url);
-      console.log('🎥 [EVOLUTION_API] Payload:', JSON.stringify(payload));
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.config.apiKey
-        },
-        body: JSON.stringify(payload)
-      });
-
-      console.log('🎥 [EVOLUTION_API] Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ [EVOLUTION_API] Erro na resposta:', errorText);
-        return {
-          success: false,
-          error: `HTTP ${response.status}: ${errorText}`
-        };
-      }
-
-      const result = await response.json();
-      console.log('🎥 [EVOLUTION_API] Resultado:', result);
-
-      // Verificar se a resposta está no formato esperado
-      if (Array.isArray(result) && result.length > 0 && result[0].success) {
-        return {
-          success: true,
-          messageId: result[0].data?.key?.id
-        };
-      }
-
-      // Formato alternativo de resposta
-      if (result.success) {
-        return {
-          success: true,
-          messageId: result.data?.key?.id || result.key?.id
-        };
-      }
-
-      if (result.status === 'error') {
-        return {
-          success: false,
-          error: result.message || 'Erro desconhecido'
-        };
-      }
-
-      return {
-        success: true,
-        messageId: result.key?.id || result.messageId
-      };
-
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API] Erro ao enviar mídia:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro desconhecido'
-      };
+    if (mappingError || !mapping) {
+      console.error('❌ [EVOLUTION_API] Mapping não encontrado para instância:', this.config.instanceName);
+      return { success: false, error: 'Mapping não encontrado para a instância' };
     }
-  }
+
+    // Redirecionar para N8N
+    const result = await N8nMessagingService.sendMediaMessage(
+      mapping.channel_name,
+      this.config.instanceName,
+      phoneNumber,
+      mediaUrl,
+      caption,
+      mediaType
+    );
+
+    return {
+      success: result.success,
+      messageId: result.success ? Date.now().toString() : undefined,
+      error: result.error
+    };
+  };
 
   /**
    * Obtém o QR Code para conectar a instância
@@ -345,7 +241,7 @@ export class EvolutionApiService {
         error: error instanceof Error ? error.message : 'Erro desconhecido'
       };
     }
-  }
+  };
 
   /**
    * Verifica o status de conexão da instância
