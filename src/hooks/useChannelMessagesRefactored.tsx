@@ -18,7 +18,7 @@ export const useChannelMessagesRefactored = (channelId: string, conversationId?:
 
     try {
       // Simular método getChannelMessages se não existir
-      const result = { success: true, messages: [] }; // Placeholder para compatibilidade
+      const result = { success: true, messages: [], error: undefined }; // Placeholder para compatibilidade
       
       if (result.success && result.messages) {
         setMessages(result.messages);
