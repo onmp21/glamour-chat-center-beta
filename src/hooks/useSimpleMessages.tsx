@@ -12,6 +12,7 @@ interface SimpleMessage {
   nome_do_contato?: string;
   mensagemtype?: string;
   media_base64?: string;
+  media_url?: string;
 }
 
 export const useSimpleMessages = (channelId: string | null, sessionId: string | null) => {
@@ -23,21 +24,45 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   const getTableName = (channelId: string): string => {
     console.log(`🔍 [SIMPLE_MESSAGES] Mapeando canal: ${channelId}`);
     
+    // CORRIGIDO: Mapeamento padronizado usando apenas UUIDs
     const mapping: Record<string, string> = {
-      'chat': 'yelena_ai_conversas',
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
+      '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas',
+      'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas',
+      '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'joao_dourado_conversas',
+      '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas',
+      'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas',
+      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas',
+      // Fallbacks para nomes legados
+      'chat': 'yelena_ai_conversas',
+      'yelena': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
       'souto-soares': 'souto_soares_conversas',
       'joao-dourado': 'joao_dourado_conversas',
       'america-dourada': 'america_dourada_conversas',
       'gerente-lojas': 'gerente_lojas_conversas',
-      'gerente-externo': 'gerente_externo_conversas',
-      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
+      'gerente-externo': 'gerente_externo_conversas'
     };
     
     const tableName = mapping[channelId] || 'yelena_ai_conversas';
     console.log(`✅ [SIMPLE_MESSAGES] Canal: ${channelId} -> Tabela: ${tableName}`);
     return tableName;
+  };
+
+  // NOVA: Função para mapear nomenclaturas de mídia
+  const mapMessageType = (mensagemtype?: string): string => {
+    if (!mensagemtype) return 'text';
+    
+    const typeMapping: Record<string, string> = {
+      'audioMessage': 'audio',
+      'imageMessage': 'image', 
+      'videoMessage': 'video',
+      'documentMessage': 'document',
+      'stickerMessage': 'sticker',
+      'conversation': 'text'
+    };
+    
+    return typeMapping[mensagemtype] || mensagemtype;
   };
 
   const loadMessages = async () => {
@@ -63,7 +88,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
 
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64, media_url") // Adicionado media_url
+        .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64, media_url")
         .eq("session_id", sessionId)
         .order("read_at", { ascending: true });
 
@@ -86,9 +111,9 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         read_at: row.read_at || new Date().toISOString(),
         tipo_remetente: row.tipo_remetente,
         nome_do_contato: row.nome_do_contato,
-        mensagemtype: row.mensagemtype,
+        mensagemtype: mapMessageType(row.mensagemtype), // APLICAR MAPEAMENTO
         media_base64: row.media_base64,
-        media_url: row.media_url
+        media_url: row.media_url // NOVA COLUNA
       }));
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
@@ -107,7 +132,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     let realtimeChannel: any = null;
 
     if (channelId && sessionId && isAuthenticated) {
-      loadMessages(); // Carrega as mensagens iniciais
+      loadMessages();
       const tableName = getTableName(channelId);
 
       realtimeChannel = supabase
@@ -127,8 +152,9 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
                   read_at: novo.read_at || new Date().toISOString(),
                   tipo_remetente: novo.tipo_remetente,
                   nome_do_contato: novo.nome_do_contato,
-                  mensagemtype: novo.mensagemtype,
-                  media_base64: novo.media_base64
+                  mensagemtype: mapMessageType(novo.mensagemtype), // APLICAR MAPEAMENTO
+                  media_base64: novo.media_base64,
+                  media_url: novo.media_url // NOVA COLUNA
                 }];
               });
             }

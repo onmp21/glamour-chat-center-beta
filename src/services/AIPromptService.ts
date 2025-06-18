@@ -1,130 +1,146 @@
-import { supabase } from "@/integrations/supabase/client";
 
-export type AIPromptType =
-  | "conversation_summary"
-  | "quick_response"
-  | "report_conversations"
-  | "report_channels"
-  | "report_custom"
-  | "report_exams";
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AIPrompt {
   id: string;
   name: string;
-  prompt_type: AIPromptType;
-  prompt_content: string;
   description?: string;
+  prompt_content: string;
+  prompt_type: string;
   is_active: boolean;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-const PROMPT_TYPES: { type: AIPromptType; label: string; description: string; defaultPrompt: string }[] = [
-  {
-    type: "conversation_summary",
-    label: "Resumo de Conversa",
-    description: "Prompt para a função de resumir conversas.",
-    defaultPrompt: "Você deve resumir esta conversa, destacando os pontos principais, ações pendentes e sentimento do cliente. Seja objetivo.",
-  },
-  {
-    type: "quick_response",
-    label: "Resposta Rápida",
-    description: "Prompt para sugerir uma resposta rápida baseada no contexto e última mensagem.",
-    defaultPrompt: "Com base no contexto da conversa e na última mensagem recebida, gere uma resposta breve e útil para o cliente.",
-  },
-  {
-    type: "report_conversations",
-    label: "Relatório de Conversas",
-    description: "Prompt para geração de relatório focado em conversas.",
-    defaultPrompt: "Analise todos os dados de conversas e gere um relatório com padrões, volume, sentimento e insights relevantes.",
-  },
-  {
-    type: "report_channels",
-    label: "Relatório de Canais",
-    description: "Prompt para relatório global sobre canais.",
-    defaultPrompt: "Analise os dados dos canais e forneça insights sobre performance, mensagens enviadas e recebidas, gargalos e oportunidades.",
-  },
-  {
-    type: "report_custom",
-    label: "Relatório Personalizado",
-    description: "Prompt para relatórios totalmente customizáveis pelo usuário.",
-    defaultPrompt: "Use este espaço para criar prompts customizados para relatórios inteligentes.",
-  },
-  {
-    type: "report_exams",
-    label: "Relatório de Exames",
-    description: "Prompt para relatório focado em exames (agendados, realizados, pendentes).",
-    defaultPrompt: "Analise os dados dos exames e gere um relatório detalhado sobre agendamentos, status dos exames, taxas de conclusão e insights relevantes. Destaque exames pendentes, resolvidos e qualquer tendência perceptível nos dados.",
-  },
-];
-
-export const getPromptTypes = () => PROMPT_TYPES;
-
 export class AIPromptService {
-  static async getAllPrompts(): Promise<AIPrompt[]> {
-    const { data, error } = await supabase
-      .from("ai_prompts")
-      .select("*")
-      .order("prompt_type", { ascending: true });
+  static async getPrompts(): Promise<AIPrompt[]> {
+    try {
+      console.log('📋 [AI_PROMPT_SERVICE] Carregando prompts...');
+      
+      const { data, error } = await supabase
+        .from('ai_prompts')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("[AIPromptService] Erro ao buscar prompts:", error);
-      return [];
-    }
-    return data as AIPrompt[];
-  }
+      if (error) {
+        console.error('❌ [AI_PROMPT_SERVICE] Erro ao carregar prompts:', error);
+        throw error;
+      }
 
-  static async upsertPrompt(prompt: Partial<AIPrompt> & { prompt_type: AIPromptType }) {
-    // Garante campos obrigatórios, senão lança erro para dev.
-    const label = getPromptTypes().find((p) => p.type === prompt.prompt_type)?.label || "";
-    const prompt_content = typeof prompt.prompt_content === "string" ? prompt.prompt_content : "";
-    if (!label || !prompt_content) {
-      throw new Error("Campos obrigatórios (name, prompt_content) ausentes no upsertPrompt");
-    }
-    let upsertObj = {
-      ...prompt,
-      name: label,
-      prompt_content,
-      is_active: typeof prompt.is_active === "boolean" ? prompt.is_active : true,
-      updated_at: new Date().toISOString(),
-    };
-    // upsert espera um array de objetos
-    const { data, error } = await supabase
-      .from("ai_prompts")
-      .upsert([upsertObj], { onConflict: "prompt_type" })
-      .select()
-      .single();
-
-    if (error) {
+      console.log('✅ [AI_PROMPT_SERVICE] Prompts carregados:', data?.length || 0);
+      return data || [];
+    } catch (error) {
+      console.error('❌ [AI_PROMPT_SERVICE] Erro inesperado:', error);
       throw error;
     }
-    return data as AIPrompt;
   }
 
-  static async restoreDefaultPrompt(prompt_type: AIPromptType) {
-    const promptObj = PROMPT_TYPES.find((p) => p.type === prompt_type);
-    if (!promptObj) return;
-    const { data, error } = await supabase
-      .from("ai_prompts")
-      .upsert(
-        [
-          {
-            prompt_type,
-            name: promptObj.label,
-            prompt_content: promptObj.defaultPrompt,
-            description: promptObj.description,
-            is_active: true,
-            updated_at: new Date().toISOString(),
-          },
-        ],
-        { onConflict: "prompt_type" }
-      )
-      .select()
-      .single();
+  static async upsertPrompt(prompt: Partial<AIPrompt>): Promise<AIPrompt> {
+    try {
+      console.log('💾 [AI_PROMPT_SERVICE] Salvando prompt:', prompt.name);
+      
+      // CORRIGIDO: Validação melhorada antes do salvamento
+      if (!prompt.name || !prompt.prompt_content || !prompt.prompt_type) {
+        throw new Error('Nome, conteúdo e tipo do prompt são obrigatórios');
+      }
 
-    if (error) {
+      const promptData = {
+        name: prompt.name.trim(),
+        description: prompt.description?.trim() || null,
+        prompt_content: prompt.prompt_content.trim(),
+        prompt_type: prompt.prompt_type,
+        is_active: prompt.is_active ?? true,
+        updated_at: new Date().toISOString()
+      };
+
+      let result;
+      
+      if (prompt.id) {
+        // Atualizar prompt existente
+        console.log('🔄 [AI_PROMPT_SERVICE] Atualizando prompt existente:', prompt.id);
+        const { data, error } = await supabase
+          .from('ai_prompts')
+          .update(promptData)
+          .eq('id', prompt.id)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ [AI_PROMPT_SERVICE] Erro ao atualizar prompt:', error);
+          throw error;
+        }
+        result = data;
+      } else {
+        // Criar novo prompt
+        console.log('➕ [AI_PROMPT_SERVICE] Criando novo prompt');
+        const { data, error } = await supabase
+          .from('ai_prompts')
+          .insert([promptData])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ [AI_PROMPT_SERVICE] Erro ao criar prompt:', error);
+          throw error;
+        }
+        result = data;
+      }
+
+      console.log('✅ [AI_PROMPT_SERVICE] Prompt salvo com sucesso:', result.id);
+      return result;
+    } catch (error) {
+      console.error('❌ [AI_PROMPT_SERVICE] Erro ao salvar prompt:', error);
       throw error;
     }
-    return data as AIPrompt;
+  }
+
+  static async deletePrompt(id: string): Promise<void> {
+    try {
+      console.log('🗑️ [AI_PROMPT_SERVICE] Deletando prompt:', id);
+      
+      const { error } = await supabase
+        .from('ai_prompts')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) {
+        console.error('❌ [AI_PROMPT_SERVICE] Erro ao deletar prompt:', error);
+        throw error;
+      }
+
+      console.log('✅ [AI_PROMPT_SERVICE] Prompt deletado com sucesso');
+    } catch (error) {
+      console.error('❌ [AI_PROMPT_SERVICE] Erro ao deletar prompt:', error);
+      throw error;
+    }
+  }
+
+  static async getPromptById(id: string): Promise<AIPrompt | null> {
+    try {
+      console.log('🔍 [AI_PROMPT_SERVICE] Buscando prompt por ID:', id);
+      
+      const { data, error } = await supabase
+        .from('ai_prompts')
+        .select('*')
+        .eq('id', id)
+        .eq('is_active', true)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('ℹ️ [AI_PROMPT_SERVICE] Prompt não encontrado:', id);
+          return null;
+        }
+        console.error('❌ [AI_PROMPT_SERVICE] Erro ao buscar prompt:', error);
+        throw error;
+      }
+
+      console.log('✅ [AI_PROMPT_SERVICE] Prompt encontrado:', data.name);
+      return data;
+    } catch (error) {
+      console.error('❌ [AI_PROMPT_SERVICE] Erro ao buscar prompt:', error);
+      throw error;
+    }
   }
 }

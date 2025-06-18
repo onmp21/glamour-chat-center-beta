@@ -1,8 +1,8 @@
+
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { MediaRendererFixed } from './MediaRendererFixed';
-import { MediaMigrationService } from '@/services/MediaMigrationService';
 
 interface SimpleMessageHistoryProps {
   channelId: string;
@@ -11,7 +11,6 @@ interface SimpleMessageHistoryProps {
   className?: string;
 }
 
-// ADICIONAR: função para truncar nome do cliente para 2 primeiros nomes
 const truncateName = (name: string = ''): string => {
   const parts = (name || '').split(' ').filter(Boolean);
   return parts.slice(0, 2).join(' ') || name || 'Cliente';
@@ -26,55 +25,49 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
   const { messages, loading, error } = useSimpleMessages(channelId, conversationId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Scroll automático melhorado para sempre mostrar última mensagem nova
   useEffect(() => {
     if (messages.length > 0 && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages.length]);
 
-  // Função melhorada para detectar se é mídia
+  // CORRIGIDO: Função melhorada para detectar mídia com prioridade para media_url
   const isMediaMessage = (message: any) => {
-    // Priorizar verificação de media_base64
-    if (message.media_base64) {
-      return MediaMigrationService.isBase64Content(message.media_base64) || 
-             MediaMigrationService.isStorageUrl(message.media_base64);
+    // PRIORIDADE 1: media_url (link curto)
+    if (message.media_url && message.media_url.trim() !== '') {
+      return true;
     }
-
-    // Verificar mensagemtype
-    if (message.mensagemtype && 
-        message.mensagemtype !== 'text' && 
-        message.mensagemtype !== 'conversation') {
+    
+    // PRIORIDADE 2: media_base64
+    if (message.media_base64 && message.media_base64.trim() !== '') {
       return true;
     }
 
-    // Verificar campo message
-    if (message.message) {
-      if (MediaMigrationService.isStorageUrl(message.message)) {
-        return true;
-      }
-      
-      if (message.message.startsWith('data:') || 
-          MediaMigrationService.isBase64Content(message.message)) {
-        return true;
-      }
+    // PRIORIDADE 3: mensagemtype não texto
+    if (message.mensagemtype && 
+        !['text', 'conversation'].includes(message.mensagemtype)) {
+      return true;
     }
 
     return false;
   };
 
-  // Função para obter conteúdo da mídia
+  // CORRIGIDO: Função para obter conteúdo da mídia com prioridade para media_url
   const getMediaContent = (message: any): string => {
-    // Priorizar media_base64
-    if (message.media_base64) {
+    // PRIORIDADE 1: media_url
+    if (message.media_url && message.media_url.trim() !== '') {
+      return message.media_url;
+    }
+
+    // PRIORIDADE 2: media_base64
+    if (message.media_base64 && message.media_base64.trim() !== '') {
       return message.media_base64;
     }
 
-    // Usar message se for mídia
+    // FALLBACK: message se parecer mídia
     if (message.message && 
-        (MediaMigrationService.isStorageUrl(message.message) || 
-         message.message.startsWith('data:') ||
-         MediaMigrationService.isBase64Content(message.message))) {
+        (message.message.startsWith('data:') || 
+         message.message.startsWith('http'))) {
       return message.message;
     }
 
@@ -128,16 +121,13 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
           const contactName = message.nome_do_contato || 'Cliente';
           const isMedia = isMediaMessage(message);
 
-          // ADICIONAR: Formatar hora para HH:mm
           const hora = new Date(message.read_at).toLocaleTimeString('pt-BR', {
             hour: '2-digit',
             minute: '2-digit',
           });
 
-          // ADICIONAR: Truncar nome só nos balões
           const nomeExibido = truncateName(contactName);
 
-          // ADICIONAR: Mostrar nome do canal no balão (mas só como informação, sem mexer layout)
           return (
             <div
               key={`${message.id}-${index}`}
@@ -164,7 +154,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                       messageType={message.mensagemtype || 'text'}
                       messageId={message.id?.toString?.() || String(message.id)}
                       fileName={
-                        (message.media_base64 && message.media_base64.startsWith('data:') ? 'Arquivo' 
+                        (message.media_url && !message.media_url.startsWith('data:') ? 'Arquivo' 
                           : (message.message && message.message.length < 60 ? message.message : undefined)
                         ) || undefined
                       }
@@ -183,9 +173,14 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                   isAgent ? "flex-row-reverse space-x-reverse" : "flex-row",
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 )}>
-                  {/* Nome do canal aqui, sem alterar layout */}
                   <span>
-                    {channelId === "chat" || channelId === "yelena_ai_conversas" ? "Yelena AI" : channelId}
+                    {channelId === "chat" || channelId.includes("yelena") ? "Yelena AI" : 
+                     channelId.includes("canarana") ? "Canarana" :
+                     channelId.includes("souto") ? "Souto Soares" :
+                     channelId.includes("joao") ? "João Dourado" :
+                     channelId.includes("america") ? "América Dourada" :
+                     channelId.includes("gerente-lojas") ? "Gerente Lojas" :
+                     channelId.includes("gerente-externo") ? "Gerente Externo" : "Canal"}
                   </span>
                   <span className="font-medium">
                     {isAgent ? 'Agente' : nomeExibido}
@@ -199,7 +194,6 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
           );
         })}
         
-        {/* Elemento para scroll automático */}
         <div ref={messagesEndRef} />
       </div>
     </div>

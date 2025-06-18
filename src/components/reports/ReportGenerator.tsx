@@ -1,30 +1,41 @@
+
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Brain, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { FileText, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AIProvider } from '@/types/ai-providers';
-import { AIProviderService } from '@/services/AIProviderService';
-// Import the correct types
-import type { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportGeneratorProps {
   isDarkMode: boolean;
   providers: AIProvider[];
   selectedProvider: string;
   setSelectedProvider: (value: string) => void;
-  filters: ReportFilters; // ReportFilters now correctly accepts all report types, including 'exams'
-  setFilters: (filters: ReportFilters) => void;
+  filters: any;
+  setFilters: (filters: any) => void;
   isGenerating: boolean;
   onGenerateReport: () => void;
   onClearReport: () => void;
   hasReportResult: boolean;
   availableChannels: any[];
-  channelsLoading?: boolean;
+  channelsLoading: boolean;
 }
+
+// NOVO: Dados das planilhas disponíveis
+const availableSheets = [
+  { id: 'yelena_ai_conversas', name: 'Yelena AI', description: 'Conversas do assistente principal' },
+  { id: 'canarana_conversas', name: 'Canarana', description: 'Conversas da loja Canarana' },
+  { id: 'souto_soares_conversas', name: 'Souto Soares', description: 'Conversas da loja Souto Soares' },
+  { id: 'joao_dourado_conversas', name: 'João Dourado', description: 'Conversas da loja João Dourado' },
+  { id: 'america_dourada_conversas', name: 'América Dourada', description: 'Conversas da loja América Dourada' },
+  { id: 'gerente_lojas_conversas', name: 'Gerente Lojas', description: 'Conversas do gerente de lojas' },
+  { id: 'gerente_externo_conversas', name: 'Gerente Externo', description: 'Conversas do gerente externo' },
+  { id: 'exams', name: 'Exames', description: 'Dados de agendamentos de exames' }
+];
 
 export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   isDarkMode,
@@ -37,152 +48,176 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   onGenerateReport,
   onClearReport,
   hasReportResult,
-  availableChannels = [],
-  channelsLoading = false
+  availableChannels,
+  channelsLoading
 }) => {
-  // Mostra seletor só se não for "exams"
-  const showChannelSelector = filters.report_type !== 'exams';
+
+  const handleSheetToggle = (sheetId: string, checked: boolean) => {
+    const currentSheets = filters.selected_sheets || [];
+    if (checked) {
+      setFilters({
+        ...filters,
+        selected_sheets: [...currentSheets, sheetId]
+      });
+    } else {
+      setFilters({
+        ...filters,
+        selected_sheets: currentSheets.filter((id: string) => id !== sheetId)
+      });
+    }
+  };
 
   return (
-    <div>
-      <Card className={cn("border shadow-sm", isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <div className={cn("p-2 rounded-lg", isDarkMode ? "bg-accent" : "bg-gray-100")}>
-              <Brain size={18} className="text-primary" strokeWidth={1.5} />
-            </div>
-            <div>
-              <CardTitle className={cn("text-lg", isDarkMode ? "text-card-foreground" : "text-gray-900")}>
-                Gerador de Relatórios Inteligentes
-              </CardTitle>
-              <CardDescription className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-                Descreva o relatório que deseja gerar com IA
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="ai-provider" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-              Provedor de IA
-            </Label>
-            <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-              <SelectTrigger className={cn(isDarkMode ? "bg-input-dark border-input-dark text-card-foreground" : "bg-white border-gray-200")}>
-                <SelectValue placeholder="Selecione um provedor" />
-              </SelectTrigger>
-              <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
-                {providers.map(provider => (
-                  <SelectItem key={provider.id} value={String(provider.id)}>
-                    {provider.name} ({AIProviderService.getProviderTypeLabel(provider.provider_type)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Tipo e canal lado a lado */}
-          <div className="flex gap-3">
-            <div className="flex-1 min-w-0">
-              <Label htmlFor="report-type" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-                Tipo de Relatório
-              </Label>
-              <Select
-                value={filters.report_type}
-                onValueChange={(value) => {
-                  setFilters({
-                    ...filters,
-                    report_type: value as ReportType,
-                    ...(value === "exams" ? { channel_id: undefined } : {})
-                  });
-                }}
-              >
-                <SelectTrigger className={cn(isDarkMode ? "bg-input-dark border-input-dark text-card-foreground" : "bg-white border-gray-200")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className={cn(isDarkMode ? "bg-card border-border text-card-foreground" : "bg-white text-gray-900")}>
-                  <SelectItem value="conversations">Análise de Conversas</SelectItem>
-                  <SelectItem value="channels">Análise de Canais</SelectItem>
-                  <SelectItem value="exams">Análise de Exames</SelectItem>
-                  <SelectItem value="custom">Relatório Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {/* Canal ao lado do tipo */}
-            {showChannelSelector && (
-              <div className="flex-1 min-w-0">
-                <Label className="text-sm font-medium mb-1">
-                  Selecionar Canal
-                </Label>
-                {channelsLoading ? (
-                  <div className="text-xs text-muted">Carregando canais...</div>
-                ) : (
-                  <select
-                    value={filters.channel_id || ""}
-                    onChange={e => setFilters({ ...filters, channel_id: e.target.value })}
-                    className="border rounded px-3 py-2 bg-white w-full"
-                  >
-                    <option value="">Todos os canais</option>
-                    {availableChannels.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
-          </div>
-
-          {filters.report_type === 'custom' && (
-            <div>
-              <Label htmlFor="custom-prompt" className={cn("text-sm font-medium", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-                Prompt Personalizado
-              </Label>
-              <Textarea
-                id="custom-prompt"
-                value={filters.custom_prompt || ''}
-                onChange={(e) => setFilters({ ...filters, custom_prompt: e.target.value })}
-                placeholder="Descreva que tipo de análise você gostaria..."
-                className={cn(
-                  "min-h-[100px] text-sm",
-                  isDarkMode
-                    ? "bg-input-dark border-input-dark text-card-foreground placeholder:text-muted-foreground"
-                    : "bg-white border-gray-300"
-                )}
-                rows={4}
-              />
-            </div>
+    <Card className={cn(isDarkMode ? "bg-card border-border" : "bg-white border-gray-200")}>
+      <CardHeader className="pb-4">
+        <CardTitle className={cn(
+          "text-xl font-semibold flex items-center gap-2",
+          isDarkMode ? "text-card-foreground" : "text-gray-900"
+        )}>
+          <FileText size={20} className="text-primary" />
+          Gerador de Relatórios
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Seleção do Provedor IA */}
+        <div className="space-y-2">
+          <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
+            Provedor de IA
+          </Label>
+          <Select value={selectedProvider} onValueChange={setSelectedProvider}>
+            <SelectTrigger className={cn(isDarkMode ? "bg-background border-border" : "bg-white border-gray-200")}>
+              <SelectValue placeholder="Selecione um provedor de IA" />
+            </SelectTrigger>
+            <SelectContent>
+              {providers.map((provider) => (
+                <SelectItem key={provider.id} value={String(provider.id)}>
+                  {provider.name} ({provider.provider_type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {providers.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhum provedor de IA configurado. Configure um provedor primeiro.
+            </p>
           )}
+        </div>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={onGenerateReport}
-              disabled={isGenerating || !selectedProvider}
-              size="sm"
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 size={14} className="mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                'Gerar Relatório'
-              )}
-            </Button>
-            {hasReportResult && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onClearReport}
-                className={cn(
-                  isDarkMode ? "border-border text-muted-foreground hover:bg-accent" : ""
-                )}
-              >
-                Limpar
-              </Button>
-            )}
+        {/* Tipo de Relatório */}
+        <div className="space-y-2">
+          <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
+            Tipo de Relatório
+          </Label>
+          <Select 
+            value={filters.report_type || 'conversations'} 
+            onValueChange={(value) => setFilters({ ...filters, report_type: value, selected_sheets: [] })}
+          >
+            <SelectTrigger className={cn(isDarkMode ? "bg-background border-border" : "bg-white border-gray-200")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="conversations">Análise de Conversas</SelectItem>
+              <SelectItem value="exams">Análise de Exames</SelectItem>
+              <SelectItem value="custom">Relatório Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* NOVA: Seleção de Planilhas */}
+        {(filters.report_type === 'conversations' || filters.report_type === 'exams') && (
+          <div className="space-y-3">
+            <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
+              Selecionar Planilhas (múltipla seleção)
+            </Label>
+            <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
+              {availableSheets
+                .filter(sheet => 
+                  filters.report_type === 'exams' ? sheet.id === 'exams' : sheet.id !== 'exams'
+                )
+                .map((sheet) => (
+                <div key={sheet.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border">
+                  <Checkbox
+                    id={sheet.id}
+                    checked={filters.selected_sheets?.includes(sheet.id) || false}
+                    onCheckedChange={(checked) => handleSheetToggle(sheet.id, checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <Label 
+                      htmlFor={sheet.id} 
+                      className={cn(
+                        "text-sm font-medium cursor-pointer",
+                        isDarkMode ? "text-card-foreground" : "text-gray-900"
+                      )}
+                    >
+                      {sheet.name}
+                    </Label>
+                    <p className={cn(
+                      "text-xs mt-1",
+                      isDarkMode ? "text-muted-foreground" : "text-gray-500"
+                    )}>
+                      {sheet.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Selecione uma ou mais planilhas para análise
+            </p>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        {/* Prompt Personalizado */}
+        {filters.report_type === 'custom' && (
+          <div className="space-y-2">
+            <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
+              Prompt Personalizado
+            </Label>
+            <Textarea
+              placeholder="Descreva que tipo de relatório você deseja gerar..."
+              value={filters.custom_prompt || ''}
+              onChange={(e) => setFilters({ ...filters, custom_prompt: e.target.value })}
+              className={cn(
+                "min-h-[100px] resize-none",
+                isDarkMode ? "bg-background border-border" : "bg-white border-gray-200"
+              )}
+            />
+          </div>
+        )}
+
+        {/* Botões de Ação */}
+        <div className="flex gap-3 pt-4">
+          <Button
+            onClick={onGenerateReport}
+            disabled={isGenerating || !selectedProvider}
+            className="flex-1 bg-primary hover:bg-primary/90"
+          >
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <Zap size={16} className="mr-2" />
+                Gerar Relatório
+              </>
+            )}
+          </Button>
+          
+          {hasReportResult && (
+            <Button
+              onClick={onClearReport}
+              variant="outline"
+              className={cn(isDarkMode ? "border-border hover:bg-accent" : "border-gray-200")}
+            >
+              <Trash2 size={16} className="mr-2" />
+              Limpar
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };

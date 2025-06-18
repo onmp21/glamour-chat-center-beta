@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +21,7 @@ interface EvolutionInstance {
   status: string;
   serverUrl: string;
   apikey: string;
+  apiInstanceId?: string;
 }
 
 export const useApiInstancesEnhanced = () => {
@@ -53,8 +53,13 @@ export const useApiInstancesEnhanced = () => {
       console.log('✅ [API_INSTANCES] Instâncias carregadas:', data?.length || 0);
       setInstances(data || []);
       
+      // CORRIGIDO: Resetar antes de buscar novas instâncias
+      setEvolutionInstances([]);
+      
       // Buscar instâncias do Evolution API
-      await fetchEvolutionInstances(data || []);
+      if (data && data.length > 0) {
+        await fetchEvolutionInstances(data);
+      }
     } catch (error) {
       console.error('❌ [API_INSTANCES] Erro inesperado ao carregar:', error);
       toast({
@@ -69,6 +74,8 @@ export const useApiInstancesEnhanced = () => {
 
   const fetchEvolutionInstances = async (apiInstances: ApiInstance[]) => {
     console.log('🔄 [EVOLUTION_INSTANCES] Buscando instâncias do Evolution API...');
+    
+    const allEvolutionInstances: EvolutionInstance[] = [];
     
     for (const apiInstance of apiInstances) {
       try {
@@ -92,16 +99,27 @@ export const useApiInstancesEnhanced = () => {
         
         if (Array.isArray(data)) {
           const formattedInstances = data.map((item: any) => ({
-            ...item.instance,
+            instanceName: item.instance?.instanceName || item.instanceName,
+            instanceId: item.instance?.instanceId || item.instanceId,
+            owner: item.instance?.owner || item.owner,
+            profileName: item.instance?.profileName || item.profileName,
+            profilePictureUrl: item.instance?.profilePictureUrl || item.profilePictureUrl,
+            profileStatus: item.instance?.profileStatus || item.profileStatus,
+            status: item.instance?.status || item.status,
+            serverUrl: item.instance?.serverUrl || apiInstance.base_url,
+            apikey: item.instance?.apikey || apiInstance.api_key,
             apiInstanceId: apiInstance.id
           }));
           
-          setEvolutionInstances(prev => [...prev, ...formattedInstances]);
+          allEvolutionInstances.push(...formattedInstances);
         }
       } catch (error) {
         console.error(`❌ [EVOLUTION_INSTANCES] Erro ao buscar instâncias de ${apiInstance.base_url}:`, error);
       }
     }
+    
+    console.log('✅ [EVOLUTION_INSTANCES] Total de instâncias encontradas:', allEvolutionInstances.length);
+    setEvolutionInstances(allEvolutionInstances);
   };
 
   const checkConnectionStatus = async (instance: ApiInstance) => {
