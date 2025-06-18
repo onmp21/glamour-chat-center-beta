@@ -26,6 +26,16 @@ interface LocalMessage {
   agentName: string;
   messageType: string;
   fileData: FileData | null;
+  // Add missing properties to match RawMessage interface
+  session_id: string;
+  message: string;
+  tipo_remetente?: string;
+  mensagemtype?: string;
+  Nome_do_contato?: string;
+  nome_do_contato?: string;
+  media_base64?: string;
+  read_at?: string;
+  is_read?: boolean;
 }
 
 export const useMessageSenderExtended = () => {
@@ -101,7 +111,14 @@ export const useMessageSenderExtended = () => {
             channelId: messageData.channelId,
             agentName: messageData.agentName || user?.name || 'Agente',
             messageType: messageData.messageType || 'text',
-            fileData: messageData.fileData || null
+            fileData: messageData.fileData || null,
+            // Add required properties for RawMessage compatibility
+            session_id: messageData.conversationId,
+            message: messageData.content,
+            tipo_remetente: 'agent',
+            mensagemtype: messageData.messageType || 'text',
+            read_at: new Date().toISOString(),
+            is_read: true
           };
           
           addMessageToState(localMessage);
