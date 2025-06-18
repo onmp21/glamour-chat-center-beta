@@ -22,6 +22,8 @@ export interface ReportResult {
   generation_time: number | null;
   created_at: string;
   generated_at: string;
+  report_type: string;
+  status: string;
 }
 
 export interface ReportHistory {
@@ -193,7 +195,9 @@ Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
           tokens_used: savedReport.tokens_used,
           generation_time: savedReport.generation_time,
           created_at: savedReport.created_at,
-          generated_at: savedReport.created_at
+          generated_at: savedReport.created_at,
+          report_type: savedReport.report_type,
+          status: 'completed'
         }
       };
 
