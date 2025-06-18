@@ -54,10 +54,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations();
 
     let channel: any = null;
+    let channelSuffix = '';
 
     if (channelId) {
       const messageService = new MessageService(channelId);
-      const channelSuffix = `-conversations-${Date.now()}`;
+      channelSuffix = `-conversations-${Date.now()}`;
       
       channel = messageService.createRealtimeSubscription((payload) => {
         DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
@@ -70,12 +71,16 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     return () => {
-      if (channel && channelId) {
+      if (channel && channelId && channelSuffix) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
-        const messageService = new MessageService(channelId);
-        const repository = messageService['getRepository']();
-        const tableName = repository.getTableName();
-        MessageService.unsubscribeChannel(`-conversations-${Date.now()}`, tableName);
+        try {
+          const messageService = new MessageService(channelId);
+          const repository = messageService['getRepository']();
+          const tableName = repository.getTableName();
+          MessageService.unsubscribeChannel(channelSuffix, tableName);
+        } catch (error) {
+          DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
+        }
       }
     };
   }, [channelId, loadConversations]);

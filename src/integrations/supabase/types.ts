@@ -385,7 +385,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -396,7 +396,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -407,7 +407,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -421,7 +421,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -432,7 +432,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -443,7 +443,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -665,7 +665,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -676,9 +676,9 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -687,7 +687,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
