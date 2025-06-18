@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -148,7 +149,8 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
 
     return () => {
       if (realtimeChannel) {
-        console.log(`🗑️ [SIMPLE_MESSAGES] Removendo canal realtime para ${tableName}:${sessionId}`);
+        const currentTableName = channelId ? getTableName(channelId) : '';
+        console.log(`🗑️ [SIMPLE_MESSAGES] Removendo canal realtime para ${currentTableName}:${sessionId}`);
         supabase.removeChannel(realtimeChannel);
       }
     };

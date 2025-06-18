@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { FileData, RawMessage } from '@/types/messageTypes';
+import { FileData } from '@/types/messageTypes';
 import { N8nMessagingService } from '@/services/N8nMessagingService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,6 +16,18 @@ export interface ExtendedMessageData {
   fileData?: FileData;
 }
 
+interface LocalMessage {
+  id: string;
+  content: string;
+  sender: 'agent';
+  timestamp: string;
+  conversationId: string;
+  channelId: string;
+  agentName: string;
+  messageType: string;
+  fileData: FileData | null;
+}
+
 export const useMessageSenderExtended = () => {
   const [sending, setSending] = useState(false);
   const { toast } = useToast();
@@ -23,7 +35,7 @@ export const useMessageSenderExtended = () => {
 
   const sendMessage = async (
     messageData: ExtendedMessageData, 
-    addMessageToState?: (message: RawMessage) => void
+    addMessageToState?: (message: LocalMessage) => void
   ): Promise<boolean> => {
     setSending(true);
     console.log('[useMessageSenderExtended] Início de sendMessage. messageData:', messageData);
@@ -80,16 +92,16 @@ export const useMessageSenderExtended = () => {
         
         // IMPORTANTE: NÃO SALVAR NO SUPABASE - apenas adicionar ao estado local
         if (addMessageToState) {
-          const localMessage: RawMessage = {
+          const localMessage: LocalMessage = {
             id: `temp_${Date.now()}`,
             content: messageData.content,
             sender: 'agent',
             timestamp: new Date().toISOString(),
-            conversation_id: messageData.conversationId,
-            channel_id: messageData.channelId,
-            agent_name: messageData.agentName || user?.name || 'Agente',
-            message_type: messageData.messageType || 'text',
-            file_data: messageData.fileData || null
+            conversationId: messageData.conversationId,
+            channelId: messageData.channelId,
+            agentName: messageData.agentName || user?.name || 'Agente',
+            messageType: messageData.messageType || 'text',
+            fileData: messageData.fileData || null
           };
           
           addMessageToState(localMessage);

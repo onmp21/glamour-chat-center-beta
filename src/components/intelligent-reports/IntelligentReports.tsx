@@ -113,8 +113,8 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
         for (const table of selectedChannelTables) {
           try {
             const { data, error } = await supabase
-              .from(table)
-              .select('message, timestamp, tipo_remetente')
+              .from(table as any)
+              .select('message, read_at, tipo_remetente')
               .limit(200);
             
             if (!error && data) {
@@ -141,7 +141,7 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
         for (const table of selectedChannelTables) {
           try {
             const { data, error } = await supabase
-              .from(table)
+              .from(table as any)
               .select('*')
               .limit(100);
             
@@ -169,11 +169,10 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
         reportData = { exams: examsData || [] };
       } else if (reportType === 'custom') {
         // Buscar dados das tabelas selecionadas
-        const customData = {};
+        const customData: any = {};
         
         for (const tableId of selectedTables) {
           try {
-            let tableName = '';
             if (tableId === 'conversations') {
               // Para conversas, buscar de todos os canais selecionados
               const conversationData = [];
@@ -183,7 +182,7 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
               
               for (const table of selectedChannelTables) {
                 const { data, error } = await supabase
-                  .from(table)
+                  .from(table as any)
                   .select('*')
                   .limit(100);
                 
@@ -198,13 +197,13 @@ export const IntelligentReports: React.FC<IntelligentReportsProps> = ({ isDarkMo
               customData[tableId] = conversationData;
             } else {
               // Para outras tabelas
-              tableName = tableId === 'channels' ? 'channels' :
-                         tableId === 'exams' ? 'exams' :
-                         tableId === 'users' ? 'users' :
-                         tableId === 'api_instances' ? 'api_instances' : tableId;
+              const tableName = tableId === 'channels' ? 'channels' :
+                             tableId === 'exams' ? 'exams' :
+                             tableId === 'users' ? 'users' :
+                             tableId === 'api_instances' ? 'api_instances' : tableId;
               
               const { data, error } = await supabase
-                .from(tableName)
+                .from(tableName as any)
                 .select('*')
                 .limit(100);
               
