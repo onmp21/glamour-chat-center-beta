@@ -12,15 +12,24 @@ export interface ReportGenerationRequest {
 
 export interface ReportResult {
   id: string;
+  title: string;
+  content: string;
+  provider_id: string;
+  report_content: string;
   generated_report: string;
   model_used: string | null;
   tokens_used: number | null;
   generation_time: number | null;
   created_at: string;
+  generated_at: string;
 }
 
 export interface ReportHistory {
   id: string;
+  title: string;
+  generated_at: string;
+  provider_used: string;
+  provider_id: string;
   report_type: string;
   generated_report: string;
   model_used: string | null;
@@ -28,11 +37,12 @@ export interface ReportHistory {
   generation_time: number | null;
   created_at: string;
   prompt: string;
+  report_metadata: any;
 }
 
 export class IntelligentReportsService {
   
-  // CORRIGIDO: Função para buscar dados reais das planilhas selecionadas
+  // Função para buscar dados reais das planilhas selecionadas
   static async fetchReportData(reportType: string, selectedSheets: string[] = []): Promise<any> {
     console.log('📊 [INTELLIGENT_REPORTS] Buscando dados para relatório:', { reportType, selectedSheets });
     
@@ -174,11 +184,16 @@ Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
         success: true,
         result: {
           id: savedReport.id,
+          title: `Relatório ${request.report_type}`,
+          content: savedReport.generated_report,
+          provider_id: savedReport.provider_id,
+          report_content: savedReport.generated_report,
           generated_report: savedReport.generated_report,
           model_used: savedReport.model_used,
           tokens_used: savedReport.tokens_used,
           generation_time: savedReport.generation_time,
-          created_at: savedReport.created_at
+          created_at: savedReport.created_at,
+          generated_at: savedReport.created_at
         }
       };
 
@@ -197,7 +212,10 @@ Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
       
       const { data, error } = await supabase
         .from('report_history')
-        .select('*')
+        .select(`
+          *,
+          ai_providers!inner(name)
+        `)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -207,7 +225,22 @@ Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
       }
 
       console.log('✅ [INTELLIGENT_REPORTS] Relatórios carregados:', data?.length || 0);
-      return data || [];
+      
+      return (data || []).map(report => ({
+        id: report.id,
+        title: `Relatório ${report.report_type}`,
+        generated_at: report.created_at,
+        provider_used: report.ai_providers?.name || 'Desconhecido',
+        provider_id: report.provider_id,
+        report_type: report.report_type,
+        generated_report: report.generated_report,
+        model_used: report.model_used,
+        tokens_used: report.tokens_used,
+        generation_time: report.generation_time,
+        created_at: report.created_at,
+        prompt: report.prompt,
+        report_metadata: report.report_metadata
+      }));
     } catch (error) {
       console.error('❌ [INTELLIGENT_REPORTS] Erro inesperado:', error);
       throw error;

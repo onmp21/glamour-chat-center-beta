@@ -3,28 +3,24 @@ import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
-import { AIProvider, ReportResult, ReportHistory } from '@/types/ai-providers';
-import { ConversationService } from '@/services/ConversationService';
-import { IntelligentReportsService } from '@/services/IntelligentReportsService';
+import { AIProvider } from '@/types/ai-providers';
+import { IntelligentReportsService, ReportResult, ReportHistory } from '@/services/IntelligentReportsService';
 import { ReportStatsSection } from './ReportStatsSection';
 import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
 import { useActiveChannels } from '@/hooks/useActiveChannels';
-import { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
 }
 
-// Everything below uses ReportType, which allows 'exams' as valid value.
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
   isDarkMode
 }) => {
   const { toast } = useToast();
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
-  // Correct: Explicitly type filters as ReportFilters (which includes ReportType = 'conversations' | 'channels' | 'exams' | 'custom')
   const [filters, setFilters] = useState<any>({
     report_type: 'conversations'
   });
@@ -147,24 +143,30 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         provider_id: selectedProvider,
         report_type: filters.report_type,
         data: reportData,
-        custom_prompt: filters.custom_prompt
+        custom_prompt: filters.custom_prompt,
+        selected_sheets: filters.selected_sheets
       });
 
-      // Exibe mensagem customizada se houver erro no conteúdo do relatório
-      if (
-        result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
-        || result.generated_report?.includes("chave de API")
-        || result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
-      ) {
-        setError(result.generated_report);
+      if (!result.success || !result.result) {
+        setError(result.error || 'Erro desconhecido na geração do relatório');
         setReportResult(null);
       } else {
-        setReportResult(result.result);
-        toast({
-          title: "Sucesso",
-          description: "Relatório gerado com sucesso",
-        });
-        loadRecentReports();
+        // Exibe mensagem customizada se houver erro no conteúdo do relatório
+        if (
+          result.result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
+          || result.result.generated_report?.includes("chave de API")
+          || result.result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
+        ) {
+          setError(result.result.generated_report);
+          setReportResult(null);
+        } else {
+          setReportResult(result.result);
+          toast({
+            title: "Sucesso",
+            description: "Relatório gerado com sucesso",
+          });
+          loadRecentReports();
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
