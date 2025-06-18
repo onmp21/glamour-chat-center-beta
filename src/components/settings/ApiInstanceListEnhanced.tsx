@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -398,7 +397,7 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
       {/* Modais */}
       <DeleteInstanceModal
         isOpen={deleteModal.isOpen}
-        instance={deleteModal.instance}
+        instanceName={deleteModal.instance?.instance_name || ''}
         onClose={() => setDeleteModal({ isOpen: false })}
         onConfirm={() => {
           if (deleteModal.instance) {
