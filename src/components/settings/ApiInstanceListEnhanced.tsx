@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -379,7 +380,7 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
                   </Button>
                   
                   <Button
-                    onClick={() => deleteInstance(instance)}
+                    onClick={() => setDeleteModal({ isOpen: true, instance })}
                     variant="outline"
                     size="sm"
                     className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -399,8 +400,10 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
         isOpen={deleteModal.isOpen}
         instance={deleteModal.instance}
         onClose={() => setDeleteModal({ isOpen: false })}
-        onConfirm={(instance) => {
-          deleteInstance(instance);
+        onConfirm={() => {
+          if (deleteModal.instance) {
+            deleteInstance(deleteModal.instance);
+          }
           setDeleteModal({ isOpen: false });
         }}
         isDarkMode={isDarkMode}
