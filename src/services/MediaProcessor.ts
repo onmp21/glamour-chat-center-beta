@@ -1,3 +1,4 @@
+
 import { MediaDetector } from './media/MediaDetector';
 import { MediaStorageService } from './MediaStorageService';
 
@@ -175,9 +176,6 @@ export class MediaProcessor {
       case 'video': return '🎥';
       case 'document': return '📄';
       default: return '📎';
-    }
-  }
-}eturn '📎';
     }
   }
 }
