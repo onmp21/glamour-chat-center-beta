@@ -13,6 +13,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
+  const subscriptionManagerRef = useRef<RealtimeSubscriptionManager | null>(null);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -56,10 +57,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   useEffect(() => {
     loadConversations();
 
-    // Only create realtime subscription if not already subscribed
+    // Only create realtime subscription if we have a valid channelId
     if (channelId) {
       const tableName = getTableNameForChannelSync(channelId);
       tableNameRef.current = tableName;
+      subscriptionManagerRef.current = RealtimeSubscriptionManager.getInstance();
       
       const callback = (payload: any) => {
         DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
@@ -71,8 +73,9 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
       const setupSubscription = async () => {
         try {
-          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          await subscriptionManager.createSubscription(tableName, callback);
+          if (!subscriptionManagerRef.current) return;
+          
+          await subscriptionManagerRef.current.createSubscription(tableName, callback);
           DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao crear subscription:`, error);
@@ -83,11 +86,10 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     return () => {
-      if (tableNameRef.current && callbackRef.current) {
+      if (tableNameRef.current && callbackRef.current && subscriptionManagerRef.current) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         try {
-          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
+          subscriptionManagerRef.current.removeSubscription(tableNameRef.current, callbackRef.current);
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }

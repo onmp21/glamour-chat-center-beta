@@ -8,12 +8,17 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   const [isConnected, setIsConnected] = useState(false);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
+  const subscriptionManagerRef = useRef<RealtimeSubscriptionManager | null>(null);
 
   useEffect(() => {
-    if (!channelId || !onNewMessage) return;
+    if (!channelId || !onNewMessage) {
+      setIsConnected(false);
+      return;
+    }
 
     const tableName = getTableNameForChannelSync(channelId);
     tableNameRef.current = tableName;
+    subscriptionManagerRef.current = RealtimeSubscriptionManager.getInstance();
 
     const callback = (payload: any) => {
       console.log('🔴 [CONVERSATION_REALTIME] New realtime message:', payload);
@@ -26,12 +31,13 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
 
     const setupSubscription = async () => {
       try {
-        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        if (!subscriptionManagerRef.current) return;
         
-        const channel = await subscriptionManager.createSubscription(tableName, callback);
+        const channel = await subscriptionManagerRef.current.createSubscription(tableName, callback);
 
         if (channel) {
           setIsConnected(true);
+          console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName}`);
         }
       } catch (error) {
         console.error('❌ [CONVERSATION_REALTIME] Error setting up subscription:', error);
@@ -42,11 +48,10 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
     setupSubscription();
 
     return () => {
-      if (tableNameRef.current && callbackRef.current) {
+      if (tableNameRef.current && callbackRef.current && subscriptionManagerRef.current) {
         console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription for table ${tableNameRef.current}`);
         try {
-          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
+          subscriptionManagerRef.current.removeSubscription(tableNameRef.current, callbackRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_REALTIME] Error cleaning up subscription:', error);
         }

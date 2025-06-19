@@ -6,6 +6,7 @@ interface SubscriptionInfo {
   subscriptionCount: number;
   tableName: string;
   isSubscribed: boolean;
+  isSubscribing: boolean;
   callbacks: Set<(payload: any) => void>;
 }
 
@@ -30,9 +31,9 @@ class RealtimeSubscriptionManager {
       return null;
     }
 
-    // Use table name as the key to prevent duplicates
     const existing = this.subscriptions.get(tableName);
     
+    // If already subscribed, just add the callback
     if (existing && existing.isSubscribed) {
       console.log(`[REALTIME_MANAGER] Reusing existing subscription for table: ${tableName}`);
       existing.subscriptionCount++;
@@ -40,42 +41,37 @@ class RealtimeSubscriptionManager {
       return existing.channel;
     }
 
-    if (existing && !existing.isSubscribed) {
+    // If currently subscribing, wait for it and add callback
+    if (existing && existing.isSubscribing) {
       console.log(`[REALTIME_MANAGER] Adding callback to pending subscription: ${tableName}`);
       existing.callbacks.add(callback);
       existing.subscriptionCount++;
-      return existing.channel;
+      
+      // Wait for the subscription to complete
+      return new Promise((resolve) => {
+        const checkSubscription = setInterval(() => {
+          const current = this.subscriptions.get(tableName);
+          if (current && current.isSubscribed) {
+            clearInterval(checkSubscription);
+            resolve(current.channel);
+          }
+        }, 100);
+        
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          clearInterval(checkSubscription);
+          resolve(existing.channel);
+        }, 10000);
+      });
     }
 
     // Create new subscription
     console.log(`[REALTIME_MANAGER] Creating new subscription for table: ${tableName}`);
     
-    const channelName = `realtime-${tableName}-${Date.now()}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: tableName
-        },
-        (payload) => {
-          const info = this.subscriptions.get(tableName);
-          if (info) {
-            // Call all registered callbacks
-            info.callbacks.forEach(cb => {
-              try {
-                cb(payload);
-              } catch (error) {
-                console.error(`[REALTIME_MANAGER] Error in callback for ${tableName}:`, error);
-              }
-            });
-          }
-        }
-      );
+    const channelName = `realtime-${tableName}`;
+    const channel = supabase.channel(channelName);
 
-    // Initialize subscription info
+    // Initialize subscription info immediately to prevent race conditions
     const callbacks = new Set<(payload: any) => void>();
     callbacks.add(callback);
     
@@ -84,8 +80,32 @@ class RealtimeSubscriptionManager {
       subscriptionCount: 1,
       tableName,
       isSubscribed: false,
+      isSubscribing: true,
       callbacks
     });
+
+    // Configure the channel but don't subscribe yet
+    channel.on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: tableName
+      },
+      (payload) => {
+        const info = this.subscriptions.get(tableName);
+        if (info) {
+          // Call all registered callbacks
+          info.callbacks.forEach(cb => {
+            try {
+              cb(payload);
+            } catch (error) {
+              console.error(`[REALTIME_MANAGER] Error in callback for ${tableName}:`, error);
+            }
+          });
+        }
+      }
+    );
 
     // Subscribe and wait for confirmation
     return new Promise((resolve, reject) => {
@@ -96,8 +116,10 @@ class RealtimeSubscriptionManager {
         if (info) {
           if (status === 'SUBSCRIBED') {
             info.isSubscribed = true;
+            info.isSubscribing = false;
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR') {
+            info.isSubscribing = false;
             this.subscriptions.delete(tableName);
             reject(new Error(`Failed to subscribe to table: ${tableName}`));
           }
