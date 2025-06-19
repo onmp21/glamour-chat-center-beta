@@ -56,32 +56,32 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
       )}>
         Relatórios Recentes
       </h2>
-      <ul className="grid gap-3">
+      <ul className="grid gap-4">
         {recentReports.map(report => (
           <li key={report.id} className={cn(
-            "flex flex-col p-4 rounded transition-colors border",
+            "flex flex-col p-5 rounded-lg transition-colors border",
             isDarkMode 
-              ? "bg-[#27272a] border-[#3f3f46]" 
-              : "bg-gray-100 border-gray-200"
+              ? "bg-card border-border" 
+              : "bg-gray-50 border-gray-200"
           )}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <span className={cn(
-                "font-medium text-sm flex-1",
+                "font-medium text-base flex-1",
                 isDarkMode ? "text-white" : "text-gray-900"
               )}>
                 {report.title}
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <button
                   onClick={() => {
                     setSelectedReport(report);
                     if (typeof onViewReport === "function") onViewReport(report.result);
                   }}
                   className={cn(
-                    "text-primary px-3 py-1 border rounded hover:bg-primary/10 transition text-xs",
+                    "px-4 py-2 border rounded-md hover:bg-primary/10 transition-colors text-sm font-medium",
                     isDarkMode 
-                      ? "bg-[#18181b] border-[#3f3f46] hover:bg-primary/20" 
-                      : "bg-white border-gray-300"
+                      ? "bg-card border-border text-primary hover:bg-primary/20" 
+                      : "bg-white border-gray-300 text-primary hover:bg-primary/5"
                   )}
                 >
                   Ver
@@ -89,37 +89,37 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
                 <button
                   onClick={() => handleDownloadTxt(report.generated_report, report.report_type, report.id)}
                   className={cn(
-                    "flex items-center gap-1 px-3 py-1 border rounded hover:bg-blue-50 transition text-xs",
+                    "flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-blue-50 transition-colors text-sm font-medium",
                     isDarkMode 
-                      ? "bg-[#18181b] border-[#3f3f46] text-blue-400 hover:bg-blue-900/20" 
-                      : "bg-white border-gray-300 text-blue-600"
+                      ? "bg-card border-border text-blue-400 hover:bg-blue-500/20" 
+                      : "bg-white border-gray-300 text-blue-600 hover:bg-blue-50"
                   )}
                   title="Baixar como TXT"
                 >
-                  <Download size={12} />
+                  <Download size={16} />
                   TXT
                 </button>
                 <button
                   onClick={() => handleRemove(report.id)}
                   className={cn(
-                    "flex items-center gap-1 px-3 py-1 border rounded hover:bg-red-50 transition text-xs",
+                    "flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-red-50 transition-colors text-sm font-medium",
                     isDarkMode 
-                      ? "bg-[#18181b] border-[#3f3f46] text-red-400 hover:bg-red-900/20" 
-                      : "bg-white border-gray-300 text-red-600"
+                      ? "bg-card border-border text-red-400 hover:bg-red-500/20" 
+                      : "bg-white border-gray-300 text-red-600 hover:bg-red-50"
                   )}
                   title="Remover relatório"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             </div>
             
             {/* Data de criação */}
             <div className={cn(
-              "flex items-center gap-1 text-xs",
-              isDarkMode ? "text-gray-400" : "text-gray-600"
+              "flex items-center gap-2 text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
             )}>
-              <Calendar size={12} />
+              <Calendar size={14} />
               <span>Criado em: {formatDate(report.created_at)}</span>
             </div>
           </li>
@@ -128,33 +128,54 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
       
       {/* Modal simples para visualização de relatório */}
       {selectedReport && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className={cn(
-            "max-w-lg w-full rounded shadow p-5",
+            "max-w-2xl w-full mx-4 rounded-lg shadow-xl",
             isDarkMode 
-              ? "bg-[#18181b] border border-[#3f3f46]" 
+              ? "bg-card border border-border" 
               : "bg-white border border-gray-200"
           )}>
-            <h3 className={cn(
-              "font-semibold text-lg mb-2",
-              isDarkMode ? "text-white" : "text-gray-900"
+            <div className={cn(
+              "flex items-center justify-between p-6 border-b",
+              isDarkMode ? "border-border" : "border-gray-200"
             )}>
-              Relatório
-            </h3>
-            <pre className={cn(
-              "overflow-x-auto max-h-96 rounded p-3 text-sm",
-              isDarkMode 
-                ? "bg-[#27272a] text-gray-300" 
-                : "bg-gray-50 text-gray-900"
+              <h3 className={cn(
+                "font-semibold text-xl",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
+                Relatório
+              </h3>
+              <button 
+                onClick={() => setSelectedReport(null)}
+                className={cn(
+                  "text-2xl font-light hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors",
+                  isDarkMode ? "text-gray-400 hover:bg-gray-700 hover:text-white" : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              <pre className={cn(
+                "overflow-auto max-h-96 rounded-lg p-4 text-sm whitespace-pre-wrap",
+                isDarkMode 
+                  ? "bg-muted text-foreground" 
+                  : "bg-gray-50 text-gray-900"
+              )}>
+                {selectedReport.generated_report || selectedReport.content}
+              </pre>
+            </div>
+            <div className={cn(
+              "flex justify-end p-6 border-t",
+              isDarkMode ? "border-border" : "border-gray-200"
             )}>
-              {selectedReport.generated_report || selectedReport.content}
-            </pre>
-            <button 
-              className="mt-3 px-4 py-2 bg-primary text-white rounded hover:bg-primary/90 transition-colors" 
-              onClick={() => setSelectedReport(null)}
-            >
-              Fechar
-            </button>
+              <button 
+                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium" 
+                onClick={() => setSelectedReport(null)}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
