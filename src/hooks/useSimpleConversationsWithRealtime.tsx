@@ -146,7 +146,7 @@ export const useSimpleConversationsWithRealtime = (
     }
   }, [channelId, isAuthenticated, user?.name]);
 
-  // Setup polling
+  // Setup polling - APENAS polling, sem Supabase subscriptions
   useEffect(() => {
     mountedRef.current = true;
     
