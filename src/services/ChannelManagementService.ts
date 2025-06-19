@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -73,9 +72,9 @@ export class ChannelManagementService {
         return { success: false, error: 'Erro ao criar canal no banco de dados' };
       }
 
-      // Criar tabela de conversas usando o nome correto do parâmetro
+      // Criar tabela de conversas usando o parâmetro correto
       const { error: tableError } = await supabase.rpc('create_conversation_table', {
-        p_table_name: tableName
+        table_name: tableName
       });
 
       if (tableError) {
