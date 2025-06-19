@@ -7,7 +7,7 @@ import { MessageHistory } from './MessageHistory';
 import { MessageInput } from './MessageInput';
 import { ConversationHeader } from './ConversationHeader';
 import { ConversationStatusManager } from './ConversationStatusManager';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 
 interface WhatsAppChatProps {
   isDarkMode: boolean;
@@ -24,7 +24,7 @@ export const WhatsAppChat: React.FC<WhatsAppChatProps> = ({
 }) => {
   const [selectedChannel, setSelectedChannel] = useState<string>(channelId === 'channels' ? 'chat' : channelId);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(initialConversationId);
-  const { conversations } = useChannelConversationsRefactored(selectedChannel);
+  const { conversations } = useSimpleConversationsWithRealtime(selectedChannel);
 
   useEffect(() => {
     if (channelId !== 'channels') {

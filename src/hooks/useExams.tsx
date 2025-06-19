@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 
@@ -159,6 +160,9 @@ export const useExams = () => {
     }
   };
 
+  // Add the missing function
+  const deleteMultipleExams = deleteExams;
+
   const getExamStats = () => {
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -200,6 +204,7 @@ export const useExams = () => {
     updateExam,
     deleteExam,
     deleteExams, // Para deletar múltiplos exames
+    deleteMultipleExams, // Add the alias that ExamesTable expects
     getExamStats, // Para estatísticas do dashboard
     refreshExams: loadExams
   };

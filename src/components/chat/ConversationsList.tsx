@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { ConversationsListHeader } from './ConversationsListHeader';
 import { ConversationsListEmpty } from './ConversationsListEmpty';
 import { ConversationItem } from './ConversationItem';
@@ -23,9 +23,9 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
   const {
     conversations,
     loading,
-    refreshing,
+    error,
     refreshConversations
-  } = useChannelConversationsRefactored(channelId);
+  } = useSimpleConversationsWithRealtime(channelId);
   
   console.log(`📋 [CONVERSATIONS_LIST] Rendering for channel ${channelId} with ${conversations.length} conversations`);
   
@@ -33,6 +33,13 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
     console.log(`👆 [CONVERSATIONS_LIST] Conversation clicked: ${conversationId}`);
     onConversationSelect(conversationId);
   };
+
+  // Ordenar conversas por data mais recente no topo
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const dateA = new Date(a.last_message_time || a.updated_at).getTime();
+    const dateB = new Date(b.last_message_time || b.updated_at).getTime();
+    return dateB - dateA; // Mais recente primeiro
+  });
   
   if (loading) {
     return (
@@ -47,18 +54,18 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
       <div className="flex-shrink-0">
         <ConversationsListHeader
           isDarkMode={isDarkMode}
-          refreshing={refreshing}
+          refreshing={loading}
           onRefresh={refreshConversations}
         />
       </div>
 
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
-          {conversations.length === 0 ? (
+          {sortedConversations.length === 0 ? (
             <ConversationsListEmpty isDarkMode={isDarkMode} />
           ) : (
             <div className="space-y-1 p-2">
-              {conversations.map(conversation => (
+              {sortedConversations.map(conversation => (
                 <ConversationItem
                   key={`${channelId}-${conversation.id}`}
                   conversation={conversation}

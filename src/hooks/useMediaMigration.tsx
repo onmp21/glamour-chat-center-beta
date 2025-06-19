@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { MediaMigrationService } from '@/services/MediaMigrationService';
-import { getTableNameForChannel } from '@/utils/channelMapping';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 
 export const useMediaMigration = (channelId: string) => {
   const [migrationState, setMigrationState] = useState({
@@ -12,7 +12,7 @@ export const useMediaMigration = (channelId: string) => {
   });
 
   const startMigration = async (batchSize: number = 5) => {
-    const tableName = getTableNameForChannel(channelId);
+    const tableName = getTableNameForChannelSync(channelId);
     
     setMigrationState({
       isRunning: true,

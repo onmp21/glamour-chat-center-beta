@@ -291,30 +291,30 @@ export type Database = {
         }
         Relationships: []
       }
-      contact_tags: {
+      contacts: {
         Row: {
-          applied_at: string | null
-          contact_phone: string
-          expires_at: string | null
+          channels: string[] | null
+          contact_name: string
+          created_at: string
           id: string
-          is_active: boolean
-          tag_id: string | null
+          phone_number: string
+          updated_at: string
         }
         Insert: {
-          applied_at?: string | null
-          contact_phone: string
-          expires_at?: string | null
+          channels?: string[] | null
+          contact_name: string
+          created_at?: string
           id?: string
-          is_active?: boolean
-          tag_id?: string | null
+          phone_number: string
+          updated_at?: string
         }
         Update: {
-          applied_at?: string | null
-          contact_phone?: string
-          expires_at?: string | null
+          channels?: string[] | null
+          contact_name?: string
+          created_at?: string
           id?: string
-          is_active?: boolean
-          tag_id?: string | null
+          phone_number?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -385,7 +385,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -396,7 +396,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -407,7 +407,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -421,7 +421,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -432,7 +432,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -443,7 +443,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -457,7 +457,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -468,7 +468,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -479,7 +479,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -590,6 +590,150 @@ export type Database = {
         }
         Relationships: []
       }
+      teste_conversas: {
+        Row: {
+          id: number
+          is_read: boolean | null
+          media_url: string | null
+          mensagemtype: string | null
+          message: string
+          nome_do_contato: string | null
+          read_at: string | null
+          session_id: string
+          tipo_remetente: string | null
+        }
+        Insert: {
+          id?: number
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id: string
+          tipo_remetente?: string | null
+        }
+        Update: {
+          id?: number
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string
+          tipo_remetente?: string | null
+        }
+        Relationships: []
+      }
+      teste_conversas_backup_20250619_180343: {
+        Row: {
+          id: number | null
+          is_read: boolean | null
+          media_url: string | null
+          mensagemtype: string | null
+          message: string | null
+          nome_do_contato: string | null
+          read_at: string | null
+          session_id: string | null
+          tipo_remetente: string | null
+        }
+        Insert: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Update: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Relationships: []
+      }
+      teste_conversas_backup_20250619_180344: {
+        Row: {
+          id: number | null
+          is_read: boolean | null
+          media_url: string | null
+          mensagemtype: string | null
+          message: string | null
+          nome_do_contato: string | null
+          read_at: string | null
+          session_id: string | null
+          tipo_remetente: string | null
+        }
+        Insert: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Update: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Relationships: []
+      }
+      teste_conversas_backup_20250619_180402: {
+        Row: {
+          id: number | null
+          is_read: boolean | null
+          media_url: string | null
+          mensagemtype: string | null
+          message: string | null
+          nome_do_contato: string | null
+          read_at: string | null
+          session_id: string | null
+          tipo_remetente: string | null
+        }
+        Insert: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Update: {
+          id?: number | null
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string | null
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string | null
+          tipo_remetente?: string | null
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null
@@ -665,7 +809,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
+          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -676,9 +820,9 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -687,7 +831,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
+          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -702,12 +846,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backup_conversation_table: {
+        Args: { table_name: string }
+        Returns: string
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      count_unique_sessions: {
+        Args: { table_name: string }
+        Returns: number
+      }
       count_unread_messages: {
         Args: { table_name: string; p_session_id: string }
+        Returns: number
+      }
+      count_unread_messages_total: {
+        Args: { table_name: string }
         Returns: number
       }
       create_audit_log: {
@@ -720,6 +876,10 @@ export type Database = {
           p_details?: Json
         }
         Returns: string
+      }
+      create_conversation_table: {
+        Args: { table_name: string }
+        Returns: undefined
       }
       create_user_with_hash: {
         Args: {
@@ -735,6 +895,10 @@ export type Database = {
       detect_mime_from_base64: {
         Args: { base64_content: string }
         Returns: string
+      }
+      drop_conversation_table: {
+        Args: { table_name: string }
+        Returns: undefined
       }
       format_base64_to_data_url: {
         Args: { base64_content: string; message_type?: string }
@@ -817,6 +981,10 @@ export type Database = {
       process_base64_to_storage: {
         Args: { base64_content: string; file_name?: string; mime_type?: string }
         Returns: string
+      }
+      rename_conversation_table: {
+        Args: { old_name: string; new_name: string }
+        Returns: undefined
       }
       sparsevec_out: {
         Args: { "": unknown }

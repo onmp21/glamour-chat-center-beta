@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -59,16 +60,11 @@ const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   manager: 'Gerência geral'
 };
 
+// Reduced settings sections - removed admin-only sections
 const SETTINGS_SECTIONS = [
   { key: 'credentials', label: 'Alterar Credenciais' },
   { key: 'notifications', label: 'Configurações de Notificação' },
-  { key: 'users', label: 'Gerenciamento de Usuários' },
-  { key: 'channels', label: 'Gerenciar Canais' },
-  { key: 'audit', label: 'Histórico de Auditoria' },
-  { key: 'ai', label: 'Configurações de IA' },
-  { key: 'evolution', label: 'API Evolution' },
-  { key: 'system', label: 'Sistema' },
-  { key: 'backup', label: 'Backup e Dados' },
+  { key: 'system', label: 'Sistema' }
 ];
 
 export const UserFormModal: React.FC<UserFormModalProps> = ({
@@ -111,7 +107,7 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className={cn("sm:max-w-md", isDarkMode ? "bg-[#1a1a1a] border-[#333333] text-white" : "bg-white text-gray-900")}>
+      <DialogContent className={cn("sm:max-w-md max-h-[90vh] overflow-y-auto", isDarkMode ? "bg-[#1a1a1a] border-[#333333] text-white" : "bg-white text-gray-900")}>
         <DialogHeader>
           <DialogTitle className={cn(isDarkMode ? "text-white" : "text-gray-900")}>
             {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
@@ -230,10 +226,10 @@ export const UserFormModal: React.FC<UserFormModalProps> = ({
               ))}
             </div>
           </div>
-          {/* Seções de Configurações Permitidas */}
+          {/* Seções de Configurações Permitidas - Reduced */}
           <div>
             <Label className={cn(isDarkMode ? "text-gray-300" : "text-gray-700")}>Seções de Configurações Permitidas</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="grid grid-cols-1 gap-2 mt-2">
               {SETTINGS_SECTIONS.map(sec => (
                 <div key={sec.key} className="flex items-center space-x-2">
                   <Checkbox

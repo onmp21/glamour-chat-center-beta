@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Paperclip, Mic, X, FileText, Image, Music, Video, StopCircle, Check, Sparkles, Zap } from 'lucide-react';
 import { EmojiPickerCompact } from './EmojiPickerCompact';
-import { openaiService } from '@/services/openaiService';
 import { ChannelConversation } from '@/types/messages';
 import { useMessageSenderExtended } from '@/hooks/useMessageSenderExtended';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileService } from '@/services/FileService';
 import { useAgentMessageLock } from "@/hooks/useAgentMessageLock";
 import { getContactDisplayName } from "@/utils/getContactDisplayName";
+import { AIQuickResponseModal } from './AIQuickResponseModal';
+
 interface ChatInputProps {
   isDarkMode: boolean;
   onSendMessage?: (message: string) => void;
@@ -19,12 +20,13 @@ interface ChatInputProps {
   selectedConv?: ChannelConversation;
   channelId?: string;
 }
+
 interface FilePreview {
   file: File;
   url: string;
   type: 'image' | 'video' | 'audio' | 'file';
 }
-const QUICK_RESPONSES = ["Olá! Como posso ajudá-lo hoje?", "Obrigado pelo contato. Vou verificar essa informação para você.", "Perfeito! Vou agendar isso para você agora mesmo.", "Entendi sua solicitação. Preciso de alguns dados adicionais.", "Muito obrigado! Seu atendimento foi finalizado com sucesso.", "Vou transferir você para o setor responsável."];
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   isDarkMode,
   selectedConv,
@@ -36,7 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showFilePreviewModal, setShowFilePreviewModal] = useState(false);
-  const [showQuickResponses, setShowQuickResponses] = useState(false);
+  const [showAIQuickResponseModal, setShowAIQuickResponseModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -76,9 +78,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         let base64: string;
         let mimeType = filePreview.file.type;
         base64 = await FileService.convertToBase64(filePreview.file);
-        const fullBase64 = ensureDataUrl(base64, mimeType);
+        
+        // Garantir que o base64 seja puro (sem prefixo data:)
+        const pureBase64 = base64.startsWith("data:") ? base64.split(",")[1] : base64;
+        
         fileData = {
-          base64: fullBase64,
+          base64: pureBase64, // Enviar base64 puro
           fileName: filePreview.file.name,
           mimeType: mimeType,
           size: filePreview.file.size
@@ -96,7 +101,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     const getMessageTypeFromFileType = (type: FilePreview['type'] | undefined): 'text' | 'file' | 'audio' | 'image' | 'video' | 'document' => {
       if (!type) return 'text';
-      if (type === 'file') return 'file';
+      if (type === 'file') return 'document';
       if (type === 'audio') return 'audio';
       if (type === 'image') return 'image';
       if (type === 'video') return 'video';
@@ -107,15 +112,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       ? getMessageTypeFromFileType(fileType)
       : 'text';
 
+    // Usar a legenda personalizada se fornecida, senão usar a mensagem normal
+    const finalContent = customCaption !== undefined ? customCaption : message.trim() || (filePreview ? filePreview.file.name : "");
+
     const messageData = {
       conversationId,
       channelId,
-      content: customCaption !== undefined ? customCaption : message.trim() || (filePreview ? filePreview.file.name : ""),
+      content: finalContent,
       sender: 'agent' as const,
       agentName: user.name,
       messageType,
       fileData: fileData || undefined
     };
+
+    console.log('📤 [CHAT_INPUT] Enviando mensagem:', {
+      hasText: !!finalContent,
+      hasFile: !!fileData,
+      messageType,
+      fileName: fileData?.fileName
+    });
 
     const success = await sendMessage(messageData, onSendMessage as ((message: any) => void) | undefined);
 
@@ -128,40 +143,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     setSendingLocal(false);
   };
 
-  const handleQuickResponse = (response: string) => {
+  const handleQuickResponseSelect = (response: string) => {
     setMessage(response);
-    setShowQuickResponses(false);
-  };
-
-  const handleAIQuickResponse = async () => {
-    if (!selectedConv || !channelId) {
-      console.error('❌ [AI_QUICK_RESPONSE] Conversa ou canal não selecionado');
-      return;
-    }
-
-    if (typeof openaiService.generateSuggestedResponse !== 'function') {
-      console.error('❌ [AI_QUICK_RESPONSE] openaiService.generateSuggestedResponse is not a function.');
-      setMessage("Desculpe, não consigo gerar uma sugestão agora.");
-      return;
-    }
-    try {
-      console.log('🤖 [AI_QUICK_RESPONSE] Gerando resposta rápida com IA...');
-
-      const conversationIdentifier = selectedConv.contact_phone || selectedConv.id;
-      if (!conversationIdentifier) {
-        console.error('❌ [AI_QUICK_RESPONSE] Identificador de conversa inválido.');
-        setMessage("Não foi possível identificar a conversa para gerar uma sugestão.");
-        return;
-      }
-      const suggestedResponse = await openaiService.generateSuggestedResponse(channelId, conversationIdentifier);
-      setMessage(suggestedResponse);
-      console.log('✅ [AI_QUICK_RESPONSE] Resposta sugerida gerada:', suggestedResponse);
-    } catch (error) {
-      console.error('❌ [AI_QUICK_RESPONSE] Erro ao gerar resposta:', error);
-      const fallbackResponses = ["Obrigado pelo contato. Como posso ajudá-lo hoje?", "Entendi sua solicitação. Vou verificar isso para você.", "Agradeço sua paciência. Estou analisando sua situação."];
-      const randomResponse = fallbackResponses[Math.floor(Math.random() * fallbackResponses.length)];
-      setMessage(randomResponse);
-    }
+    setShowAIQuickResponseModal(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -255,26 +239,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         let convertedBase64 = '';
         try {
           convertedBase64 = await FileService.convertToBase64(audioFile);
+          // Garantir que seja base64 puro
+          const pureBase64 = convertedBase64.startsWith("data:") ? convertedBase64.split(",")[1] : convertedBase64;
+          
+          await sendMessage({
+            conversationId: selectedConv?.contact_phone || selectedConv?.id,
+            channelId,
+            content: '[Áudio]',
+            sender: 'agent' as const,
+            agentName: user?.name,
+            messageType: 'audio',
+            fileData: {
+              base64: pureBase64, // Base64 puro
+              fileName: audioFile.name,
+              mimeType: audioFile.type,
+              size: audioFile.size
+            }
+          }, onSendMessage as ((message: any) => void) | undefined);
         } catch {
           alert('Erro ao codificar áudio');
-          setSendingLocal(false);
-          setSendingAudio(false);
-          return;
         }
-        await sendMessage({
-          conversationId: selectedConv?.contact_phone || selectedConv?.id,
-          channelId,
-          content: '[Áudio]',
-          sender: 'agent' as const,
-          agentName: user?.name,
-          messageType: 'audio',
-          fileData: {
-            base64: convertedBase64.startsWith("data:") ? convertedBase64.split(",")[1] : convertedBase64,
-            fileName: audioFile.name,
-            mimeType: audioFile.type,
-            size: audioFile.size
-          }
-        }, onSendMessage as ((message: any) => void) | undefined);
+        
         setSendingLocal(false);
         setSendingAudio(false);
         setIsRecording(false);
@@ -409,24 +394,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       </div>
     </div>;
   }
+  
   return <>
       <div className={cn("border-t", isDarkMode ? "border-[#3f3f46] bg-[#18181b]" : "border-gray-200 bg-white")}>
-        {showQuickResponses && <div className={cn("p-3 border-b", isDarkMode ? "border-[#3f3f46] bg-[#27272a]" : "border-gray-200 bg-gray-50")}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={cn("text-sm font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
-                Respostas Rápidas
-              </span>
-              <Button onClick={() => setShowQuickResponses(false)} variant="ghost" size="icon" className="h-6 w-6">
-                <X size={14} />
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {QUICK_RESPONSES.map((response, index) => <button key={index} onClick={() => handleQuickResponse(response)} className={cn("text-left text-sm p-2 rounded-lg transition-colors", isDarkMode ? "bg-[#3f3f46] text-white hover:bg-[#52525b]" : "bg-white text-gray-900 hover:bg-gray-100")}>
-                  {response}
-                </button>)}
-            </div>
-          </div>}
-
         {filePreview && !showFilePreviewModal && <div className={cn("p-3 border-b flex items-center gap-3", isDarkMode ? "border-[#3f3f46] bg-[#27272a]" : "border-gray-200 bg-gray-50")}>
             <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center text-gray-500", isDarkMode ? "bg-[#3f3f46]" : "bg-gray-200")}>
               {getFileIcon(filePreview.type)}
@@ -456,11 +426,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               
               <EmojiPickerCompact onEmojiSelect={handleEmojiSelect} isDarkMode={isDarkMode} />
               
-              <Button variant="ghost" size="icon" onClick={() => setShowQuickResponses(!showQuickResponses)} className={cn("h-9 w-9", isDarkMode ? "text-gray-400 hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100")} title="Respostas rápidas">
-                <Zap size={20} />
-              </Button>
-              
-              <Button variant="ghost" size="icon" onClick={handleAIQuickResponse} title="Gerar resposta com IA" className="text-yellow-700 bg-black/0 rounded-none py-0 px-0 text-7xl">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setShowAIQuickResponseModal(true)} 
+                className={cn("h-9 w-9", isDarkMode ? "text-gray-400 hover:bg-[#27272a]" : "text-gray-600 hover:bg-gray-100")} 
+                title="Respostas Rápidas com IA"
+              >
                 <Sparkles size={20} />
               </Button>
             </div>
@@ -484,6 +456,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       </div>
 
       {showFilePreviewModal && renderFilePreviewModal()}
+      
+      {showAIQuickResponseModal && (
+        <AIQuickResponseModal
+          isDarkMode={isDarkMode}
+          conversationId={selectedConv?.id}
+          channelId={channelId}
+          contactName={selectedConv?.contact_name}
+          onClose={() => setShowAIQuickResponseModal(false)}
+          onSelectResponse={handleQuickResponseSelect}
+        />
+      )}
     </>;
 };
 

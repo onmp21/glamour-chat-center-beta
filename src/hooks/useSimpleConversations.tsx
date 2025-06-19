@@ -1,6 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
+import { ContactNameResolver } from '@/services/ContactNameResolver';
 
 interface SimpleConversation {
   id: string;
@@ -11,6 +13,14 @@ interface SimpleConversation {
   status: 'unread' | 'in_progress' | 'resolved';
   unread_count: number;
   updated_at: string;
+}
+
+interface ConversationMessage {
+  session_id: string;
+  nome_do_contato: string;
+  message: string;
+  read_at: string;
+  tipo_remetente?: string;
 }
 
 export const useSimpleConversations = (channelId: string | null) => {
@@ -64,54 +74,53 @@ export const useSimpleConversations = (channelId: string | null) => {
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_CONVERSATIONS] Iniciando query na tabela: ${tableName}, usuário: ${user?.name}`);
 
-      const { data: rawData, error: queryError } = await supabase
+      const queryResult = await supabase
         .from(tableName as any)
         .select('session_id, nome_do_contato, message, read_at, tipo_remetente')
         .order('read_at', { ascending: false })
         .limit(200);
 
-      if (queryError) {
-        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryError);
-        setError(queryError.message);
+      if (queryResult.error) {
+        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryResult.error);
+        setError(queryResult.error.message);
         return;
       }
 
+      const rawData = queryResult.data;
       console.log(`📋 [SIMPLE_CONVERSATIONS] Query executada. Registros recebidos:`, rawData?.length || 0);
 
       const conversationsMap = new Map<string, SimpleConversation>();
       
-      (rawData || []).forEach((message: any) => {
-        const sessionId = message.session_id;
-        
-        if (!conversationsMap.has(sessionId)) {
-          let contactName = 'Cliente';
-          if (message.nome_do_contato) {
-            contactName = message.nome_do_contato;
-          } else {
-            contactName = extractPhoneFromSession(sessionId);
-          }
+      if (rawData && Array.isArray(rawData)) {
+        for (const message of rawData as unknown as ConversationMessage[]) {
+          const sessionId = message.session_id;
+          
+          if (!conversationsMap.has(sessionId)) {
+            const phoneNumber = extractPhoneFromSession(sessionId);
+            
+            const contactName = await ContactNameResolver.resolveName(
+              phoneNumber, 
+              message.nome_do_contato
+            );
 
-          conversationsMap.set(sessionId, {
-            id: sessionId,
-            contact_name: contactName,
-            contact_phone: extractPhoneFromSession(sessionId),
-            last_message: message.message || '',
-            last_message_time: message.read_at || new Date().toISOString(),
-            status: 'unread', // Default status, can be enhanced later
-            unread_count: 0, // Default unread count
-            updated_at: message.read_at || new Date().toISOString()
-          });
+            conversationsMap.set(sessionId, {
+              id: sessionId,
+              contact_name: contactName,
+              contact_phone: phoneNumber,
+              last_message: message.message || '',
+              last_message_time: message.read_at || new Date().toISOString(),
+              status: 'unread' as const,
+              unread_count: 0,
+              updated_at: message.read_at || new Date().toISOString()
+            });
+          }
         }
-      });
+      }
 
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
-      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas`);
-      
-      if (conversations.length > 0) {
-        console.log(`📋 [SIMPLE_CONVERSATIONS] Primeira conversa:`, conversations[0]);
-      }
+      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas com nomes resolvidos`);
       
       setConversations(conversations);
 

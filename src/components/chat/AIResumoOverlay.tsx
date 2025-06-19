@@ -1,9 +1,13 @@
-
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Brain, X } from "lucide-react";
+import { Brain, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { AIProviderService } from "@/services/AIProviderService";
+import { AIProvider } from "@/types/ai-providers";
+import { supabase } from "@/integrations/supabase/client";
+import { getTableNameForChannelSync } from "@/utils/channelMapping";
 
 interface AIResumoOverlayProps {
   open: boolean;
@@ -14,21 +18,234 @@ interface AIResumoOverlayProps {
   isDarkMode?: boolean;
   onCopy?: () => void;
   onDownload?: () => void;
+  conversationId?: string;
+  channelId?: string;
+  contactName?: string;
+  messages?: any[];
+}
+
+const MINIMUM_MESSAGES_FOR_SUMMARY = 4; // Número mínimo de mensagens para permitir resumo
+
+// Type for message data from database
+interface MessageData {
+  id: string;
+  message: string;
+  nome_do_contato?: string | null;
+  tipo_remetente?: string | null;
+  read_at?: string | null;
+  mensagemtype?: string | null;
+  session_id?: string;
 }
 
 export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   open,
   onClose,
-  summary,
-  isLoading,
-  error,
+  summary: externalSummary,
+  isLoading: externalLoading,
+  error: externalError,
   isDarkMode,
   onCopy,
-  onDownload
+  onDownload,
+  conversationId,
+  channelId,
+  contactName,
+  messages = []
 }) => {
+  const { toast } = useToast();
+  const [internalSummary, setInternalSummary] = useState<string>('');
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string>('');
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<MessageData[]>([]);
+
+  // Use external props or internal state
+  const summary = externalSummary || internalSummary;
+  const isLoading = externalLoading || internalLoading;
+  const error = externalError || internalError;
+
+  useEffect(() => {
+    if (open && !summary && !isLoading && conversationId && channelId) {
+      console.log('🚀 [AI_RESUMO] Modal aberto, iniciando geração de resumo');
+      loadProvidersAndGenerateSummary();
+    }
+  }, [open, conversationId, channelId]);
+
+  const loadConversationMessages = async (): Promise<MessageData[]> => {
+    if (!channelId || !conversationId) {
+      console.log('❌ [AI_RESUMO] Missing channelId or conversationId');
+      return [];
+    }
+
+    try {
+      const tableName = getTableNameForChannelSync(channelId);
+      console.log(`📊 [AI_RESUMO] Loading messages from table: ${tableName} for session: ${conversationId}`);
+      
+      const { data, error: queryError } = await supabase
+        .from(tableName as any)
+        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype, session_id')
+        .eq('session_id', conversationId)
+        .order('read_at', { ascending: true })
+        .limit(100);
+
+      if (queryError) {
+        console.error('❌ [AI_RESUMO] Error loading messages:', queryError);
+        throw new Error(`Erro ao carregar mensagens: ${queryError.message}`);
+      }
+
+      console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
+      
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        setInternalError('Não há mensagens nesta conversa para resumir.');
+        return [];
+      }
+
+      if (data.length < MINIMUM_MESSAGES_FOR_SUMMARY) {
+        setInternalError(`Esta conversa tem apenas ${data.length} mensagem${data.length !== 1 ? 's' : ''}. É necessário pelo menos ${MINIMUM_MESSAGES_FOR_SUMMARY} mensagens para gerar um resumo útil.`);
+        return [];
+      }
+
+      const meaningfulMessages = data.filter((msg: any) => 
+        msg.message && 
+        typeof msg.message === 'string' &&
+        msg.message.trim().length > 10 &&
+        !msg.message.trim().match(/^(ok|sim|não|oi|olá|tchau|obrigado|obrigada)$/i)
+      );
+
+      if (meaningfulMessages.length < 3) {
+        setInternalError(`Esta conversa tem apenas ${meaningfulMessages.length} mensagem${meaningfulMessages.length !== 1 ? 's' : ''} significativas. É necessário mais conteúdo para gerar um resumo útil.`);
+        return [];
+      }
+
+      const typedMessages: MessageData[] = data.map((item: any) => ({
+        id: String(item.id),
+        message: item.message || '',
+        nome_do_contato: item.nome_do_contato,
+        tipo_remetente: item.tipo_remetente,
+        read_at: item.read_at,
+        mensagemtype: item.mensagemtype,
+        session_id: item.session_id
+      }));
+
+      return typedMessages;
+
+    } catch (error) {
+      console.error('❌ [AI_RESUMO] Error loading conversation messages:', error);
+      setInternalError(error instanceof Error ? error.message : 'Erro ao carregar mensagens');
+      return [];
+    }
+  };
+
+  const loadProvidersAndGenerateSummary = async () => {
+    try {
+      console.log('🔄 [AI_RESUMO] Loading providers...');
+      const activeProviders = await AIProviderService.getActiveProviders();
+      setProviders(activeProviders);
+      
+      if (activeProviders.length === 0) {
+        setInternalError('Nenhum provedor de IA configurado');
+        return;
+      }
+      
+      console.log(`✅ [AI_RESUMO] Found ${activeProviders.length} active providers`);
+      
+      const messages = await loadConversationMessages();
+      setConversationMessages(messages);
+      
+      if (messages.length > 0) {
+        await generateSummary(activeProviders[0].id, messages);
+      }
+    } catch (error) {
+      console.error('❌ [AI_RESUMO] Error loading providers:', error);
+      setInternalError('Erro ao carregar configurações de IA');
+    }
+  };
+
+  const generateSummary = async (providerId?: string, messagesData?: MessageData[]) => {
+    if (!conversationId || !channelId) {
+      setInternalError('Dados da conversa não disponíveis');
+      return;
+    }
+
+    const selectedProvider = providerId || providers[0]?.id;
+    if (!selectedProvider) {
+      setInternalError('Nenhum provedor de IA configurado');
+      return;
+    }
+
+    setInternalLoading(true);
+    setInternalError('');
+
+    try {
+      console.log('📝 [AI_RESUMO] Gerando resumo com edge function...');
+
+      const messagesToUse = messagesData || conversationMessages || messages;
+      
+      if (messagesToUse.length === 0) {
+        console.warn('⚠️ [AI_RESUMO] Nenhuma mensagem encontrada para resumir');
+        setInternalError('Não há mensagens nesta conversa para resumir.');
+        return;
+      }
+
+      const contextMessages = messagesToUse.slice(-50).map(m => ({
+        id: m.id,
+        nome_do_contato: m.nome_do_contato,
+        tipo_remetente: m.tipo_remetente,
+        message: m.message,
+        read_at: m.read_at,
+      }));
+
+      console.log(`📊 [AI_RESUMO] Enviando ${contextMessages.length} mensagens para análise`);
+
+      const { data, error } = await supabase.functions.invoke('generate-report', {
+        body: {
+          provider_id: selectedProvider,
+          report_type: 'conversation_summary',
+          action_type: 'conversation_summary',
+          data: {
+            conversation_id: conversationId,
+            channel_id: channelId,
+            contact_name: contactName,
+            messages: contextMessages,
+          }
+        }
+      });
+
+      console.log('📊 [AI_RESUMO] Resposta da edge function:', { data, error });
+
+      if (error) {
+        console.error('❌ [AI_RESUMO] Erro na edge function:', error);
+        setInternalError('Erro ao gerar resumo: ' + (error.message || String(error)));
+        return;
+      }
+
+      if (data && data.success) {
+        const generatedSummary = data.report || data.content || 'Resumo não disponível';
+        console.log('✅ [AI_RESUMO] Resumo gerado com sucesso:', generatedSummary.substring(0, 100) + '...');
+        setInternalSummary(generatedSummary);
+        toast({
+          title: "Resumo gerado",
+          description: "Resumo da conversa gerado com sucesso",
+        });
+      } else {
+        console.error('❌ [AI_RESUMO] Resposta sem sucesso:', data);
+        setInternalError(data?.error || 'Erro desconhecido na geração do resumo');
+      }
+
+    } catch (error) {
+      console.error('❌ [AI_RESUMO] Erro geral:', error);
+      setInternalError('Erro ao gerar resumo. Tente novamente.');
+    } finally {
+      setInternalLoading(false);
+    }
+  };
+
   const handleCopy = () => {
     if (!summary) return;
     navigator.clipboard.writeText(summary);
+    toast({
+      title: "Copiado",
+      description: "Resumo copiado para a área de transferência",
+    });
     if (onCopy) onCopy();
   };
 
@@ -40,6 +257,16 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     link.download = "resumo-conversa.txt";
     link.click();
     if (onDownload) onDownload();
+  };
+
+  const handleRefresh = () => {
+    setInternalSummary('');
+    setInternalError('');
+    if (providers.length > 0) {
+      generateSummary();
+    } else {
+      loadProvidersAndGenerateSummary();
+    }
   };
 
   return (
@@ -55,16 +282,31 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
               Resumo da Conversa
             </DialogTitle>
           </div>
-          <button
-            className={cn(
-              "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
-              isDarkMode ? "text-gray-400" : "text-gray-500"
+          <div className="flex items-center gap-2">
+            {conversationId && channelId && (
+              <button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className={cn(
+                  "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                )}
+                aria-label="Atualizar resumo"
+              >
+                <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              </button>
             )}
-            aria-label="Fechar"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
+            <button
+              className={cn(
+                "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              )}
+              aria-label="Fechar"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
         <div className={cn(
           "p-6 pb-4 max-h-[60vh] min-h-[120px] overflow-y-auto text-base transition-all",

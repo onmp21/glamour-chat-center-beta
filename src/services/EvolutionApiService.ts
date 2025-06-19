@@ -69,9 +69,10 @@ export class EvolutionApiService {
    */
   listInstances = async (): Promise<{ success: boolean; instances?: InstanceInfo[]; error?: string }> => {
     try {
-      console.log('📋 [EVOLUTION_API] Listando instâncias');
+      console.log("📋 [EVOLUTION_API] Listando instâncias");
 
       const url = `${this.config.baseUrl}/instance/fetchInstances`;
+      console.log("📋 [EVOLUTION_API] URL de listagem de instâncias:", url);
 
       const response = await fetch(url, {
         method: 'GET',

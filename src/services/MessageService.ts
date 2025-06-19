@@ -1,6 +1,6 @@
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
-import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
+import { TableName, getTableNameForChannelSync } from '@/utils/channelMapping';
 import { supabase } from '@/integrations/supabase/client.ts';
 
 export class MessageService {
@@ -17,7 +17,7 @@ export class MessageService {
   private getRepository(channelId?: string): MessageRepository {
     const targetChannelId = channelId || this.channelId;
     if (!this.repositories.has(targetChannelId)) {
-      const tableName = getTableNameForChannel(targetChannelId);
+      const tableName = getTableNameForChannelSync(targetChannelId);
       this.repositories.set(targetChannelId, new MessageRepository(tableName));
     }
     return this.repositories.get(targetChannelId)!;
@@ -137,26 +137,45 @@ export class MessageService {
     try {
       console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
       
-      // Query otimizada
+      // Query otimizada para contar conversas corretamente
       const { data, error } = await supabase
         .from(tableName as any)
-        .select('*')
-        .order('read_at', { ascending: false })
-        .limit(limit);
+        .select(`
+          session_id,
+          nome_do_contato,
+          message,
+          read_at,
+          is_read
+        `)
+        .order('read_at', { ascending: false });
 
       if (error) {
         console.error(`❌ [MESSAGE_SERVICE] Database error:`, error);
         return [];
       }
 
+      // Agrupar por session_id para contar conversas únicas
       const conversationsMap = new Map<string, ChannelConversation>();
       
       (data || []).forEach((message: any) => {
         const sessionId = message.session_id;
-        if (!conversationsMap.has(sessionId)) {
+        
+        // Se já existe, só atualizar unread_count se necessário
+        if (conversationsMap.has(sessionId)) {
+          const existing = conversationsMap.get(sessionId)!;
+          if (!message.is_read) {
+            existing.unread_count = (existing.unread_count || 0) + 1;
+          }
+          // Manter a mensagem mais recente
+          if (message.read_at > existing.last_message_time!) {
+            existing.last_message = message.message;
+            existing.last_message_time = message.read_at;
+          }
+        } else {
+          // Criar nova conversa
           conversationsMap.set(sessionId, {
             id: sessionId,
-            contact_name: message.nome_do_contato || message.Nome_do_contato || 'Unknown',
+            contact_name: message.nome_do_contato || 'Unknown',
             contact_phone: this.extractPhoneFromSessionId(sessionId),
             last_message: message.message,
             last_message_time: message.read_at || new Date().toISOString(),
@@ -167,8 +186,12 @@ export class MessageService {
         }
       });
 
-      const conversations = Array.from(conversationsMap.values());
-      console.log(`✅ [MESSAGE_SERVICE] Loaded ${conversations.length} conversations from ${tableName}`);
+      // Converter para array e limitar
+      const conversations = Array.from(conversationsMap.values())
+        .sort((a, b) => new Date(b.last_message_time!).getTime() - new Date(a.last_message_time!).getTime())
+        .slice(0, limit);
+      
+      console.log(`✅ [MESSAGE_SERVICE] Loaded ${conversations.length} unique conversations from ${tableName}`);
       
       this.setCache(cacheKey, conversations);
       return conversations;
@@ -224,14 +247,16 @@ export class MessageService {
     const tableName = repository.getTableName();
     const subscriptionKey = `${tableName}-${channelSuffix}`;
     
-    // Check if subscription already exists
+    // Check if subscription already exists and remove it first
     if (MessageService.activeSubscriptions.has(subscriptionKey)) {
-      console.log(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing`);
-      return MessageService.activeSubscriptions.get(subscriptionKey);
+      console.log(`🔌 [MESSAGE_SERVICE] Removing existing subscription for ${subscriptionKey}`);
+      const existingChannel = MessageService.activeSubscriptions.get(subscriptionKey);
+      supabase.removeChannel(existingChannel);
+      MessageService.activeSubscriptions.delete(subscriptionKey);
     }
     
     const channel = supabase
-      .channel(`${tableName}-changes${channelSuffix}`)
+      .channel(`${tableName}-changes${channelSuffix}-${Date.now()}`) // Add timestamp to make unique
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: tableName as any },
         (payload) => {
@@ -277,8 +302,8 @@ export class MessageService {
     console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId} from table ${repository.getTableName()}`);
     
     try {
-      // Stats simplificados para evitar queries pesadas
-      const conversations = await this.getConversations(10); // Increased limit for better stats
+      // Stats baseados nas conversas únicas
+      const conversations = await this.getConversations(1000); // Get more for accurate stats
       const stats = {
         totalMessages: 0, // Placeholder, as this can be expensive
         totalConversations: conversations.length,

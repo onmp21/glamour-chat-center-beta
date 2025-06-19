@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { SimpleConversationsList } from './SimpleConversationsList';
+import { SimpleConversationsListWithRealtime } from './SimpleConversationsListWithRealtime';
 
 interface ConversationsListOptimizedProps {
   channelId: string | null;
@@ -11,5 +11,6 @@ interface ConversationsListOptimizedProps {
 
 export const ConversationsListOptimized: React.FC<ConversationsListOptimizedProps> = (props) => {
   console.log('📋 [CONVERSATIONS_LIST_OPTIMIZED] Rendering with:', props);
-  return <SimpleConversationsList {...props} />;
+  // Usar apenas polling, sem realtime subscriptions
+  return <SimpleConversationsListWithRealtime {...props} enableRealtime={false} />;
 };

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Bot, Store, Users, Pin } from 'lucide-react';
@@ -85,13 +86,16 @@ export const ChannelsGrid: React.FC<ChannelsGridProps> = ({
     'Andressa Gerente Externo'
   ];
 
+  // Ordenar canais: fixados primeiro, depois seguindo a ordem específica
   const sortedChannels = [...channels].sort((a, b) => {
     const aIsPinned = isPinned(a.id);
     const bIsPinned = isPinned(b.id);
     
+    // Canais fixados vêm primeiro
     if (aIsPinned && !bIsPinned) return -1;
     if (!aIsPinned && bIsPinned) return 1;
     
+    // Se ambos são fixados ou não fixados, usar ordem específica
     const aDisplayName = getDisplayName(a.name);
     const bDisplayName = getDisplayName(b.name);
     const aIndex = channelOrder.indexOf(aDisplayName);
@@ -155,8 +159,8 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channel.id);
   
-  // Calcular notificações não lidas
-  const unreadNotifications = counts.pending + counts.inProgress;
+  // Apenas mensagens pendentes (não lidas)
+  const pendingCount = counts.pending;
 
   const handleCardClick = () => {
     console.log(`🎯 [DASHBOARD_CHANNEL_CARD] Clicking channel ${displayName} with legacyId: ${legacyId}`);
@@ -180,12 +184,6 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
               isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
-              {/* Badge de Mensagens - Posição absoluta fixa */}
-              {unreadNotifications > 0 && (
-                <Badge className="absolute -top-1 -right-1 bg-[#b5103c] text-white h-5 min-w-[20px] flex items-center justify-center text-xs font-bold px-1">
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                </Badge>
-              )}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className={cn("font-medium text-sm truncate flex items-center gap-1", isDarkMode ? "text-white" : "text-gray-900")}>
@@ -200,13 +198,6 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {loading ? (
-              <div className="w-8 h-4 bg-gray-300 rounded animate-pulse"></div>
-            ) : counts.total > 0 ? (
-              <Badge className="bg-[#b5103c] text-white text-xs px-2 py-1">
-                {counts.total}
-              </Badge>
-            ) : null}
             {/* Pin Button - Só aparece no hover */}
             <button
               onClick={(e) => {
@@ -234,6 +225,13 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
         </div>
+
+        {/* Badge de mensagens pendentes - posicionado no canto inferior direito */}
+        {pendingCount > 0 && (
+          <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium shadow-lg">
+            {pendingCount > 99 ? '99+' : pendingCount}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

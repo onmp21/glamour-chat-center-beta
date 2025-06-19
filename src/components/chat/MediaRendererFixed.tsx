@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MediaProcessor } from '@/services/MediaProcessor';
+import { MediaProcessor, MediaResult } from '@/services/MediaProcessor';
 import { MediaDownloadService } from '@/services/MediaDownloadService';
 import { AudioPlayerFixed } from './AudioPlayerFixed';
 import { MediaOverlay } from './MediaOverlay';
@@ -7,22 +7,13 @@ import { AlertCircle, Download, Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-interface MediaResult {
-  isProcessed: boolean;
-  url?: string;
-  type?: string;
-  mimeType?: string;
-  size?: string;
-  error?: string;
-}
-
 interface MediaRendererFixedProps {
   content: string;
   messageType?: string;
   messageId: string;
   isDarkMode?: boolean;
   fileName?: string;
-  balloonColor?: 'sent' | 'received'; // Nova prop para determinar a cor do balão
+  balloonColor?: 'sent' | 'received';
 }
 
 export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
@@ -43,15 +34,17 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     let mounted = true;
     setLoading(true);
     console.log("🖼️ [MediaRendererFixed] Chamando processAsync para:", { content, messageType, messageId });
-    MediaProcessor.processAsync(content, messageType).then(res => {
+    
+    MediaProcessor.processAsync(content, messageType).then(result => {
       if (mounted) {
-        setProcessedResult(res);
+        setProcessedResult(result);
         setLoading(false);
-        if (res && !res.isProcessed) {
-          console.warn("[MediaRendererFixed] Não processou mídia:", res.error, {content});
+        if (result && !result.isProcessed) {
+          console.warn("[MediaRendererFixed] Não processou mídia:", result.error, {content});
         }
       }
     });
+    
     return () => { mounted = false };
   }, [content, messageType]);
 
@@ -137,10 +130,9 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     return (
       <div className="max-w-[300px] relative">
         <AudioPlayerFixed
-          audioContent={content}
+          audioSrc={url}
           isDarkMode={isDarkMode}
-          messageId={messageId}
-          balloonColor={balloonColor} // Usar a prop balloonColor
+          balloonColor={balloonColor}
         />
         {MediaDownloadService.isDownloadableMedia(url) && (
           <button
@@ -332,7 +324,7 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
       )}
     >
       <div className="text-2xl mr-3">
-        {MediaProcessor.getMediaIcon((type as "document" | "text" | "audio" | "image" | "video" | "sticker") || 'document')}
+        {MediaProcessor.getMediaIcon(type || 'document')}
       </div>
       <div className="flex-1 min-w-0">
         <div className={cn(

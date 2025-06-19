@@ -1,183 +1,113 @@
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { QrCode, Wifi, WifiOff, Settings, Trash2, RotateCcw, Plus, Link, Unlink, Edit, CheckCircle, AlertCircle, X, LogOut } from 'lucide-react';
-import { EvolutionApiService, EvolutionApiConfig, InstanceInfo } from '@/services/EvolutionApiService.ts';
-import { ChannelInstanceMappingService, ChannelInstanceMapping } from '@/services/ChannelInstanceMappingService';
-
-interface EvolutionApiSettingsProps {
-  isDarkMode: boolean;
-  channelId: string;
-  onClose?: () => void;
-}
+import { useTheme } from '@/components/theme-provider';
+import { 
+  Settings, 
+  Wifi, 
+  CheckCircle, 
+  RotateCcw, 
+  Plus, 
+  QrCode, 
+  Trash2, 
+  LogOut, 
+  Link, 
+  Unlink 
+} from 'lucide-react';
+import { EvolutionApiService } from '@/services/EvolutionApiService';
+import { useInternalChannels } from '@/hooks/useInternalChannels';
+import { channelMappingService, ChannelInstanceMapping } from "@/services/ChannelInstanceMappingService";
 
 interface ApiConnection {
   baseUrl: string;
   apiKey: string;
   isValidated: boolean;
-  instances: InstanceInfo[];
+  instances: Array<{
+    instanceName: string;
+    status: string;
+    profileName?: string;
+  }>;
 }
 
-interface ChannelMapping {
-  id: string;
-  channelId: string;
-  instanceId: string;
+interface QrCodeModal {
+  isOpen: boolean;
+  qrCode: string;
   instanceName: string;
-  channelName: string;
-  baseUrl: string;
-  apiKey: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  loading: boolean;
 }
 
-export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
-  isDarkMode,
-  channelId,
-  onClose
-}) => {
+export const EvolutionApiSettings: React.FC = () => {
+  const { isDarkMode } = useTheme();
   const { toast } = useToast();
-  
-  // Estados para as 3 seções
+  const { channels: availableChannels } = useInternalChannels();
+
   const [apiConnection, setApiConnection] = useState<ApiConnection>({
-    baseUrl: 'https://evolution.estudioonmp.com',
+    baseUrl: '',
     apiKey: '',
     isValidated: false,
     instances: []
   });
+
+  const [validatingApi, setValidatingApi] = useState(false);
+  const [creatingInstance, setCreatingInstance] = useState(false);
+  const [newInstanceName, setNewInstanceName] = useState('');
+  const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
+  const [loggingOutInstance, setLoggingOutInstance] = useState<string | null>(null);
   
-  // Estados para QR Code Modal
-  const [qrCodeModal, setQrCodeModal] = useState({
+  const [qrCodeModal, setQrCodeModal] = useState<QrCodeModal>({
     isOpen: false,
     qrCode: '',
     instanceName: '',
     loading: false
   });
-  
-  const [newInstanceName, setNewInstanceName] = useState('');
-  const [channelMappings, setChannelMappings] = useState<ChannelMapping[]>([]);
-  const [selectedChannelForMapping, setSelectedChannelForMapping] = useState<string>('');
-  const [selectedInstanceForMapping, setSelectedInstanceForMapping] = useState<string>('');
-  
-  // Estados de loading
-  const [validatingApi, setValidatingApi] = useState(false);
-  const [creatingInstance, setCreatingInstance] = useState(false);
-  const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
-  const [loggingOutInstance, setLoggingOutInstance] = useState<string | null>(null);
+
+  const [selectedChannelForMapping, setSelectedChannelForMapping] = useState('');
+  const [selectedInstanceForMapping, setSelectedInstanceForMapping] = useState('');
   const [linkingChannel, setLinkingChannel] = useState(false);
-  
-  const channelMappingService = new ChannelInstanceMappingService();
-  const availableChannels = channelMappingService.getAvailableChannels();
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    console.log('🔄 [EVOLUTION_API_SETTINGS] Componente montado, carregando dados...');
-    loadSavedApiConnection();
-    loadChannelMappings();
-  }, []);
-
-  const loadSavedApiConnection = () => {
-    try {
-      const saved = localStorage.getItem("evolution_api_connection");
-      if (saved) {
-        const connection = JSON.parse(saved);
-        console.log("📂 [EVOLUTION_API_SETTINGS] Conexão salva carregada:", connection);
-        setApiConnection(connection);
-        
-        // Se já validado, carregar instâncias
-        if (connection.isValidated) {
-          console.log("📂 [EVOLUTION_API_SETTINGS] Conexão validada, carregando instâncias...");
-          loadInstances(connection.baseUrl, connection.apiKey);
-        }
-      } else {
-        console.log("📂 [EVOLUTION_API_SETTINGS] Nenhuma conexão salva encontrada.");
-      }
-    } catch (error) {
-      console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar conexão:", error);
-    }
-  };
+  const [channelMappings, setChannelMappings] = useState<ChannelInstanceMapping[]>([]);
 
   const loadChannelMappings = async () => {
     try {
       const mappings = await channelMappingService.getAllMappings();
-      const transformedMappings = mappings.map(mapping => ({
-        id: mapping.id || '',
-        channelId: mapping.channel_id,
-        instanceId: mapping.instance_id,
-        instanceName: mapping.instance_name,
-        channelName: mapping.channel_name,
-        baseUrl: mapping.base_url,
-        apiKey: mapping.api_key,
-        isActive: mapping.is_active,
-        createdAt: mapping.created_at || '',
-        updatedAt: mapping.updated_at || ''
-      }));
-      setChannelMappings(transformedMappings);
+      setChannelMappings(mappings);
     } catch (error) {
-      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao carregar mapeamentos:', error);
+      console.error('Erro ao carregar mapeamentos:', error);
     }
   };
 
-  const loadInstances = async (baseUrl: string, apiKey: string) => {
+  useEffect(() => {
+    loadSavedApiConnection();
+    loadChannelMappings();
+  }, []);
+
+  const loadSavedApiConnection = async () => {
     try {
-      console.log('📋 [EVOLUTION_API_SETTINGS] Carregando instâncias...');
-      const service = new EvolutionApiService({
-        baseUrl,
-        apiKey,
-        instanceName: 'temp'
-      });
-      
-      const result = await service.listInstances();
-      console.log("📋 [EVOLUTION_API_SETTINGS] Resultado de listInstances:", result);
-      if (result.success && result.instances) {
-        console.log("✅ [EVOLUTION_API_SETTINGS] Instâncias carregadas:", result.instances);
-        setApiConnection(prev => ({
-          ...prev,
-          instances: result.instances || []
-        }));
-      } else {
-        console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias, resultado:", result);
-        toast({
-          title: "Erro",
-          description: `Erro ao carregar instâncias: ${result.error || "Erro desconhecido"}`,
-          variant: "destructive"
-        });
+      const saved = localStorage.getItem("evolution_api_connection");
+      if (saved) {
+        const connection = JSON.parse(saved);
+        setApiConnection(connection);
+        
+        if (connection.isValidated) {
+          await loadInstances(connection.baseUrl, connection.apiKey);
+        }
       }
     } catch (error) {
-      console.error("❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias:", error);
-      toast({
-        title: "Erro",
-        description: `Erro ao carregar instâncias: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
-        variant: "destructive"
-      });
+      console.error("Erro ao carregar conexão salva:", error);
     }
   };
 
-  const saveApiConnection = (connection: ApiConnection) => {
-    try {
-      localStorage.setItem('evolution_api_connection', JSON.stringify(connection));
-      console.log('💾 [EVOLUTION_API_SETTINGS] Conexão salva:', connection);
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao salvar conexão:', error);
-    }
-  };
-
-  // SEÇÃO 1: Conectar API
   const validateApi = async () => {
-    console.log('🔍 [EVOLUTION_API_SETTINGS] Iniciando validação da API...');
-    
     if (!apiConnection.baseUrl || !apiConnection.apiKey) {
-      console.log('❌ [EVOLUTION_API_SETTINGS] URL ou API Key não preenchidos');
       toast({
         title: "Erro",
-        description: "URL base e API Key são obrigatórios",
+        description: "Preencha a URL base e a API Key",
         variant: "destructive"
       });
       return;
@@ -185,76 +115,72 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
     setValidatingApi(true);
     try {
-      console.log('🔗 [EVOLUTION_API_SETTINGS] Criando serviço com:', {
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey.substring(0, 10) + '...'
-      });
-
       const service = new EvolutionApiService({
-        baseUrl: apiConnection.baseUrl.replace(/\/$/, ''),
-        apiKey: apiConnection.apiKey,
-        instanceName: 'temp'
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey
       });
 
-      console.log('🔍 [EVOLUTION_API_SETTINGS] Validando API...');
-      const result = await service.validateApi();
+      const result = await service.validateConnection();
       
       if (result.success) {
-        console.log('✅ [EVOLUTION_API_SETTINGS] API validada com sucesso!');
-        
-        // Carregar instâncias após validação
-        console.log('📋 [EVOLUTION_API_SETTINGS] Carregando instâncias após validação...');
-        const instancesResult = await service.listInstances();
-        console.log('📋 [EVOLUTION_API_SETTINGS] Resultado do carregamento de instâncias:', instancesResult);
-        
-        const validatedConnection: ApiConnection = {
-          baseUrl: apiConnection.baseUrl.replace(/\/$/, ''),
-          apiKey: apiConnection.apiKey,
-          isValidated: true,
-          instances: instancesResult.instances || []
+        const updatedConnection = {
+          ...apiConnection,
+          isValidated: true
         };
         
-        // Atualizar o estado primeiro, depois salvar
-        setApiConnection(validatedConnection);
-        saveApiConnection(validatedConnection);
+        setApiConnection(updatedConnection);
+        localStorage.setItem("evolution_api_connection", JSON.stringify(updatedConnection));
         
-        console.log('🎉 [EVOLUTION_API_SETTINGS] Validação completa!', validatedConnection.instances.length, 'instâncias encontradas');
+        await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
         
         toast({
           title: "Sucesso",
-          description: `API validada! ${validatedConnection.instances.length} instâncias encontradas.`,
+          description: "API conectada com sucesso!",
         });
       } else {
-        console.error('❌ [EVOLUTION_API_SETTINGS] Falha na validação:', result.error);
-        throw new Error(result.error || 'Erro ao validar API');
+        throw new Error(result.error || 'Erro na validação');
       }
     } catch (error) {
-      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao validar API:', error);
+      console.error('Erro ao validar API:', error);
       toast({
         title: "Erro",
-        description: `Falha ao conectar: ${error}`,
+        description: `Erro ao conectar: ${error}`,
         variant: "destructive"
       });
+      
+      setApiConnection(prev => ({ ...prev, isValidated: false }));
     } finally {
       setValidatingApi(false);
     }
   };
 
-  // SEÇÃO 2: Criar Nova Instância
-  const createNewInstance = async () => {
-    if (!apiConnection.isValidated) {
-      toast({
-        title: "Erro",
-        description: "Valide a API primeiro",
-        variant: "destructive"
+  const loadInstances = async (baseUrl: string, apiKey: string) => {
+    try {
+      const service = new EvolutionApiService({
+        baseUrl,
+        apiKey
       });
-      return;
-    }
 
+      const result = await service.listInstances();
+      
+      if (result.success && result.instances) {
+        setApiConnection(prev => ({
+          ...prev,
+          instances: result.instances || []
+        }));
+      } else {
+        console.error('Erro ao listar instâncias:', result.error);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instâncias:', error);
+    }
+  };
+
+  const createNewInstance = async () => {
     if (!newInstanceName.trim()) {
       toast({
         title: "Erro",
-        description: "Nome da instância é obrigatório",
+        description: "Digite um nome para a instância",
         variant: "destructive"
       });
       return;
@@ -276,10 +202,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           description: `Instância '${newInstanceName}' criada com sucesso!`,
         });
 
-        // Recarregar instâncias
-        console.log('📋 [EVOLUTION_API_SETTINGS] Recarregando instâncias após criação...');
-        await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
         setNewInstanceName('');
+        await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
       } else {
         throw new Error(result.error || 'Erro ao criar instância');
       }
@@ -292,6 +216,65 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
     } finally {
       setCreatingInstance(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'open':
+        return <Badge className="bg-green-500 text-white">Conectado</Badge>;
+      case 'close':
+        return <Badge className="bg-red-500 text-white">Desconectado</Badge>;
+      case 'connecting':
+        return <Badge className="bg-yellow-500 text-white">Conectando</Badge>;
+      default:
+        return <Badge className="bg-gray-500 text-white">Desconhecido</Badge>;
+    }
+  };
+
+  const linkChannelToInstance = async () => {
+    if (!selectedChannelForMapping || !selectedInstanceForMapping) {
+      toast({
+        title: "Erro",
+        description: "Selecione um canal e uma instância",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLinkingChannel(true);
+    try {
+      const selectedChannel = availableChannels.find(c => c.id === selectedChannelForMapping);
+      
+      const mapping: ChannelInstanceMapping = {
+        channel_id: selectedChannelForMapping,
+        instance_id: selectedInstanceForMapping,
+        instance_name: selectedInstanceForMapping,
+        channel_name: selectedChannel?.name || 'Canal',
+        base_url: apiConnection.baseUrl,
+        api_key: apiConnection.apiKey,
+        is_active: true
+      };
+
+      await channelMappingService.createMapping(mapping);
+      
+      toast({
+        title: "Sucesso",
+        description: "Canal vinculado com sucesso!",
+      });
+
+      await loadChannelMappings();
+      setSelectedChannelForMapping('');
+      setSelectedInstanceForMapping('');
+    } catch (error) {
+      console.error("Erro ao vincular canal:", error);
+      toast({
+        title: "Erro",
+        description: `Erro ao vincular canal: ${error}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLinkingChannel(false);
     }
   };
 
@@ -309,20 +292,18 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       if (result.success) {
         toast({
           title: "Sucesso",
-          description: `Instância '${instanceName}' excluída com sucesso!`,
+          description: `Instância '${instanceName}' removida com sucesso!`,
         });
 
-        // Recarregar instâncias
-        console.log('📋 [EVOLUTION_API_SETTINGS] Recarregando instâncias após exclusão...');
         await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
       } else {
-        throw new Error(result.error || 'Erro ao excluir instância');
+        throw new Error(result.error || 'Erro ao remover instância');
       }
     } catch (error) {
-      console.error('Erro ao excluir instância:', error);
+      console.error('Erro ao remover instância:', error);
       toast({
         title: "Erro",
-        description: `Erro ao excluir instância: ${error}`,
+        description: `Erro ao remover instância: ${error}`,
         variant: "destructive"
       });
     } finally {
@@ -347,8 +328,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           description: `Instância '${instanceName}' desconectada com sucesso!`,
         });
 
-        // Recarregar instâncias
-        console.log('📋 [EVOLUTION_API_SETTINGS] Recarregando instâncias após logout...');
         await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
       } else {
         throw new Error(result.error || 'Erro ao desconectar instância');
@@ -365,124 +344,16 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
     }
   };
 
-  // SEÇÃO 3: Vincular Canal à Instância
-  const webhookMap: Record<string, string> = {
-    'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-yelena',
-    '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-canarana',
-    'b7996f75-41a7-4725-8229-564f31868027': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-souto',
-    '621abb21-60b2-4ff2-a0a6-172a94b4b65c': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-joao',
-    '64d8acad-c645-4544-a1e6-2f0825fae00b': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-america',
-    'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerentelojas',
-    'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'https://uxccfhptochnfomurulr.supabase.co/functions/v1/webhook-evolution-gerenteexterno'
-    // Adicione outros canais aqui seguindo o padrão!
-  };
-
-  const linkChannelToInstance = async () => {
-    if (!selectedChannelForMapping || !selectedInstanceForMapping) {
-      toast({
-        title: "Erro",
-        description: "Selecione um canal e uma instância",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLinkingChannel(true);
-    try {
-      const selectedChannel = availableChannels.find(c => c.id === selectedChannelForMapping);
-      const selectedInstance = apiConnection.instances.find(i => i.instanceName === selectedInstanceForMapping);
-      
-      if (!selectedChannel || !selectedInstance) {
-        throw new Error('Canal ou instância não encontrados');
-      }
-
-      // ✅ 1. Criar mapeamento no banco
-      await channelMappingService.createMapping({
-        channel_id: selectedChannel.id,
-        channel_name: selectedChannel.name,
-        instance_id: selectedInstance.instanceName,
-        instance_name: selectedInstance.instanceName,
-        base_url: apiConnection.baseUrl,
-        api_key: apiConnection.apiKey,
-        is_active: true
-      });
-
-      // ✅ 2. Configurar webhook do canal
-      const webhookUrl = webhookMap[selectedChannel.id];
-      if (!webhookUrl) {
-        throw new Error("Canal não tem um webhook configurado! Edite o código para adicionar.");
-      }
-
-      const events = [
-        "MESSAGES_UPSERT",
-        "MESSAGES_SET",
-        "MESSAGES_UPDATE",
-        "CONNECTION_UPDATE",
-        "QRCODE_UPDATED",
-        "CONTACTS_UPSERT",
-        "CONTACTS_SET",
-        "CONTACTS_UPDATE",
-        "CHATS_UPSERT",
-        "CHATS_SET",
-        "CHATS_UPDATE",
-        "PRESENCE_UPDATE",
-        "GROUPS_UPSERT",
-        "GROUP_UPDATE",
-        "GROUP_PARTICIPANTS_UPDATE"
-      ];
-
-      const service = new EvolutionApiService({
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey,
-        instanceName: selectedInstance.instanceName
-      });
-
-      // Fix: Use webhook with events array properly
-      const webhookResult = await service.setWebhook(webhookUrl, events);
-
-      if (webhookResult.success) {
-        console.log('✅ [WEBHOOK] Webhook canal configurado:', webhookUrl);
-      } else {
-        throw new Error(webhookResult.error || 'Erro ao configurar webhook');
-      }
-
-      toast({
-        title: "Sucesso",
-        description: `Canal '${selectedChannel.name}' vinculado à instância '${selectedInstance.instanceName}' com webhook dedicado!`
-      });
-
-      await loadChannelMappings();
-      setSelectedChannelForMapping('');
-      setSelectedInstanceForMapping('');
-    } catch (error) {
-      console.error('Erro ao vincular canal:', error);
-      toast({
-        title: "Erro",
-        description: `Erro ao vincular canal: ${error}`,
-        variant: "destructive"
-      });
-    } finally {
-      setLinkingChannel(false);
-    }
-  };
-
   const unlinkChannel = async (mappingId: string) => {
     try {
-      const mapping = channelMappings.find(m => m.id === mappingId);
-      if (mapping) {
-        console.log(`🔌 [UNLINK] Desvinculando canal ${mapping.channelName} da instância ${mapping.instanceName}`);
-      }
-
       await channelMappingService.deleteMapping(mappingId);
-      
       toast({
         title: "Sucesso",
         description: "Canal desvinculado com sucesso!",
       });
-
       await loadChannelMappings();
     } catch (error) {
-      console.error('Erro ao desvincular canal:', error);
+      console.error("Erro ao desvincular canal:", error);
       toast({
         title: "Erro",
         description: `Erro ao desvincular canal: ${error}`,
@@ -491,422 +362,379 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      'open': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
-      'connected': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
-      'ready': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
-      'online': { color: 'bg-green-500', text: 'Conectado', icon: Wifi },
-      'close': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
-      'closed': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
-      'disconnected': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
-      'offline': { color: 'bg-red-500', text: 'Desconectado', icon: WifiOff },
-      'connecting': { color: 'bg-yellow-500', text: 'Conectando', icon: Settings },
-      'qr': { color: 'bg-blue-500', text: 'QR Code', icon: QrCode }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.close;
-    const Icon = config.icon;
-
-    return (
-      <Badge className={cn("text-white", config.color)}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.text}
-      </Badge>
-    );
-  };
-
   return (
-    <>
-      <div className="space-y-8">
-        {/* SEÇÃO 1: Conectar API Evolution */}
+    <div className={cn("space-y-6", isDarkMode ? "text-white" : "text-gray-900")}>
+      {/* SEÇÃO 1: Conectar API */}
+      <Card className={cn(
+        "border-2",
+        isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+      )}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Conectar API Evolution
+          </CardTitle>
+          <CardDescription>
+            Configure a conexão com a API Evolution para gerenciar instâncias do WhatsApp.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="baseUrl">URL Base da API</Label>
+            <Input
+              id="baseUrl"
+              type="url"
+              placeholder="https://evolution.estudioonmp.com"
+              value={apiConnection.baseUrl}
+              onChange={(e) => setApiConnection(prev => ({ ...prev, baseUrl: e.target.value }))}
+              disabled={validatingApi}
+              className={cn(
+                isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+              )}
+            />
+          </div>
+          <div>
+            <Label htmlFor="apiKey">API Key</Label>
+            <Input
+              id="apiKey"
+              type="password"
+              placeholder="Sua API Key"
+              value={apiConnection.apiKey}
+              onChange={(e) => setApiConnection(prev => ({ ...prev, apiKey: e.target.value }))}
+              disabled={validatingApi}
+              className={cn(
+                isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+              )}
+            />
+          </div>
+          <Button
+            onClick={validateApi}
+            disabled={validatingApi || !apiConnection.baseUrl || !apiConnection.apiKey}
+            className={cn(
+              "w-full",
+              apiConnection.isValidated 
+                ? "bg-green-600 hover:bg-green-700 text-white" 
+                : "bg-[#b5103c] hover:bg-[#9d0e34] text-white"
+            )}
+          >
+            {validatingApi ? (
+              <>
+                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                Validando...
+              </>
+            ) : apiConnection.isValidated ? (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                API Conectada
+              </>
+            ) : (
+              <>
+                <Wifi className="mr-2 h-4 w-4" />
+                Conectar API
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO 2: Gerenciar Instâncias */}
+      {apiConnection.isValidated && (
         <Card className={cn(
           "border-2",
           isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
         )}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              Conectar API Evolution
+              <Plus className="w-5 h-5" />
+              Gerenciar Instâncias
             </CardTitle>
             <CardDescription>
-              Configure a URL e API Key para conectar com a Evolution API
+              Crie e gerencie instâncias do WhatsApp conectadas à API Evolution.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome da nova instância"
+                value={newInstanceName}
+                onChange={(e) => setNewInstanceName(e.target.value)}
+                disabled={creatingInstance}
+                className={cn(
+                  "flex-1",
+                  isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                )}
+              />
+              <Button
+                onClick={createNewInstance}
+                disabled={creatingInstance || !newInstanceName.trim()}
+                className="bg-[#b5103c] hover:bg-[#9d0e34] text-white"
+              >
+                {creatingInstance ? (
+                  <RotateCcw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            {apiConnection.instances.length > 0 && (
+              <div className="space-y-3">
+                <Label>Instâncias Disponíveis:</Label>
+                {apiConnection.instances.map((instance) => (
+                  <div
+                    key={instance.instanceName}
+                    className={cn(
+                      "flex items-center justify-between p-3 border rounded-md",
+                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      {getStatusBadge(instance.status)}
+                      <div>
+                        <p className={cn("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                          {instance.instanceName}
+                        </p>
+                        {instance.profileName && (
+                          <p className={cn("text-sm", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                            {instance.profileName}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {instance.status === 'close' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              setQrCodeModal({
+                                isOpen: true,
+                                qrCode: '',
+                                instanceName: instance.instanceName,
+                                loading: true
+                              });
+                              
+                              const service = new EvolutionApiService({
+                                baseUrl: apiConnection.baseUrl,
+                                apiKey: apiConnection.apiKey,
+                                instanceName: instance.instanceName
+                              });
+                              
+                              const qrResult = await service.getQRCodeForInstance(instance.instanceName);
+                              if (qrResult.success && qrResult.qrCode) {
+                                const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
+                                  ? qrResult.qrCode 
+                                  : `data:image/png;base64,${qrResult.qrCode}`;
+                                
+                                setQrCodeModal(prev => ({
+                                  ...prev,
+                                  qrCode: qrCodeSrc,
+                                  loading: false
+                                }));
+                              } else {
+                                setQrCodeModal(prev => ({ ...prev, loading: false }));
+                                toast({
+                                  title: "Erro",
+                                  description: qrResult.error || "Erro ao obter QR Code",
+                                  variant: "destructive"
+                                });
+                              }
+                            } catch (error) {
+                              setQrCodeModal(prev => ({ ...prev, loading: false }));
+                              toast({
+                                title: "Erro",
+                                description: `Erro ao obter QR Code: ${error}`,
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className={cn(
+                            isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
+                          )}
+                        >
+                          <QrCode className="mr-2 h-4 w-4" />
+                          QR Code
+                        </Button>
+                      )}
+                      {instance.status === 'open' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => logoutInstance(instance.instanceName)}
+                          disabled={loggingOutInstance === instance.instanceName}
+                          className={cn(
+                            "border-orange-500 text-orange-600 hover:bg-orange-50",
+                            isDarkMode ? "border-orange-400 text-orange-400 hover:bg-orange-900/20" : ""
+                          )}
+                        >
+                          {loggingOutInstance === instance.instanceName ? (
+                            <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <LogOut className="mr-2 h-4 w-4" />
+                          )}
+                          Desconectar
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteInstance(instance.instanceName)}
+                        disabled={deletingInstance === instance.instanceName}
+                        className={cn(
+                          "border-red-500 text-red-600 hover:bg-red-50",
+                          isDarkMode ? "border-red-400 text-red-400 hover:bg-red-900/20" : ""
+                        )}
+                      >
+                        {deletingInstance === instance.instanceName ? (
+                          <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="mr-2 h-4 w-4" />
+                        )}
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SEÇÃO 3: Vincular Canal à Instância */}
+      {apiConnection.isValidated && (
+        <Card className={cn(
+          "border-2",
+          isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+        )}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Link className="w-5 h-5" />
+              Vincular Canal à Instância
+            </CardTitle>
+            <CardDescription>
+              Associe um canal de comunicação a uma instância da API Evolution.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="baseUrl">URL Base da API</Label>
-                <Input
-                  id="baseUrl"
-                  placeholder="https://evolution.estudioonmp.com"
-                  value={apiConnection.baseUrl}
-                  onChange={(e) => setApiConnection(prev => ({
-                    ...prev,
-                    baseUrl: e.target.value,
-                    isValidated: false
-                  }))}
-                  disabled={validatingApi}
-                  className={cn(
-                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                  )}
-                />
+                <Label htmlFor="selectChannel">Selecionar Canal</Label>
+                <Select
+                  onValueChange={setSelectedChannelForMapping}
+                  value={selectedChannelForMapping}
+                  disabled={linkingChannel}
+                >
+                  <SelectTrigger
+                    id="selectChannel"
+                    className={cn(
+                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                    )}
+                  >
+                    <SelectValue placeholder="Selecione um canal" />
+                  </SelectTrigger>
+                  <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    {availableChannels.map(channel => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              
               <div>
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="Sua API Key"
-                  value={apiConnection.apiKey}
-                  onChange={(e) => setApiConnection(prev => ({
-                    ...prev,
-                    apiKey: e.target.value,
-                    isValidated: false
-                  }))}
-                  disabled={validatingApi}
-                  className={cn(
-                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                  )}
-                />
+                <Label htmlFor="selectInstance">Selecionar Instância</Label>
+                <Select
+                  onValueChange={setSelectedInstanceForMapping}
+                  value={selectedInstanceForMapping}
+                  disabled={linkingChannel}
+                >
+                  <SelectTrigger
+                    id="selectInstance"
+                    className={cn(
+                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                    )}
+                  >
+                    <SelectValue placeholder="Selecione uma instância" />
+                  </SelectTrigger>
+                  <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
+                    {apiConnection.instances.map(instance => (
+                      <SelectItem key={instance.instanceName} value={instance.instanceName}>
+                        {instance.instanceName}
+                        {instance.profileName && (
+                          <span className="text-xs text-gray-400 ml-1">
+                            ({instance.profileName})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <Button
-              onClick={validateApi}
-              disabled={validatingApi}
-              variant={apiConnection.isValidated ? "default" : "default"}
-              className={cn(
-                "w-full",
-                isDarkMode ? "text-white" : "text-white"
-              )}
+              onClick={linkChannelToInstance}
+              disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
+              className="w-full bg-[#b5103c] hover:bg-[#9d0e34] text-white"
             >
-              {validatingApi ? (
+              {linkingChannel ? (
                 <>
                   <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                  Validando...
-                </>
-              ) : apiConnection.isValidated ? (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  API Validada
+                  Vinculando...
                 </>
               ) : (
                 <>
-                  <Wifi className="mr-2 h-4 w-4" />
-                  Validar API
+                  <Link className="mr-2 h-4 w-4" />
+                  Vincular Canal
                 </>
               )}
             </Button>
-          </CardContent>
-        </Card>
 
-        {/* SEÇÃO 2: Gerenciar Instâncias */}
-        {apiConnection.isValidated && (
-          <Card className={cn(
-            "border-2",
-            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
-          )}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Gerenciar Instâncias
-              </CardTitle>
-              <CardDescription>
-                Crie novas instâncias ou visualize as existentes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Ex: minha-loja-principal"
-                  value={newInstanceName}
-                  onChange={(e) => setNewInstanceName(e.target.value)}
-                  disabled={creatingInstance}
-                  className={cn(
-                    "flex-grow",
-                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                  )}
-                />
-                <Button
-                  onClick={createNewInstance}
-                  disabled={creatingInstance}
-                  className={cn(
-                    "bg-blue-600 hover:bg-blue-700 text-white",
-                    creatingInstance && "bg-gray-400 hover:bg-gray-400"
-                  )}
-                >
-                  {creatingInstance ? (
-                    <>
-                      <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Criar Instância
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Instâncias Existentes:</Label>
-                {apiConnection.instances.length === 0 ? (
-                  <p className="text-gray-500">Nenhuma instância encontrada.</p>
-                ) : (
-                  apiConnection.instances.map((instance) => {
-                    console.log('🔍 [EVOLUTION_API_SETTINGS] Renderizando instância:', instance);
-                    return (
-                      <div
-                        key={instance.instanceName}
+            {/* Lista de Canais Vinculados */}
+            {channelMappings.length > 0 && (
+              <div className="space-y-3">
+                <Label>Canais Vinculados:</Label>
+                {channelMappings.map((mapping) => (
+                  <div
+                    key={mapping.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 border rounded-md",
+                      isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                    )}
+                  >
+                    <div>
+                      <p className={cn("font-medium", isDarkMode ? "text-white" : "text-gray-900")}>
+                        {mapping.channel_name}
+                      </p>
+                      <p className={cn("text-sm", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+                        Instância: {mapping.instance_name}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={mapping.is_active ? "bg-green-500 text-white" : "bg-gray-500 text-white"}>
+                        {mapping.is_active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => unlinkChannel(mapping.id!)}
                         className={cn(
-                          "flex items-center justify-between p-3 border rounded-md",
-                          isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                          "border-red-500 text-red-600 hover:bg-red-50",
+                          isDarkMode ? "border-red-400 text-red-400 hover:bg-red-900/20" : ""
                         )}
                       >
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(instance.status)}
-                          <span className="font-semibold">{instance.instanceName}</span>
-                          {instance.profileName && (
-                            <span className="text-xs text-gray-400 ml-2">
-                              ({instance.profileName})
-                            </span>
-                          )}
-                          {instance.number && (
-                            <span className="text-sm text-gray-500">({instance.number})</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(instance.status === 'connecting' || instance.status === 'close' || instance.status === 'unknown') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                setQrCodeModal({
-                                  isOpen: true,
-                                  qrCode: '',
-                                  instanceName: instance.instanceName,
-                                  loading: true
-                                });
-                                
-                                try {
-                                  const service = new EvolutionApiService({
-                                    baseUrl: apiConnection.baseUrl,
-                                    apiKey: apiConnection.apiKey,
-                                    instanceName: instance.instanceName
-                                  });
-                                  
-                                  const qrResult = await service.getQRCodeForInstance(instance.instanceName);
-                                  if (qrResult.success && qrResult.qrCode) {
-                                    // Verificar se o QR Code já tem o prefixo data:image
-                                    const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
-                                      ? qrResult.qrCode 
-                                      : `data:image/png;base64,${qrResult.qrCode}`;
-                                    
-                                    setQrCodeModal(prev => ({
-                                      ...prev,
-                                      qrCode: qrCodeSrc,
-                                      loading: false
-                                    }));
-                                  } else {
-                                    setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                    toast({
-                                      title: "Erro",
-                                      description: qrResult.error || "Erro ao obter QR Code",
-                                      variant: "destructive"
-                                    });
-                                  }
-                                } catch (error) {
-                                  setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                  toast({
-                                    title: "Erro",
-                                    description: `Erro ao obter QR Code: ${error}`,
-                                    variant: "destructive"
-                                  });
-                                }
-                              }}
-                              className={cn(
-                                isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
-                              )}
-                            >
-                              <QrCode className="mr-2 h-4 w-4" />
-                              Ver QR Code
-                            </Button>
-                          )}
-                          {instance.status === 'open' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => logoutInstance(instance.instanceName)}
-                              disabled={loggingOutInstance === instance.instanceName}
-                              className={cn(
-                                "border-orange-500 text-orange-600 hover:bg-orange-50",
-                                isDarkMode ? "border-orange-400 text-orange-400 hover:bg-orange-900/20" : ""
-                              )}
-                            >
-                              {loggingOutInstance === instance.instanceName ? (
-                                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <LogOut className="mr-2 h-4 w-4" />
-                              )}
-                              Desconectar
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteInstance(instance.instanceName)}
-                            disabled={deletingInstance === instance.instanceName}
-                          >
-                            {deletingInstance === instance.instanceName ? (
-                              <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="mr-2 h-4 w-4" />
-                            )}
-                            Excluir
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* SEÇÃO 3: Vincular Canal à Instância */}
-        {apiConnection.isValidated && (
-          <Card className={cn(
-            "border-2",
-            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
-          )}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Link className="w-5 h-5" />
-                Vincular Canal à Instância
-              </CardTitle>
-              <CardDescription>
-                Associe um canal de comunicação a uma instância da API Evolution usando o novo webhook universal.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                <div>
-                  <Label htmlFor="selectChannel">Selecionar Canal</Label>
-                  <Select
-                    onValueChange={setSelectedChannelForMapping}
-                    value={selectedChannelForMapping}
-                    disabled={linkingChannel}
-                  >
-                    <SelectTrigger
-                      id="selectChannel"
-                      className={cn(
-                        isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                      )}
-                    >
-                      <SelectValue placeholder="Selecione um canal" />
-                    </SelectTrigger>
-                    <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
-                      {availableChannels.map(channel => (
-                        <SelectItem key={channel.id} value={channel.id}>
-                          {channel.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="selectInstance">Selecionar Instância</Label>
-                  <Select
-                    onValueChange={setSelectedInstanceForMapping}
-                    value={selectedInstanceForMapping}
-                    disabled={linkingChannel}
-                  >
-                    <SelectTrigger
-                      id="selectInstance"
-                      className={cn(
-                        isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                      )}
-                    >
-                      <SelectValue placeholder="Selecione uma instância" />
-                    </SelectTrigger>
-                    <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
-                      {apiConnection.instances.map(instance => (
-                        <SelectItem key={instance.instanceName} value={instance.instanceName}>
-                          {instance.instanceName}
-                          {instance.profileName && (
-                            <span className="text-xs text-gray-400 ml-1">
-                              ({instance.profileName})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button
-                onClick={linkChannelToInstance}
-                disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
-                className={cn(
-                  "w-full bg-green-600 hover:bg-green-700 text-white",
-                  (linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping) && "bg-gray-400 hover:bg-gray-400"
-                )}
-              >
-                {linkingChannel ? (
-                  <>
-                    <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                    Configurando novo webhook...
-                  </>
-                ) : (
-                  <>
-                    <Link className="mr-2 h-4 w-4" />
-                    Vincular Canal
-                  </>
-                )}
-              </Button>
-
-              <div className="space-y-2">
-                <Label>Canais Vinculados:</Label>
-                {channelMappings.length === 0 ? (
-                  <p className="text-gray-500">Nenhum canal vinculado.</p>
-                ) : (
-                  channelMappings.map((mapping) => (
-                    <div
-                      key={mapping.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 border rounded-md",
-                        isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(mapping.isActive ? 'open' : 'close')}
-                        <span className="font-semibold">{mapping.channelName}</span>
-                        <span className="text-sm text-gray-500">({mapping.instanceName})</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => unlinkChannel(mapping.id)}
-                          className={cn(
-                            isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
-                          )}
-                        >
-                          <Unlink className="mr-2 h-4 w-4" />
-                          Desvincular
-                        </Button>
-                      </div>
+                        <Unlink className="mr-2 h-4 w-4" />
+                        Desvincular
+                      </Button>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal QR Code */}
       <Dialog open={qrCodeModal.isOpen} onOpenChange={(open) => setQrCodeModal(prev => ({ ...prev, isOpen: open }))}>
@@ -942,6 +770,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
+

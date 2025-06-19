@@ -1,239 +1,261 @@
-import { supabase } from '@/integrations/supabase/client.ts';
-import { ReportHistory } from '@/types/ai-providers';
-import OpenAI from 'openai';
+import { supabase } from '@/integrations/supabase/client';
+import { AIProviderService } from './AIProviderService';
+
+export interface ReportGenerationRequest {
+  provider_id: string;
+  report_type: string;
+  data?: any;
+  custom_prompt?: string;
+  selected_sheets?: string[];
+}
+
+export interface ReportResult {
+  id: string;
+  title: string;
+  content: string;
+  provider_id: string;
+  report_content: string;
+  generated_report: string;
+  model_used: string | null;
+  tokens_used: number | null;
+  generation_time: number | null;
+  created_at: string;
+  generated_at: string;
+  report_type: string;
+  status: string;
+}
+
+export interface ReportHistory {
+  id: string;
+  title: string;
+  generated_at: string;
+  provider_used: string;
+  provider_id: string;
+  report_type: string;
+  generated_report: string;
+  model_used: string | null;
+  tokens_used: number | null;
+  generation_time: number | null;
+  created_at: string;
+  prompt: string;
+  report_metadata: any;
+}
 
 export class IntelligentReportsService {
+  
+  // Função para buscar dados reais das planilhas selecionadas
+  static async fetchReportData(reportType: string, selectedSheets: string[] = []): Promise<any> {
+    console.log('📊 [INTELLIGENT_REPORTS] Buscando dados para relatório:', { reportType, selectedSheets });
+    
+    try {
+      const allData: Record<string, any[]> = {};
+      
+      for (const tableName of selectedSheets) {
+        console.log(`🔍 [INTELLIGENT_REPORTS] Buscando dados da tabela: ${tableName}`);
+        
+        let query;
+        if (tableName === 'exams') {
+          query = supabase
+            .from('exams')
+            .select('*')
+            .limit(50)
+            .order('appointment_date', { ascending: false });
+        } else {
+          // Tabelas de conversas
+          query = supabase
+            .from(tableName as any)
+            .select('session_id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+            .limit(100)
+            .order('read_at', { ascending: false });
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error(`❌ [INTELLIGENT_REPORTS] Erro ao buscar dados de ${tableName}:`, error);
+          continue;
+        }
+        
+        allData[tableName] = data || [];
+        console.log(`✅ [INTELLIGENT_REPORTS] ${data?.length || 0} registros encontrados em ${tableName}`);
+      }
+      
+      // Verificar se há pelo menos uma conversa nos dados
+      const totalRecords = Object.values(allData).reduce((sum, records) => sum + records.length, 0);
+      if (totalRecords === 0 && selectedSheets.length > 0) {
+        throw new Error('Nenhum dado encontrado nas tabelas selecionadas. Certifique-se de que há pelo menos uma conversa ou registro.');
+      }
+      
+      return allData;
+    } catch (error) {
+      console.error('❌ [INTELLIGENT_REPORTS] Erro ao buscar dados:', error);
+      throw error;
+    }
+  }
+
+  static async generateReport(request: ReportGenerationRequest): Promise<{ success: boolean; result?: ReportResult; error?: string }> {
+    console.log('🚀 [INTELLIGENT_REPORTS] Iniciando geração de relatório:', request);
+    
+    try {
+      // Buscar dados das planilhas selecionadas
+      let reportData = {};
+      if (request.selected_sheets && request.selected_sheets.length > 0) {
+        reportData = await this.fetchReportData(request.report_type, request.selected_sheets);
+      }
+
+      // Buscar provedor de IA
+      const provider = await AIProviderService.getProviderById(request.provider_id);
+      if (!provider) {
+        return { success: false, error: 'Provedor de IA não encontrado' };
+      }
+
+      const startTime = Date.now();
+
+      // Fazer chamada para a edge function com dados reais
+      const { data: aiResult, error } = await supabase.functions.invoke('generate-report', {
+        body: {
+          provider_id: request.provider_id,
+          report_type: request.report_type,
+          custom_prompt: request.custom_prompt,
+          selected_sheets: request.selected_sheets || [],
+          table_data: reportData // Enviando dados reais das tabelas
+        }
+      });
+
+      if (error) {
+        console.error('❌ [INTELLIGENT_REPORTS] Erro na edge function:', error);
+        return { success: false, error: `Erro na API: ${error.message}` };
+      }
+
+      if (!aiResult || !aiResult.success) {
+        return { success: false, error: aiResult?.error || 'Erro desconhecido na geração do relatório' };
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+
+      // Buscar o relatório salvo no histórico (a edge function já salva automaticamente)
+      const { data: savedReports, error: fetchError } = await supabase
+        .from('report_history')
+        .select('*')
+        .eq('provider_id', request.provider_id)
+        .eq('report_type', request.report_type)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (fetchError || !savedReports || savedReports.length === 0) {
+        console.error('❌ [INTELLIGENT_REPORTS] Erro ao buscar relatório salvo:', fetchError);
+        // Criar resultado sem ID se não conseguir buscar do histórico
+        return {
+          success: true,
+          result: {
+            id: 'temp-' + Date.now(),
+            title: `Relatório ${request.report_type}`,
+            content: aiResult.report,
+            provider_id: request.provider_id,
+            report_content: aiResult.report,
+            generated_report: aiResult.report,
+            model_used: aiResult.model_used || provider.default_model,
+            tokens_used: aiResult.tokens_used || 0,
+            generation_time: generationTime,
+            created_at: new Date().toISOString(),
+            generated_at: new Date().toISOString(),
+            report_type: request.report_type,
+            status: 'completed'
+          }
+        };
+      }
+
+      const savedReport = savedReports[0];
+
+      console.log('✅ [INTELLIGENT_REPORTS] Relatório gerado com sucesso:', savedReport.id);
+      
+      return {
+        success: true,
+        result: {
+          id: savedReport.id,
+          title: `Relatório ${request.report_type}`,
+          content: savedReport.generated_report,
+          provider_id: savedReport.provider_id,
+          report_content: savedReport.generated_report,
+          generated_report: savedReport.generated_report,
+          model_used: savedReport.model_used,
+          tokens_used: savedReport.tokens_used,
+          generation_time: savedReport.generation_time,
+          created_at: savedReport.created_at,
+          generated_at: savedReport.created_at,
+          report_type: savedReport.report_type,
+          status: 'completed'
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ [INTELLIGENT_REPORTS] Erro na geração:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Erro desconhecido' 
+      };
+    }
+  }
+
   static async getReports(): Promise<ReportHistory[]> {
     try {
+      console.log('📋 [INTELLIGENT_REPORTS] Carregando histórico de relatórios...');
+      
       const { data, error } = await supabase
         .from('report_history')
         .select(`
           *,
-          ai_providers(name)
+          ai_providers!inner(name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) {
-        console.error('Error fetching reports:', error);
+        console.error('❌ [INTELLIGENT_REPORTS] Erro ao carregar relatórios:', error);
         throw error;
       }
 
+      console.log('✅ [INTELLIGENT_REPORTS] Relatórios carregados:', data?.length || 0);
+      
       return (data || []).map(report => ({
         id: report.id,
-        title: report.prompt || 'Relatório',
-        prompt: report.prompt,
+        title: `Relatório ${report.report_type}`,
         generated_at: report.created_at,
-        created_at: report.created_at,
-        provider_used: (report as any).ai_providers?.name || 'Unknown',
-        provider_id: report.provider_id || '',
-        provider_name: (report as any).ai_providers?.name || 'Unknown',
-        model_used: report.model_used || '',
-        tokens_used: report.tokens_used || 0,
-        generation_time: Number(report.generation_time) || 0,
-        metadata: typeof report.report_metadata === 'object' 
-          ? report.report_metadata as Record<string, any> 
-          : {},
-        query: report.prompt,
-        result: {
-          id: report.id,
-          title: report.prompt || 'Relatório',
-          content: report.generated_report,
-          created_at: report.created_at,
-          provider_id: report.provider_id || '',
-          report_content: report.generated_report,
-          report_type: report.report_type,
-          status: 'completed'
-        },
-        timestamp: report.created_at,
-        status: 'success',
+        provider_used: report.ai_providers?.name || 'Desconhecido',
+        provider_id: report.provider_id,
         report_type: report.report_type,
-        generated_report: report.generated_report
+        generated_report: report.generated_report,
+        model_used: report.model_used,
+        tokens_used: report.tokens_used,
+        generation_time: report.generation_time,
+        created_at: report.created_at,
+        prompt: report.prompt,
+        report_metadata: report.report_metadata
       }));
     } catch (error) {
-      console.error('Error in getReports:', error);
-      return [];
-    }
-  }
-
-  static async createReport(reportData: {
-    prompt: string;
-    report_type: string;
-    generated_report: string;
-    provider_id?: string;
-    model_used?: string;
-    tokens_used?: number;
-    generation_time?: number;
-    metadata?: Record<string, any>;
-  }): Promise<ReportHistory> {
-    const { data, error } = await supabase
-      .from('report_history')
-      .insert({
-        prompt: reportData.prompt,
-        report_type: reportData.report_type,
-        generated_report: reportData.generated_report,
-        provider_id: reportData.provider_id,
-        model_used: reportData.model_used,
-        tokens_used: reportData.tokens_used || 0,
-        generation_time: reportData.generation_time || 0,
-        report_metadata: reportData.metadata || {}
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating report:', error);
+      console.error('❌ [INTELLIGENT_REPORTS] Erro inesperado:', error);
       throw error;
     }
-
-    return {
-      id: data.id,
-      title: data.prompt,
-      prompt: data.prompt,
-      generated_at: data.created_at,
-      created_at: data.created_at,
-      provider_used: 'Unknown',
-      provider_id: data.provider_id || '',
-      provider_name: 'Unknown',
-      model_used: data.model_used || '',
-      tokens_used: data.tokens_used || 0,
-      generation_time: Number(data.generation_time) || 0,
-      metadata: data.report_metadata as Record<string, any> || {},
-      query: data.prompt,
-      result: {
-        id: data.id,
-        title: data.prompt,
-        content: data.generated_report,
-        created_at: data.created_at,
-        provider_id: data.provider_id || '',
-        report_content: data.generated_report,
-        report_type: data.report_type,
-        status: 'completed'
-      },
-      timestamp: data.created_at,
-      status: 'success',
-      report_type: data.report_type,
-      generated_report: data.generated_report
-    };
   }
 
-  static async getProviderAndKey(provider_id: string) {
-    // Busca o provedor de IA e valida a chave configurada
+  static async deleteReport(reportId: string): Promise<void> {
     try {
-      const { data: provider, error } = await supabase
-        .from('ai_providers')
-        .select('*')
-        .eq('id', provider_id)
-        .maybeSingle();
+      console.log('🗑️ [INTELLIGENT_REPORTS] Removendo relatório:', reportId);
+      
+      const { error } = await supabase
+        .from('report_history')
+        .delete()
+        .eq('id', reportId);
 
       if (error) {
-        console.error('[IntelligentReportsService] Erro ao buscar provedor:', error);
-        return null;
+        console.error('❌ [INTELLIGENT_REPORTS] Erro ao remover relatório:', error);
+        throw error;
       }
-      if (!provider) {
-        console.error('[IntelligentReportsService] Nenhum provedor configurado para o ID:', provider_id);
-        return null;
-      }
-      if (!provider.api_key) {
-        console.error('[IntelligentReportsService] Provedor sem chave de API:', provider);
-        return null;
-      }
-      return provider;
-    } catch (e) {
-      console.error('[IntelligentReportsService] Exception durante busca de provedor:', e);
-      return null;
+
+      console.log('✅ [INTELLIGENT_REPORTS] Relatório removido com sucesso');
+    } catch (error) {
+      console.error('❌ [INTELLIGENT_REPORTS] Erro inesperado ao remover relatório:', error);
+      throw error;
     }
-  }
-
-  static async generateReport(params: {
-    provider_id: string;
-    report_type: 'conversations' | 'channels' | 'custom';
-    data: any;
-    custom_prompt?: string;
-  }): Promise<ReportHistory> {
-    // Usar provider de IA real do banco
-    const provider = await this.getProviderAndKey(params.provider_id);
-    if (!provider) {
-      console.error("[Relatórios Inteligentes] Nenhum provedor de IA configurado ou sem chave de API válida.");
-      return await this.createReport({
-        prompt: params.custom_prompt || `Tentativa de gerar relatório ${params.report_type}`,
-        report_type: params.report_type,
-        generated_report: "Erro: Nenhum provedor de IA configurado ou chave de API faltando. Configure um provedor ativo no menu de Provedores de IA.",
-        provider_id: params.provider_id,
-        model_used: "N/A",
-        tokens_used: 0,
-        generation_time: 0,
-        metadata: {
-          error: "AI provider config missing",
-        }
-      });
-    }
-    // Usar provider.api_key em vez de variável de ambiente!
-    const openai = new OpenAI({
-      apiKey: provider.api_key,
-      baseURL: provider.base_url || undefined,
-      // Do not add default_model - set after if needed
-      dangerouslyAllowBrowser: true,
-    });
-
-    let generatedReportContent = "";
-    let modelUsed = provider.default_model || "gpt-3.5-turbo";
-    let tokensUsed = 0;
-    let generationTime = 0;
-    const startTime = Date.now();
-
-    try {
-      console.log("🤖 [AI_REPORTS] Gerando relatório com OpenAI...", { type: params.report_type, provider: provider.id });
-      let userPromptContent = `Gere um relatório detalhado sobre ${params.report_type}.`;
-      if (params.data && Object.keys(params.data).length > 0) {
-        const dataString = JSON.stringify(params.data).length > 3000 
-          ? "Dados muito extensos para incluir diretamente. Analise o contexto geral." 
-          : JSON.stringify(params.data);
-        userPromptContent += `\n\nDados fornecidos para análise:\n${dataString}`;
-      }
-      if (params.custom_prompt) {
-        userPromptContent += `\n\nInstruções adicionais (prompt customizado):\n${params.custom_prompt}`;
-      }
-
-      const completion = await openai.chat.completions.create({
-        messages: [{
-          role: "system",
-          content: "Você é um assistente analítico especializado em gerar relatórios concisos e informativos baseados nos dados e instruções fornecidas."
-        }, {
-          role: "user",
-          content: userPromptContent
-        }],
-        model: modelUsed, // Pode vir do banco
-      });
-
-      generatedReportContent = completion.choices[0].message.content || "Não foi possível gerar o conteúdo do relatório.";
-      modelUsed = completion.model;
-      tokensUsed = completion.usage?.total_tokens || 0;
-      console.log("✅ [AI_REPORTS] Relatório gerado pela OpenAI:", { model: modelUsed, tokens: tokensUsed });
-
-    } catch (error: any) {
-      console.error("❌ [AI_REPORTS] Erro ao gerar relatório com OpenAI:", error);
-      generatedReportContent = `Falha ao gerar relatório: ${error.message || String(error)}`;
-      if (error.status === 401) {
-        generatedReportContent = "Erro de autenticação com a API OpenAI. Verifique a chave da API.";
-      }
-    } finally {
-      generationTime = (Date.now() - startTime) / 1000;
-    }
-
-    const report = await this.createReport({
-      prompt: params.custom_prompt || `Gerar relatório de ${params.report_type}`,
-      report_type: params.report_type,
-      generated_report: generatedReportContent,
-      provider_id: provider.id,
-      model_used: modelUsed,
-      tokens_used: tokensUsed,
-      generation_time: generationTime,
-      metadata: { 
-        data_source: params.report_type,
-        ...(params.data && Object.keys(params.data).length > 0 && { data_preview: JSON.stringify(params.data).substring(0, 200) + "..."})
-      }
-    });
-
-    return report;
   }
 }

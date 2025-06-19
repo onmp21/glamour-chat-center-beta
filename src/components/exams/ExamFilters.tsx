@@ -37,36 +37,41 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
   cities
 }) => {
   return (
-    <div className="p-4 border-b" style={{
-      borderColor: isDarkMode ? "#404040" : "#e5e7eb"
-    }}>
+    <div className={cn(
+      "p-4 border-b",
+      isDarkMode ? "border-border" : "border-gray-200"
+    )}>
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <Button 
           onClick={() => setShowThisWeek(!showThisWeek)} 
           variant={showThisWeek ? "default" : "outline"} 
-          className="flex items-center gap-2" 
-          style={{
-            backgroundColor: showThisWeek ? '#b5103c' : 'transparent',
-            borderColor: showThisWeek ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-            color: showThisWeek ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-          }}
+          className={cn(
+            "flex items-center gap-2",
+            showThisWeek 
+              ? "bg-primary text-primary-foreground" 
+              : isDarkMode 
+                ? "border-border text-foreground hover:bg-accent" 
+                : "border-gray-300 text-gray-700"
+          )}
         >
-          <CalendarDays size={16} className="text-[#b5103c]" />
+          <CalendarDays size={16} className="text-primary" />
           {showThisWeek ? 'Mostrar Todos' : 'Exames da Semana'}
         </Button>
         
         <Button 
           onClick={toggleMultiSelect} 
           variant={isMultiSelectMode ? "default" : "outline"} 
-          className="flex items-center gap-2" 
-          style={{
-            backgroundColor: isMultiSelectMode ? '#b5103c' : 'transparent',
-            borderColor: isMultiSelectMode ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-            color: isMultiSelectMode ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-          }}
+          className={cn(
+            "flex items-center gap-2",
+            isMultiSelectMode 
+              ? "bg-primary text-primary-foreground" 
+              : isDarkMode 
+                ? "border-border text-foreground hover:bg-accent" 
+                : "border-gray-300 text-gray-700"
+          )}
         >
-          <CheckSquare size={16} className="text-[#b5103c]" />
+          <CheckSquare size={16} className="text-primary" />
           {isMultiSelectMode ? 'Cancelar Seleção' : 'Seleção Múltipla'}
         </Button>
         
@@ -74,7 +79,7 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
           <Button 
             onClick={deleteSelectedExams} 
             variant="outline" 
-            className="flex items-center gap-2 text-red-500 border-red-500 hover:bg-red-50"
+            className="flex items-center gap-2 text-red-500 border-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
           >
             <Trash2 size={16} />
             Excluir ({selectedExams.length})
@@ -83,7 +88,7 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
         
         <Button 
           onClick={handleAddExam} 
-          className="flex items-center gap-2 bg-[#b5103c] hover:bg-[#9d0e35] text-white"
+          className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           <Plus size={16} />
           Adicionar Exame
@@ -98,14 +103,25 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
               placeholder="Buscar por nome, telefone ou Instagram..." 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
-              className={cn("w-full", isDarkMode ? "bg-[#1a1a1a] border-[#404040] text-white placeholder:text-gray-400" : "bg-white border-gray-200")} 
+              className={cn(
+                "w-full",
+                isDarkMode 
+                  ? "bg-background border-border text-foreground placeholder:text-muted-foreground" 
+                  : "bg-white border-gray-200"
+              )} 
             />
           </div>
-          <Button variant="outline" size="icon" className="shrink-0" style={{
-            borderColor: isDarkMode ? '#404040' : '#d1d5db',
-            color: isDarkMode ? '#ffffff' : '#374151'
-          }}>
-            <Filter size={16} className="text-[#b5103c]" />
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className={cn(
+              "shrink-0",
+              isDarkMode 
+                ? "border-border text-foreground hover:bg-accent" 
+                : "border-gray-300 text-gray-700"
+            )}
+          >
+            <Filter size={16} className="text-primary" />
           </Button>
         </div>
         
@@ -114,12 +130,14 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
             variant={selectedCity === 'all' ? 'default' : 'outline'} 
             size="sm" 
             onClick={() => setSelectedCity('all')} 
-            className="whitespace-nowrap" 
-            style={{
-              backgroundColor: selectedCity === 'all' ? '#b5103c' : 'transparent',
-              borderColor: selectedCity === 'all' ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-              color: selectedCity === 'all' ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-            }}
+            className={cn(
+              "whitespace-nowrap",
+              selectedCity === 'all' 
+                ? "bg-primary text-primary-foreground" 
+                : isDarkMode 
+                  ? "border-border text-foreground hover:bg-accent" 
+                  : "border-gray-300 text-gray-700"
+            )}
           >
             Todas
           </Button>
@@ -129,12 +147,14 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
               variant={selectedCity === city ? 'default' : 'outline'} 
               size="sm" 
               onClick={() => setSelectedCity(city)} 
-              className="whitespace-nowrap" 
-              style={{
-                backgroundColor: selectedCity === city ? '#b5103c' : 'transparent',
-                borderColor: selectedCity === city ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-                color: selectedCity === city ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-              }}
+              className={cn(
+                "whitespace-nowrap",
+                selectedCity === city 
+                  ? "bg-primary text-primary-foreground" 
+                  : isDarkMode 
+                    ? "border-border text-foreground hover:bg-accent" 
+                    : "border-gray-300 text-gray-700"
+              )}
             >
               {city}
             </Button>
@@ -145,12 +165,17 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
       {/* Desktop: Filtros em linha */}
       <div className="hidden md:flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#b5103c]" />
+          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary" />
           <Input 
             placeholder="Buscar por nome, telefone ou Instagram..." 
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)} 
-            className={cn("pl-10", isDarkMode ? "bg-[#1a1a1a] border-[#404040] text-white placeholder:text-gray-400" : "bg-white border-gray-200")} 
+            className={cn(
+              "pl-10",
+              isDarkMode 
+                ? "bg-background border-border text-foreground placeholder:text-muted-foreground" 
+                : "bg-white border-gray-200"
+            )} 
           />
         </div>
         
@@ -158,11 +183,13 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
           <Button 
             variant={selectedCity === 'all' ? 'default' : 'outline'} 
             onClick={() => setSelectedCity('all')} 
-            style={{
-              backgroundColor: selectedCity === 'all' ? '#b5103c' : 'transparent',
-              borderColor: selectedCity === 'all' ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-              color: selectedCity === 'all' ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-            }}
+            className={cn(
+              selectedCity === 'all' 
+                ? "bg-primary text-primary-foreground" 
+                : isDarkMode 
+                  ? "border-border text-foreground hover:bg-accent" 
+                  : "border-gray-300 text-gray-700"
+            )}
           >
             Todas as Cidades
           </Button>
@@ -171,11 +198,13 @@ export const ExamFilters: React.FC<ExamFiltersProps> = ({
               key={city} 
               variant={selectedCity === city ? 'default' : 'outline'} 
               onClick={() => setSelectedCity(city)} 
-              style={{
-                backgroundColor: selectedCity === city ? '#b5103c' : 'transparent',
-                borderColor: selectedCity === city ? '#b5103c' : (isDarkMode ? '#404040' : '#d1d5db'),
-                color: selectedCity === city ? '#ffffff' : isDarkMode ? '#ffffff' : '#374151'
-              }}
+              className={cn(
+                selectedCity === city 
+                  ? "bg-primary text-primary-foreground" 
+                  : isDarkMode 
+                    ? "border-border text-foreground hover:bg-accent" 
+                    : "border-gray-300 text-gray-700"
+              )}
             >
               {city}
             </Button>

@@ -3,28 +3,24 @@ import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
-import { AIProvider, ReportResult, ReportHistory } from '@/types/ai-providers';
-import { ConversationService } from '@/services/ConversationService';
-import { IntelligentReportsService } from '@/services/IntelligentReportsService';
+import { AIProvider } from '@/types/ai-providers';
+import { IntelligentReportsService, ReportResult, ReportHistory } from '@/services/IntelligentReportsService';
 import { ReportStatsSection } from './ReportStatsSection';
 import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
 import { useActiveChannels } from '@/hooks/useActiveChannels';
-import { ReportFilters, ReportType } from '@/types/report';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
 }
 
-// Everything below uses ReportType, which allows 'exams' as valid value.
 export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = ({
   isDarkMode
 }) => {
   const { toast } = useToast();
   const [providers, setProviders] = useState<AIProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
-  // Correct: Explicitly type filters as ReportFilters (which includes ReportType = 'conversations' | 'channels' | 'exams' | 'custom')
   const [filters, setFilters] = useState<any>({
     report_type: 'conversations'
   });
@@ -46,31 +42,38 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     return `${Math.round(seconds)}s`;
   }
 
-  // BUSCA DADOS REAIS para o relatório
+  // CORRIGIDO: Usar import dinâmico e type assertion para resolver erro TypeScript
   async function fetchReportData(report_type: string, channel_id?: string) {
-    const supabaseClient = require('@/integrations/supabase/client').supabase;
-    if (report_type === 'conversations' && channel_id) {
-      // Buscar até 30 conversas recentes do canal selecionado
-      // Determinar a tabela pelo channel_id
-      const { getTableNameForChannel } = require('@/utils/channelMapping');
-      const tableName = getTableNameForChannel(channel_id);
-      const { data } = await supabaseClient
-        .from(tableName)
-        .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
-        .limit(30)
-        .order('read_at', { ascending: false });
-      return data || [];
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      if (report_type === 'conversations' && channel_id) {
+        // CORRIGIDO: Usar type assertion para resolver erro do Supabase
+        const { getTableNameForChannel } = await import('@/utils/channelMapping');
+        const tableName = getTableNameForChannel(channel_id);
+        
+        // Type assertion para resolver o erro do TypeScript
+        const { data } = await (supabase as any)
+          .from(tableName)
+          .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
+          .limit(30)
+          .order('read_at', { ascending: false });
+        return data || [];
+      }
+      if (report_type === 'exams') {
+        // Buscar até 30 exames
+        const { data } = await supabase
+          .from('exams')
+          .select('*')
+          .limit(30)
+          .order('appointment_date', { ascending: false });
+        return data || [];
+      }
+      return {}; // Para custom, retorna vazio
+    } catch (error) {
+      console.error('❌ [REPORT_DATA] Erro ao buscar dados:', error);
+      return {};
     }
-    if (report_type === 'exams') {
-      // Buscar até 30 exames
-      const { data } = await supabaseClient
-        .from('exams')
-        .select('*')
-        .limit(30)
-        .order('appointment_date', { ascending: false });
-      return data || [];
-    }
-    return {}; // Para custom, retorna vazio
   }
 
   useEffect(() => {
@@ -138,33 +141,40 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
-      // Busca dados REAIS conforme tipo do relatório
+      // CORRIGIDO: Busca dados REAIS conforme tipo do relatório usando import dinâmico
       let reportData: any = {};
       if (filters.report_type === "conversations" || filters.report_type === "exams") {
         reportData = await fetchReportData(filters.report_type, filters.channel_id);
       }
+      
       const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
         report_type: filters.report_type,
         data: reportData,
-        custom_prompt: filters.custom_prompt
+        custom_prompt: filters.custom_prompt,
+        selected_sheets: filters.selected_sheets
       });
 
-      // Exibe mensagem customizada se houver erro no conteúdo do relatório
-      if (
-        result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
-        || result.generated_report?.includes("chave de API")
-        || result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
-      ) {
-        setError(result.generated_report);
+      if (!result.success || !result.result) {
+        setError(result.error || 'Erro desconhecido na geração do relatório');
         setReportResult(null);
       } else {
-        setReportResult(result.result);
-        toast({
-          title: "Sucesso",
-          description: "Relatório gerado com sucesso",
-        });
-        loadRecentReports();
+        // Exibe mensagem customizada se houver erro no conteúdo do relatório
+        if (
+          result.result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
+          || result.result.generated_report?.includes("chave de API")
+          || result.result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
+        ) {
+          setError(result.result.generated_report);
+          setReportResult(null);
+        } else {
+          setReportResult(result.result);
+          toast({
+            title: "Sucesso",
+            description: "Relatório gerado com sucesso",
+          });
+          loadRecentReports();
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
@@ -218,6 +228,24 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setError('');
     setFilters({ report_type: 'conversations' });
     setSelectedProvider(providers.length > 0 ? String(providers[0].id) : '');
+  };
+
+  const removeReport = async (reportId: string) => {
+    try {
+      await IntelligentReportsService.deleteReport(reportId);
+      toast({
+        title: "Sucesso",
+        description: "Relatório removido com sucesso",
+      });
+      loadRecentReports(); // Reload the reports list
+    } catch (error) {
+      console.error('Erro ao remover relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao remover relatório. Tente novamente.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -287,6 +315,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               recentReports={recentReports}
               onViewReport={setReportResult}
               onDownloadReport={downloadReport}
+              onRemoveReport={removeReport}
             />
           </div>
         </div>

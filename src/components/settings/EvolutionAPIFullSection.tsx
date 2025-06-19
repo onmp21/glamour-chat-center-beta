@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { EvolutionApiSettings } from '@/components/EvolutionApiSettings';
 
@@ -17,4 +18,3 @@ export const EvolutionAPIFullSection: React.FC<EvolutionAPIFullSectionProps> = (
     </div>
   );
 };
-

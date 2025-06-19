@@ -38,52 +38,101 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
+  // Usar dados estáticos dos canais sem polling constante
   const { channels: internalChannels } = useInternalChannels();
   const { getAccessibleChannels } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Montar lista de canais baseada no role:
-  let canaisData = [];
-  if (user?.role === 'admin') {
-    // Admin pode ver todos os ativos, exceto Pedro
-    canaisData = internalChannels
-      .filter(channel =>
-        channel.isActive &&
-        channel.name &&
-        channel.name.toLowerCase() !== 'pedro'
-      )
-      .map(channel => ({
-        id: channel.legacyId,
-        nome: channel.name,
-        tipo: channel.type === 'general' ? 'IA Assistant' :
-              channel.type === 'store' ? 'Loja' :
-              channel.type === 'manager' ? 'Gerente' : 'Canal',
-        status: 'ativo' as const,
-        conversasNaoLidas: 0,
-        ultimaAtividade: 'Online'
-      }));
-  } else {
-    // Usuário comum
-    const accessibleChannels = getAccessibleChannels();
-    canaisData = internalChannels
-      .filter(channel =>
-        channel.isActive &&
-        channel.name &&
-        channel.name.toLowerCase() !== 'pedro' &&
-        accessibleChannels.includes(channel.legacyId)
-      )
-      .map(channel => ({
-        id: channel.legacyId,
-        nome: channel.name,
-        tipo: channel.type === 'general' ? 'IA Assistant' :
-              channel.type === 'store' ? 'Loja' :
-              channel.type === 'manager' ? 'Gerente' : 'Canal',
-        status: 'ativo' as const,
-        conversasNaoLidas: 0,
-        ultimaAtividade: 'Online'
-      }));
-  }
+  // Carregar canais apenas uma vez na inicialização
+  const [canaisData, setCanaisData] = useState(() => {
+    if (user?.role === 'admin') {
+      return internalChannels
+        .filter(channel =>
+          channel.isActive &&
+          channel.name &&
+          channel.name.toLowerCase() !== 'pedro'
+        )
+        .map(channel => ({
+          id: channel.legacyId,
+          nome: channel.name,
+          tipo: channel.type === 'general' ? 'IA Assistant' :
+                channel.type === 'store' ? 'Loja' :
+                channel.type === 'manager' ? 'Gerente' : 'Canal',
+          status: 'ativo' as const,
+          conversasNaoLidas: 0,
+          ultimaAtividade: 'Online'
+        }));
+    } else {
+      const accessibleChannels = getAccessibleChannels();
+      return internalChannels
+        .filter(channel =>
+          channel.isActive &&
+          channel.name &&
+          channel.name.toLowerCase() !== 'pedro' &&
+          accessibleChannels.includes(channel.legacyId)
+        )
+        .map(channel => ({
+          id: channel.legacyId,
+          nome: channel.name,
+          tipo: channel.type === 'general' ? 'IA Assistant' :
+                channel.type === 'store' ? 'Loja' :
+                channel.type === 'manager' ? 'Gerente' : 'Canal',
+          status: 'ativo' as const,
+          conversasNaoLidas: 0,
+          ultimaAtividade: 'Online'
+        }));
+    }
+  });
+
+  // Atualizar canais apenas quando há mudanças reais nos dados
+  useEffect(() => {
+    if (internalChannels.length > 0) {
+      let newCanaisData = [];
+      if (user?.role === 'admin') {
+        newCanaisData = internalChannels
+          .filter(channel =>
+            channel.isActive &&
+            channel.name &&
+            channel.name.toLowerCase() !== 'pedro'
+          )
+          .map(channel => ({
+            id: channel.legacyId,
+            nome: channel.name,
+            tipo: channel.type === 'general' ? 'IA Assistant' :
+                  channel.type === 'store' ? 'Loja' :
+                  channel.type === 'manager' ? 'Gerente' : 'Canal',
+            status: 'ativo' as const,
+            conversasNaoLidas: 0,
+            ultimaAtividade: 'Online'
+          }));
+      } else {
+        const accessibleChannels = getAccessibleChannels();
+        newCanaisData = internalChannels
+          .filter(channel =>
+            channel.isActive &&
+            channel.name &&
+            channel.name.toLowerCase() !== 'pedro' &&
+            accessibleChannels.includes(channel.legacyId)
+          )
+          .map(channel => ({
+            id: channel.legacyId,
+            nome: channel.name,
+            tipo: channel.type === 'general' ? 'IA Assistant' :
+                  channel.type === 'store' ? 'Loja' :
+                  channel.type === 'manager' ? 'Gerente' : 'Canal',
+            status: 'ativo' as const,
+            conversasNaoLidas: 0,
+            ultimaAtividade: 'Online'
+          }));
+      }
+      
+      // Só atualizar se houve mudança real nos dados
+      if (JSON.stringify(newCanaisData) !== JSON.stringify(canaisData)) {
+        setCanaisData(newCanaisData);
+      }
+    }
+  }, [internalChannels, user?.role, getAccessibleChannels]);
 
   useEffect(() => {
     console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
@@ -116,29 +165,24 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const handleNewContact = (contactData: { nome: string; telefone: string; canal: string }) => {
     console.log('🆕 [NEW_CONTACT] Creating contact:', contactData);
     
-    // Mostrar toast de sucesso
     toast({
       title: "Contato Criado",
       description: `Contato ${contactData.nome} criado com sucesso. Aguardando primeira mensagem.`,
     });
     
-    // Abrir o canal selecionado para o novo contato
     setSelectedChannel(contactData.canal);
   };
 
   const handleContactClick = (contact: any) => {
     console.log('👤 [CONTACT_CLICK] Contact selected:', contact);
     
-    // Se o contato tem apenas um canal, abrir diretamente
     if (contact.canais && contact.canais.length === 1) {
       setSelectedChannel(contact.canais[0]);
     } else if (contact.canais && contact.canais.length > 1) {
-      // Se tem múltiplos canais, abrir modal de seleção
       setSelectedContactChannels(contact.canais);
       setSelectedContactName(contact.nome);
       setIsChannelSelectorOpen(true);
     } else {
-      // Fallback: usar o primeiro canal disponível
       const firstChannel = canaisData[0]?.id;
       if (firstChannel) {
         setSelectedChannel(firstChannel);

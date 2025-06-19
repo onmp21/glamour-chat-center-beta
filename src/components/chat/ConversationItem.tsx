@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
-import { useConversationStatus } from '@/hooks/useConversationStatus';
+import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { useAuditLogger } from '@/hooks/useAuditLogger';
 
 interface ConversationItemProps {
@@ -24,7 +24,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   onClick
 }) => {
-  const { getConversationStatus } = useConversationStatus();
+  const { getConversationStatus, markConversationAsViewed } = useConversationStatusEnhanced();
   const { logConversationAction } = useAuditLogger();
   const [currentStatus, setCurrentStatus] = useState<'unread' | 'in_progress' | 'resolved'>('unread');
 
@@ -68,9 +68,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const showUnreadBadge = currentStatus === 'unread';
+  // Só mostrar badge se for unread (pendente) E se unread_count > 0
+  const showUnreadBadge = currentStatus === 'unread' && (conversation.unread_count || 0) > 0;
 
-  const handleClick = () => {
+  const handleClick = async () => {
     
     logConversationAction('conversation_opened', conversation.id, {
       channel_id: channelId,
@@ -80,6 +81,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
       last_message_time: conversation.last_message_time,
       unread_count: conversation.unread_count || 0
     });
+    
+    // Marcar como visualizada (auto-transição de pendente para em andamento)
+    await markConversationAsViewed(channelId, conversation.id);
     
     onClick();
   };
@@ -103,6 +107,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={cn("text-xs flex-shrink-0", isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")}>
               {formatTime(conversation.last_message_time)}
             </span>
+            {/* Só mostrar badge se for unread (pendente) E se unread_count > 0 */}
             {showUnreadBadge && (
               <Badge variant="default" className="bg-[#b5103c] hover:bg-[#9d0e34] text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center">
                 •

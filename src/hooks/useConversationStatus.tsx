@@ -1,7 +1,8 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useToast } from '@/hooks/use-toast';
-import { getTableNameForChannel } from '@/utils/channelMapping';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 
 export const useConversationStatus = () => {
   const [updating, setUpdating] = useState(false);
@@ -73,7 +74,7 @@ export const useConversationStatus = () => {
     try {
       setUpdating(true);
       
-      const tableName = getTableNameForChannel(channelId);
+      const tableName = getTableNameForChannelSync(channelId);
       
       // Marcar mensagens como lidas se o status for 'in_progress' ou 'resolved'
       if (status === 'in_progress' || status === 'resolved') {

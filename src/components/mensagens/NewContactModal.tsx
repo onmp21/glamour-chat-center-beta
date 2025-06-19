@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,8 +11,7 @@ import { useInternalChannels } from '@/hooks/useInternalChannels';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getTableNameForChannel } from '@/utils/channelMapping';
-import type { Database } from '@/integrations/supabase/types';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -84,7 +84,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
     try {
       console.log('🆕 [NEW_CONTACT] Criando nova conversa:', { channelId, phoneNumber, contactName });
       
-      const tableName = getTableNameForChannel(channelId);
+      const tableName = getTableNameForChannelSync(channelId);
       if (!tableName) {
         throw new Error('Canal não encontrado');
       }
@@ -92,9 +92,9 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
       // Criar primeira mensagem para inicializar a conversa
       const welcomeMessage = `Conversa iniciada com ${contactName}`;
       
-      // Type assertion for table name to satisfy TypeScript
+      // Use table name directly as the type system will handle it
       const { data, error } = await supabase
-        .from(tableName as keyof Database['public']['Tables'])
+        .from(tableName as any)
         .insert({
           session_id: phoneNumber,
           message: welcomeMessage,

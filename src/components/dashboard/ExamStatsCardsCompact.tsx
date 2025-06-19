@@ -46,7 +46,7 @@ export const ExamStatsCardsCompact: React.FC<ExamStatsCardsCompactProps> = ({
           className={cn(
             "transition-all duration-200",
             isDarkMode 
-              ? "bg-zinc-800 border-zinc-700" 
+              ? "bg-[#18181b] border-[#3f3f46]" 
               : "bg-white border-gray-200"
           )}
         >
@@ -62,13 +62,13 @@ export const ExamStatsCardsCompact: React.FC<ExamStatsCardsCompactProps> = ({
               <div className="flex-1 min-w-0">
                 <p className={cn(
                   "text-xs font-medium",
-                  isDarkMode ? "text-zinc-400" : "text-gray-600"
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
                 )}>
                   {stat.title}
                 </p>
                 <p className={cn(
                   "text-lg font-bold",
-                  isDarkMode ? "text-zinc-100" : "text-gray-900"
+                  isDarkMode ? "text-white" : "text-gray-900"
                 )}>
                   {stat.value}
                 </p>

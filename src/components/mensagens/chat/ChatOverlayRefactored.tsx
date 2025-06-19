@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatMainArea } from './ChatMainArea';
-import { useSimpleConversations } from '@/hooks/useSimpleConversations';
-import { useSimpleMessages } from '@/hooks/useSimpleMessages';
+import { useNonRealtimeConversations } from '@/hooks/useNonRealtimeConversations';
+import { useNonRealtimeMessages } from '@/hooks/useNonRealtimeMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChannelConversation } from '@/types/messages';
 import { useConversationStatus } from '@/hooks/useConversationStatus';
@@ -16,8 +17,6 @@ interface ChatOverlayRefactoredProps {
   onSendAudio?: (audioBlob: Blob, duration: number) => Promise<void>;
 }
 
-// Placeholder type definition for SimpleConversation as it's not exported from the hook
-// and the hook file is not in the allowed list to modify.
 export interface SimpleConversation {
   id: string;
   contact_name: string;
@@ -27,26 +26,20 @@ export interface SimpleConversation {
   status: 'unread' | 'in_progress' | 'resolved';
   unread_count: number;
   updated_at: string;
-  // Add any other properties that useSimpleConversations might return for a conversation
 }
 
-// Placeholder type definition for SimpleMessage
 export interface SimpleMessage {
   id: string;
   message: string;
-  tipo_remetente?: string; // e.g., 'USUARIO_INTERNO', 'CONTATO_EXTERNO'
-  created_at?: string; // Timestamp
-  read_at?: string; // Timestamp for read status
-  mensagemtype?: string; // e.g., 'text', 'image', 'audio'
+  tipo_remetente?: string; 
+  created_at?: string; 
+  read_at?: string; 
+  mensagemtype?: string; 
   media_url?: string;
-  media_caption?: string;
   is_read?: boolean;
   nome_do_contato?: string;
-  // Add other properties returned by useSimpleMessages for a message
 }
 
-
-// Unified type for compatibility, if still needed
 interface UnifiedConversation {
   id: string;
   contact_name: string;
@@ -58,7 +51,6 @@ interface UnifiedConversation {
   updated_at: string;
 }
 
-// Type for messages displayed in ChatMainArea
 interface DisplayMessage {
   id: string;
   content: string;
@@ -89,20 +81,18 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isAuthenticated, user } = useAuth();
 
+  // Usar hooks sem realtime para evitar subscriptions
   const {
-    conversations: simpleConversations, // This is SimpleConversation[]
+    conversations: simpleConversations, 
     loading: conversationsLoading,
     refreshConversations
-  } = useSimpleConversations(channelId);
+  } = useNonRealtimeConversations(channelId);
   
-  // The useSimpleMessages hook provides messages, loading, error, and refreshMessages.
-  // It does NOT provide sendMessage, sendFile, sendAudio, or refetch directly based on previous errors.
-  // Those sending actions are expected to be passed to ChatMainArea or handled by ChatInput via useMessageActions.
   const {
-    messages: simpleMessagesFromHook, // This is SimpleMessage[]
+    messages: simpleMessagesFromHook, 
     loading: messagesLoading,
     refreshMessages 
-  } = useSimpleMessages(channelId, selectedConversation);
+  } = useNonRealtimeMessages(channelId, selectedConversation);
 
   console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
     channelId,
@@ -115,8 +105,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     user: user?.name
   });
 
-  // Cast simpleConversations to UnifiedConversation[] if structure matches.
-  // Ensure SimpleConversation has all needed fields for UnifiedConversation.
   const conversations: UnifiedConversation[] = simpleConversations.map((conv: SimpleConversation) => ({
     id: conv.id,
     contact_name: conv.contact_name,
@@ -141,18 +129,12 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     setSelectedConversation(conversationId);
   };
 
-  // Message sending is typically handled by ChatInput via useMessageActions or passed directly to ChatMainArea.
-  // These handlers here are illustrative if ChatOverlayRefactored itself were to send messages,
-  // but based on the setup, ChatMainArea / ChatInput handle sends.
   const handleSendMessage = async (message: string) => {
     console.log('💬 [CHAT_OVERLAY] Attempting to send message:', message);
     if (selectedConversation) {
-      // This component relies on ChatInput/useMessageActions for sending.
-      // This function is passed to ChatMainArea, which might pass it to its ChatInput.
-      // If `useSimpleMessages` were to provide `sendMessage`, it would be called here.
       console.warn("ChatOverlayRefactored.handleSendMessage: Sending logic should be in ChatInput or via a dedicated sending hook.");
       if (refreshMessages) {
-        await refreshMessages(); // Refresh after send attempt (actual send is elsewhere)
+        await refreshMessages(); 
       }
     }
   };
@@ -179,7 +161,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
   const selectedConvData: SimpleConversation | undefined = simpleConversations.find(c => c.id === selectedConversation);
   
-  // Map SimpleConversation to ChannelConversation for ChatMainArea
   const selectedConvForMainArea: ChannelConversation | undefined = selectedConvData ? {
     id: selectedConvData.id,
     contact_name: selectedConvData.contact_name,
@@ -189,46 +170,33 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     status: selectedConvData.status,
     updated_at: selectedConvData.updated_at,
     unread_count: selectedConvData.unread_count,
-    // Ensure other required fields for ChannelConversation are added if not in SimpleConversation
-    // For example, if ChannelConversation requires these:
-    // is_pinned: false, // Removed as it caused an error; add to type if needed
-    // tags: [], 
-    // notes: '', 
-    // name: selectedConvData.contact_name, 
-    // lastMessage: selectedConvData.last_message, 
-    // lastMessageTimestamp: selectedConvData.last_message_time, 
-    // avatarUrl: '', 
-    // type: 'whatsapp', 
   } : undefined;
 
   const { updateConversationStatus } = useConversationStatus();
 
   const handleMarkAsResolved = async () => {
     if (selectedConversation && channelId) {
-      // Chama o hook normal
       await updateConversationStatus(channelId, selectedConversation, 'resolved');
-      // Opcional: refresh conversations/messages
       refreshConversations && (await refreshConversations());
       refreshMessages && (await refreshMessages());
     }
   };
 
-  // Convert SimpleMessage from hook to DisplayMessage for ChatMainArea
   const displayMessages: DisplayMessage[] = simpleMessagesFromHook.map((msg: SimpleMessage) => {
     const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
     
     return {
       id: msg.id,
       content: msg.message || '',
-      timestamp: msg.created_at || msg.read_at || new Date().toISOString(), // Use created_at or read_at
-      sender: isAgent ? 'agent' : 'customer', // This assumes SimpleMessage has a way to determine sender
+      timestamp: msg.created_at || msg.read_at || new Date().toISOString(), 
+      sender: isAgent ? 'agent' : 'customer', 
       tipo_remetente: msg.tipo_remetente,
       type: msg.mensagemtype === 'image' ? 'image' :
             msg.mensagemtype === 'audio' ? 'audio' :
             msg.mensagemtype === 'video' ? 'video' :
-            msg.mensagemtype === 'document' || msg.mensagemtype === 'file' ? 'file' : 'text', // Added 'file' for document
+            msg.mensagemtype === 'document' || msg.mensagemtype === 'file' ? 'file' : 'text', 
       fileUrl: msg.media_url || undefined,
-      fileName: msg.media_caption || msg.message || undefined,
+      fileName: msg.message || undefined,
       read: typeof msg.is_read === 'boolean' ? msg.is_read : true,
       nome_do_contato: msg.nome_do_contato,
       mensagemtype: msg.mensagemtype
@@ -252,7 +220,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     <div className={cn("fixed inset-0 z-50 flex", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
       <ChatSidebar 
         channelId={channelId} 
-        conversations={conversations} // This is UnifiedConversation[]
+        conversations={conversations} 
         selectedConversation={selectedConversation} 
         isSidebarOpen={isSidebarOpen} 
         isDarkMode={isDarkMode} 

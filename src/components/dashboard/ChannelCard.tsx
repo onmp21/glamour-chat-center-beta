@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,16 +23,26 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   isDarkMode,
   onClick
 }) => {
-  const { counts, loading: countsLoading } = useChannelConversationCounts(channelId);
-  const { lastActivityText, loading: activityLoading } = useChannelLastActivity(channelId);
-  const { isPinned, togglePin } = useChannelPin();
-
+  const {
+    counts,
+    loading: countsLoading
+  } = useChannelConversationCounts(channelId);
+  const {
+    lastActivityText,
+    loading: activityLoading
+  } = useChannelLastActivity(channelId);
+  const {
+    isPinned,
+    togglePin
+  } = useChannelPin();
+  
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
-  
-  // Calcular notificações não lidas
-  const unreadNotifications = counts.pending + counts.inProgress;
 
+  // Mostrar conversas não lidas no badge, total no texto
+  const unreadCount = counts.pending;
+  const totalCount = counts.total;
+  
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
     if (name.includes('Andressa') || name.includes('Gustavo')) return Users;
@@ -76,15 +87,12 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   }
 
   return (
-    <Card 
-      className={cn(
-        "cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] relative group",
-        isDarkMode ? "bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]" : "bg-white border-gray-200 hover:bg-gray-50",
-        channelIsPinned && "ring-2 ring-[#b5103c]/30"
-      )}
-      onClick={() => onClick(channelId)}
-    >
-      <CardContent className="p-4">
+    <Card className={cn(
+      "cursor-pointer transition-all hover:shadow-md hover:scale-[1.01] relative group",
+      isDarkMode ? "bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]" : "bg-white border-gray-200 hover:bg-gray-50",
+      channelIsPinned && "ring-2 ring-[#b5103c]/30"
+    )} onClick={() => onClick(channelId)}>
+      <CardContent className="p-4 relative">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className={cn(
@@ -92,30 +100,35 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
               isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
-              {unreadNotifications > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
-                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              
+              {/* Badge de contagem no canto superior esquerdo do ícone - apenas se houver conversas não lidas (> 0) */}
+              {unreadCount > 0 && (
+                <div className={cn(
+                  "absolute -top-1 -left-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg",
+                  isDarkMode ? "bg-[#b5103c]" : "bg-[#b5103c]"
+                )}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className={cn("font-medium text-sm truncate flex items-center gap-1", isDarkMode ? "text-white" : "text-gray-900")}>
+              <h3 className={cn(
+                "font-medium text-sm truncate flex items-center gap-1",
+                isDarkMode ? "text-white" : "text-gray-900"
+              )}>
                 {displayName}
-                {channelIsPinned && (
-                  <Pin size={12} className="text-[#b5103c] fill-current" />
-                )}
+                {channelIsPinned && <Pin size={12} className="text-[#b5103c] fill-current" />}
               </h3>
-              <p className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+              <p className={cn(
+                "text-xs",
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              )}>
                 {displayType}
               </p>
             </div>
           </div>
+          
           <div className="flex items-center gap-2">
-            {counts.total > 0 && (
-              <Badge className="bg-[#b5103c] text-white text-xs px-2 py-1">
-                {counts.total}
-              </Badge>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -127,12 +140,9 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
                 isDarkMode ? "hover:bg-zinc-700" : "hover:bg-gray-200"
               )}
             >
-              <Pin 
-                size={14} 
-                className={cn(
-                  channelIsPinned ? "text-[#b5103c] fill-current" : (isDarkMode ? "text-gray-400" : "text-gray-600")
-                )} 
-              />
+              <Pin size={14} className={cn(
+                channelIsPinned ? "text-[#b5103c] fill-current" : (isDarkMode ? "text-gray-400" : "text-gray-600")
+              )} />
             </button>
           </div>
         </div>
@@ -143,6 +153,14 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             isDarkMode ? "text-gray-500" : "text-gray-500"
           )}>
             {loading ? 'Carregando...' : lastActivityText}
+          </p>
+          
+          {/* Texto de contagem total de conversas */}
+          <p className={cn(
+            "text-xs font-medium",
+            isDarkMode ? "text-gray-400" : "text-gray-600"
+          )}>
+            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
           </p>
         </div>
       </CardContent>

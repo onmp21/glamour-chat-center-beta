@@ -39,6 +39,45 @@ export class AIProviderService {
     }));
   }
 
+  static async getProviderById(id: string): Promise<AIProvider | null> {
+    try {
+      console.log('🔍 [AI_PROVIDER_SERVICE] Getting provider by ID:', id);
+
+      const { data, error } = await supabase
+        .from('ai_providers')
+        .select('*')
+        .eq('id', id)
+        .eq('is_active', true)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('ℹ️ [AI_PROVIDER_SERVICE] Provider not found:', id);
+          return null;
+        }
+        console.error('❌ [AI_PROVIDER_SERVICE] Error fetching provider:', error);
+        throw error;
+      }
+
+      console.log('✅ [AI_PROVIDER_SERVICE] Provider found:', data.name);
+      return {
+        ...data,
+        provider_type: data.provider_type as ProviderType,
+        advanced_settings: (data.advanced_settings as Record<string, any>) || {},
+        created_at: data.created_at || new Date().toISOString(),
+        updated_at: data.updated_at || new Date().toISOString(),
+        is_active: data.is_active ?? true,
+        api_key: data.api_key || '',
+        base_url: data.base_url || '',
+        default_model: data.default_model || '',
+        user_id: data.user_id || null
+      };
+    } catch (error) {
+      console.error('❌ [AI_PROVIDER_SERVICE] Error getting provider by ID:', error);
+      throw error;
+    }
+  }
+
   static async getActiveProviders(): Promise<AIProvider[]> {
     return this.getProviders();
   }
