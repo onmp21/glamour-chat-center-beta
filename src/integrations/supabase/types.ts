@@ -702,6 +702,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backup_conversation_table: {
+        Args: { table_name: string }
+        Returns: string
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -721,6 +725,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_conversation_table: {
+        Args: { table_name: string }
+        Returns: undefined
+      }
       create_user_with_hash: {
         Args: {
           p_username: string
@@ -735,6 +743,10 @@ export type Database = {
       detect_mime_from_base64: {
         Args: { base64_content: string }
         Returns: string
+      }
+      drop_conversation_table: {
+        Args: { table_name: string }
+        Returns: undefined
       }
       format_base64_to_data_url: {
         Args: { base64_content: string; message_type?: string }
@@ -817,6 +829,10 @@ export type Database = {
       process_base64_to_storage: {
         Args: { base64_content: string; file_name?: string; mime_type?: string }
         Returns: string
+      }
+      rename_conversation_table: {
+        Args: { old_name: string; new_name: string }
+        Returns: undefined
       }
       sparsevec_out: {
         Args: { "": unknown }
