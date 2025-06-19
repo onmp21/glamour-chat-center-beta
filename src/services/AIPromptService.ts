@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface AIPrompt {
@@ -18,7 +17,9 @@ export type AIPromptType =
   | 'report_conversations'
   | 'report_channels'
   | 'report_custom'
-  | 'report_exams';
+  | 'report_exams'
+  | 'summary'
+  | 'report';
 
 export interface AIPromptTypeDefinition {
   type: AIPromptType;
@@ -40,6 +41,18 @@ export function getPromptTypes(): AIPromptTypeDefinition[] {
       label: 'Resposta Rápida',
       description: 'Prompt para gerar respostas rápidas baseadas no contexto',
       defaultPrompt: 'Com base no contexto da conversa, sugira uma resposta apropriada e profissional.'
+    },
+    {
+      type: 'summary',
+      label: 'Resumir Conversa',
+      description: 'Prompt para resumir conversas específicas',
+      defaultPrompt: 'Faça um resumo detalhado desta conversa, destacando os pontos principais, problemas identificados e soluções propostas.'
+    },
+    {
+      type: 'report',
+      label: 'Relatório da Conversa',
+      description: 'Prompt para relatórios estruturados de conversas',
+      defaultPrompt: 'Crie um relatório estruturado desta conversa incluindo: resumo, problemas identificados, ações tomadas e próximos passos.'
     },
     {
       type: 'report_conversations',
@@ -100,7 +113,6 @@ export class AIPromptService {
     try {
       console.log('💾 [AI_PROMPT_SERVICE] Salvando prompt:', prompt.name);
       
-      // Validação melhorada antes do salvamento
       if (!prompt.name || !prompt.prompt_content || !prompt.prompt_type) {
         throw new Error('Nome, conteúdo e tipo do prompt são obrigatórios');
       }
@@ -132,19 +144,44 @@ export class AIPromptService {
         }
         result = data;
       } else {
-        // Criar novo prompt
-        console.log('➕ [AI_PROMPT_SERVICE] Criando novo prompt');
-        const { data, error } = await supabase
+        // Verificar se já existe um prompt do mesmo tipo
+        const { data: existingPrompt } = await supabase
           .from('ai_prompts')
-          .insert([promptData])
-          .select()
+          .select('id')
+          .eq('prompt_type', prompt.prompt_type)
+          .eq('is_active', true)
           .single();
 
-        if (error) {
-          console.error('❌ [AI_PROMPT_SERVICE] Erro ao criar prompt:', error);
-          throw error;
+        if (existingPrompt) {
+          // Atualizar o prompt existente do mesmo tipo
+          console.log('🔄 [AI_PROMPT_SERVICE] Atualizando prompt existente do tipo:', prompt.prompt_type);
+          const { data, error } = await supabase
+            .from('ai_prompts')
+            .update(promptData)
+            .eq('id', existingPrompt.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ [AI_PROMPT_SERVICE] Erro ao atualizar prompt:', error);
+            throw error;
+          }
+          result = data;
+        } else {
+          // Criar novo prompt
+          console.log('➕ [AI_PROMPT_SERVICE] Criando novo prompt');
+          const { data, error } = await supabase
+            .from('ai_prompts')
+            .insert([promptData])
+            .select()
+            .single();
+
+          if (error) {
+            console.error('❌ [AI_PROMPT_SERVICE] Erro ao criar prompt:', error);
+            throw error;
+          }
+          result = data;
         }
-        result = data;
       }
 
       console.log('✅ [AI_PROMPT_SERVICE] Prompt salvo com sucesso:', result.id);

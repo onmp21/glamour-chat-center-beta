@@ -27,7 +27,6 @@ interface ReportGeneratorProps {
   channelsLoading: boolean;
 }
 
-// Dados das planilhas disponíveis
 const availableSheets = [
   { id: 'yelena_ai_conversas', name: 'Yelena AI', description: 'Conversas do assistente principal' },
   { id: 'canarana_conversas', name: 'Canarana', description: 'Conversas da loja Canarana' },
@@ -94,7 +93,6 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
 
       console.log('✅ [REPORT_GENERATOR] Validações passaram, chamando edge function...');
 
-      // Chamar a edge function
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,

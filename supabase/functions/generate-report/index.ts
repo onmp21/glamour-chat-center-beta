@@ -25,12 +25,16 @@ serve(async (req) => {
       }
     )
 
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    // Verificar autenticação
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
 
-    if (!user) {
-      console.log('❌ [GENERATE_REPORT] Usuário não autenticado');
+    if (authError || !user) {
+      console.log('❌ [GENERATE_REPORT] Usuário não autenticado:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Unauthorized' 
+        }),
         { 
           status: 401, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -43,7 +47,14 @@ serve(async (req) => {
     const requestBody = await req.json()
     console.log('📝 [GENERATE_REPORT] Body recebido:', requestBody);
 
-    const { provider_id, report_type, custom_prompt, selected_sheets = [] } = requestBody
+    const { 
+      provider_id, 
+      report_type, 
+      custom_prompt, 
+      selected_sheets = [],
+      data: contextData = null,
+      action_type = null
+    } = requestBody
 
     // Buscar o provedor de IA
     const { data: provider, error: providerError } = await supabaseClient
@@ -68,10 +79,37 @@ serve(async (req) => {
 
     console.log('✅ [GENERATE_REPORT] Provider encontrado:', provider.name);
 
-    // Buscar dados das planilhas selecionadas
-    const reportData: any = {};
+    // Buscar prompt apropriado da tabela ai_prompts baseado no tipo de ação
+    let systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios em português brasileiro.";
+    let userPrompt = custom_prompt || "";
 
-    if (selected_sheets && selected_sheets.length > 0) {
+    if (action_type) {
+      console.log('🔍 [GENERATE_REPORT] Buscando prompt para action_type:', action_type);
+      
+      const { data: promptData, error: promptError } = await supabaseClient
+        .from('ai_prompts')
+        .select('*')
+        .eq('prompt_type', action_type)
+        .eq('is_active', true)
+        .single();
+
+      if (!promptError && promptData) {
+        console.log('✅ [GENERATE_REPORT] Prompt encontrado:', promptData.name);
+        userPrompt = promptData.prompt_content;
+        
+        // Se temos dados de contexto (mensagens da conversa), adicionar ao prompt
+        if (contextData && contextData.messages) {
+          userPrompt += `\n\nContexto da conversa:\n${JSON.stringify(contextData.messages, null, 2)}`;
+        }
+      } else {
+        console.log('⚠️ [GENERATE_REPORT] Prompt não encontrado, usando custom_prompt');
+      }
+    }
+
+    // Se não temos prompt e é um relatório padrão, buscar dados das planilhas
+    if (!userPrompt && selected_sheets && selected_sheets.length > 0) {
+      const reportData: any = {};
+
       for (const sheetId of selected_sheets) {
         try {
           console.log(`🔍 [GENERATE_REPORT] Buscando dados de: ${sheetId}`);
@@ -83,7 +121,6 @@ serve(async (req) => {
               .select('patient_name, phone, city, appointment_date, status, exam_type')
               .limit(10);
           } else {
-            // Tabelas de conversas
             const tableMapping: Record<string, string> = {
               'yelena_ai_conversas': 'yelena_ai_conversas',
               'canarana_conversas': 'canarana_conversas',
@@ -115,14 +152,10 @@ serve(async (req) => {
           console.error(`❌ [GENERATE_REPORT] Erro ao processar ${sheetId}:`, err);
         }
       }
-    }
 
-    // Preparar prompt baseado no tipo de relatório
-    let systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios em português brasileiro. Analise os dados fornecidos e gere um relatório detalhado, claro e útil."
-    let userPrompt = ""
-
-    if (report_type === 'conversations') {
-      userPrompt = `Analise as seguintes conversas de WhatsApp e gere um relatório detalhado:
+      // Preparar prompt baseado no tipo de relatório
+      if (report_type === 'conversations') {
+        userPrompt = `Analise as seguintes conversas de WhatsApp e gere um relatório detalhado:
 
 Dados das conversas: ${JSON.stringify(reportData, null, 2)}
 
@@ -132,8 +165,8 @@ Por favor, inclua:
 3. Principais temas
 4. Recomendações`
 
-    } else if (report_type === 'exams') {
-      userPrompt = `Analise os seguintes dados de exames médicos:
+      } else if (report_type === 'exams') {
+        userPrompt = `Analise os seguintes dados de exames médicos:
 
 Dados dos exames: ${JSON.stringify(reportData, null, 2)}
 
@@ -142,16 +175,16 @@ Por favor, inclua:
 2. Distribuição por cidade
 3. Análise temporal
 4. Insights e recomendações`
-
-    } else if (report_type === 'custom') {
-      userPrompt = custom_prompt || 'Gere um relatório com base nos dados fornecidos.'
-      if (reportData && Object.keys(reportData).length > 0) {
-        userPrompt += `\n\nDados disponíveis: ${JSON.stringify(reportData, null, 2)}`
       }
     }
 
-    console.log('🔄 [GENERATE_REPORT] Enviando para OpenAI...');
+    if (!userPrompt) {
+      userPrompt = custom_prompt || 'Gere um relatório com base nos dados disponíveis.';
+    }
 
+    console.log('🔄 [GENERATE_REPORT] Enviando para IA...', provider.provider_type);
+
+    // Chamar a API da OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -159,7 +192,7 @@ Por favor, inclua:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: provider.default_model || 'gpt-3.5-turbo',
+        model: provider.default_model || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
@@ -194,15 +227,16 @@ Por favor, inclua:
       .from('report_history')
       .insert({
         provider_id: provider.id,
-        report_type,
+        report_type: report_type || 'custom',
         prompt: userPrompt,
         generated_report: reportContent,
-        model_used: provider.default_model || 'gpt-3.5-turbo',
+        model_used: provider.default_model || 'gpt-4o-mini',
         tokens_used: response.usage?.total_tokens || 0,
         generation_time: 0,
         report_metadata: {
           user_id: user.id,
-          data_size: JSON.stringify(reportData).length
+          action_type: action_type || null,
+          data_size: userPrompt.length
         }
       })
       .select()
@@ -216,10 +250,13 @@ Por favor, inclua:
       JSON.stringify({
         success: true,
         report: reportContent,
+        content: reportContent, // Para compatibilidade
         metadata: {
           tokens_used: response.usage?.total_tokens || 0,
-          model_used: provider.default_model || 'gpt-3.5-turbo',
-          report_id: savedReport?.id
+          model_used: provider.default_model || 'gpt-4o-mini',
+          report_id: savedReport?.id,
+          provider_name: provider.name,
+          generation_time: 0
         }
       }),
       { 
