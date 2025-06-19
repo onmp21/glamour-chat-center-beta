@@ -109,8 +109,7 @@ export const useSimpleConversations = (channelId: string | null) => {
             contact_phone: phoneNumber,
             last_message: message.message || '',
             last_message_time: message.read_at || new Date().toISOString(),
-            status: '
-' as const,
+            status: 'unread' as const,
             unread_count: 0,
             updated_at: message.read_at || new Date().toISOString()
           });
