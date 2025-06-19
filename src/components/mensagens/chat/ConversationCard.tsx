@@ -72,12 +72,23 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
           )}>
             {truncateContactName(conversation.contact_name)}
           </h4>
-          {/* Só mostrar badge se unread_count > 0 e status não é resolved */}
-          {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (
-            <Badge className="bg-[#b5103c] text-white text-xs ml-2">
-              {conversation.unread_count}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-xs flex-shrink-0",
+              isDarkMode ? "text-gray-500" : "text-gray-500"
+            )}>
+              {conversation.last_message_time && new Date(conversation.last_message_time).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+            {/* Só mostrar badge se unread_count > 0 e status não é resolved */}
+            {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (
+              <Badge className="bg-[#b5103c] text-white text-xs">
+                {conversation.unread_count}
+              </Badge>
+            )}
+          </div>
         </div>
         <p className={cn(
           "text-xs truncate mb-2",
@@ -86,15 +97,6 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
           {truncateMessage(conversation.last_message || '')}
         </p>
         <div className="flex items-center justify-between">
-          <span className={cn(
-            "text-xs",
-            isDarkMode ? "text-gray-500" : "text-gray-500"
-          )}>
-            {conversation.last_message_time && new Date(conversation.last_message_time).toLocaleTimeString('pt-BR', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </span>
           <div className="flex items-center gap-1">
             <div className={cn("w-2 h-2 rounded-full", getStatusColor(status))}></div>
             <span className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-500")}>
