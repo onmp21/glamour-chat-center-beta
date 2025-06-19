@@ -12,6 +12,7 @@ export const useConversationService = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const subscriptionNameRef = useRef<string | null>(null);
   const isSubscribedRef = useRef<boolean>(false);
+  const isInitializingRef = useRef<boolean>(false);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -77,38 +78,37 @@ export const useConversationService = (channelId: string) => {
     loadConversations();
 
     // Setup realtime subscription only if not already subscribed
-    if (channelId && !isSubscribedRef.current) {
+    if (channelId && !isSubscribedRef.current && !isInitializingRef.current) {
+      isInitializingRef.current = true;
       const tableName = getTableNameForChannelSync(channelId);
       const subscriptionName = `service-${channelId}-${Date.now()}`;
       subscriptionNameRef.current = subscriptionName;
       
-      try {
-        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        
-        const channel = subscriptionManager.createSubscription(
-          subscriptionName,
-          (payload) => {
-            console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-            // Refresh conversations when new message arrives
-            setTimeout(() => {
-              refreshConversations();
-            }, 1000);
-          },
-          tableName
-        );
+      const setupSubscription = async () => {
+        try {
+          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+          
+          await subscriptionManager.createSubscription(
+            subscriptionName,
+            (payload) => {
+              console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
+              // Refresh conversations when new message arrives
+              setTimeout(() => {
+                refreshConversations();
+              }, 1000);
+            },
+            tableName
+          );
 
-        if (channel) {
-          // Subscribe only once
-          channel.subscribe((status: string) => {
-            console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status} for ${channelId}`);
-            if (status === 'SUBSCRIBED') {
-              isSubscribedRef.current = true;
-            }
-          });
+          isSubscribedRef.current = true;
+        } catch (error) {
+          console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
+        } finally {
+          isInitializingRef.current = false;
         }
-      } catch (error) {
-        console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
-      }
+      };
+
+      setupSubscription();
     }
 
     return () => {
@@ -123,6 +123,7 @@ export const useConversationService = (channelId: string) => {
         isSubscribedRef.current = false;
         subscriptionNameRef.current = null;
       }
+      isInitializingRef.current = false;
     };
   }, [channelId]);
 

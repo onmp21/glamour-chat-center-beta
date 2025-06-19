@@ -9,47 +9,44 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   const [isConnected, setIsConnected] = useState(false);
   const subscriptionNameRef = useRef<string | null>(null);
   const isSubscribedRef = useRef<boolean>(false);
+  const isInitializingRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (!channelId) return;
+    if (!channelId || isSubscribedRef.current || isInitializingRef.current) return;
 
-    // Prevent multiple subscriptions for the same channel
-    if (isSubscribedRef.current) {
-      console.log(`🔌 [CONVERSATION_REALTIME] Already subscribed to ${channelId}, skipping`);
-      return;
-    }
-
+    isInitializingRef.current = true;
     const tableName = getTableNameForChannelSync(channelId);
     const subscriptionName = `realtime-${channelId}-${Date.now()}`;
     subscriptionNameRef.current = subscriptionName;
 
-    try {
-      const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-      
-      const channel = subscriptionManager.createSubscription(
-        subscriptionName,
-        (payload) => {
-          console.log('🔴 [CONVERSATION_REALTIME] New realtime message:', payload);
-          if (payload.new && onNewMessage) {
-            onNewMessage(payload.new as RawMessage);
-          }
-        },
-        tableName
-      );
+    const setupSubscription = async () => {
+      try {
+        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        
+        const channel = await subscriptionManager.createSubscription(
+          subscriptionName,
+          (payload) => {
+            console.log('🔴 [CONVERSATION_REALTIME] New realtime message:', payload);
+            if (payload.new && onNewMessage) {
+              onNewMessage(payload.new as RawMessage);
+            }
+          },
+          tableName
+        );
 
-      if (channel) {
-        // Subscribe only once
-        channel.subscribe((status: string) => {
-          console.log(`🔌 [CONVERSATION_REALTIME] Status: ${status} for ${channelId}`);
-          setIsConnected(status === 'SUBSCRIBED');
-          if (status === 'SUBSCRIBED') {
-            isSubscribedRef.current = true;
-          }
-        });
+        if (channel) {
+          setIsConnected(true);
+          isSubscribedRef.current = true;
+        }
+      } catch (error) {
+        console.error('❌ [CONVERSATION_REALTIME] Error setting up subscription:', error);
+        setIsConnected(false);
+      } finally {
+        isInitializingRef.current = false;
       }
-    } catch (error) {
-      console.error('❌ [CONVERSATION_REALTIME] Error setting up subscription:', error);
-    }
+    };
+
+    setupSubscription();
 
     return () => {
       if (subscriptionNameRef.current && isSubscribedRef.current) {
@@ -64,6 +61,7 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
         isSubscribedRef.current = false;
         subscriptionNameRef.current = null;
       }
+      isInitializingRef.current = false;
     };
   }, [channelId, onNewMessage]);
 
