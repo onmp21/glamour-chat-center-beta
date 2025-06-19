@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -231,6 +230,24 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setSelectedProvider(providers.length > 0 ? String(providers[0].id) : '');
   };
 
+  const removeReport = async (reportId: string) => {
+    try {
+      await IntelligentReportsService.deleteReport(reportId);
+      toast({
+        title: "Sucesso",
+        description: "Relatório removido com sucesso",
+      });
+      loadRecentReports(); // Reload the reports list
+    } catch (error) {
+      console.error('Erro ao remover relatório:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao remover relatório. Tente novamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className={cn("h-full flex flex-col", isDarkMode ? "bg-background" : "bg-gray-50")}>
       {/* Header */}
@@ -298,6 +315,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               recentReports={recentReports}
               onViewReport={setReportResult}
               onDownloadReport={downloadReport}
+              onRemoveReport={removeReport}
             />
           </div>
         </div>
