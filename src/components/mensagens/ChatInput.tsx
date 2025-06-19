@@ -266,7 +266,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         setRecordingTime(0);
         if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
       };
-      mediaRecorder.stop();
+      mediaRecorderRef.current.stop();
     }
   };
 
