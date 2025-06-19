@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
 import { AIResumoOverlay } from '@/components/chat/AIResumoOverlay';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
-import { MediaPlayer } from '@/components/ui/MediaPlayer';
 
 interface Message {
   id: string;
@@ -20,7 +19,6 @@ interface Message {
   read: boolean;
   Nome_do_contato?: string;
   mensagemtype?: string;
-  media_url?: string;
 }
 interface Conversation {
   contactName: string;
@@ -114,39 +112,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       'gerente-externo': 'Andressa Gerente'
     };
     return mapping[channel] || channel;
-  };
-
-  // Função para detectar se é uma mensagem de mídia
-  const isMediaMessage = (message: Message): boolean => {
-    return message.content === "media" && !!message.media_url;
-  };
-
-  // Função para obter o tipo de mídia baseado na URL
-  const getMediaType = (url: string): 'image' | 'video' | 'audio' | 'file' => {
-    const extension = url.split('.').pop()?.toLowerCase();
-    
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) {
-      return 'image';
-    }
-    if (['mp4', 'webm', 'avi', 'mov'].includes(extension || '')) {
-      return 'video';
-    }
-    if (['mp3', 'wav', 'ogg', 'webm'].includes(extension || '')) {
-      return 'audio';
-    }
-    return 'file';
-  };
-
-  // Função para construir a URL completa da mídia
-  const buildMediaUrl = (mediaUrl: string): string => {
-    // Se já é uma URL completa, retorna como está
-    if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
-      return mediaUrl;
-    }
-    
-    // Se é um caminho relativo, constrói a URL completa
-    // Assumindo que o servidor está na mesma origem
-    return `${window.location.origin}/${mediaUrl}`;
   };
 
   const handleGenerateSummary = () => {
@@ -265,7 +230,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           <div className="space-y-4">
             {messages.map((message) => {
               const isAgent =
-                message.tipo_remetente === "CONTATO_INTERNO" ||
+                message.tipo_remetente === "USUARIO_INTERNO" ||
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
               const contactName =
@@ -278,11 +243,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
               const hora = (message as any).read_at
                 ? formatHour((message as any).read_at)
                 : formatHour(message.timestamp || new Date().toISOString());
-
-              // Verificar se é uma mensagem de mídia
-              const isMedia = isMediaMessage(message);
-              const mediaUrl = isMedia ? buildMediaUrl(message.media_url!) : null;
-              const mediaType = mediaUrl ? getMediaType(mediaUrl) : null;
 
               return (
                 <div
@@ -308,7 +268,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                           <span>
                             {canalNome}
                           </span>
-                          {message.tipo_remetente === "CONTATO_INTERNO" && !!message.Nome_do_contato && (
+                          {message.tipo_remetente === "USUARIO_INTERNO" && !!message.Nome_do_contato && (
                             <span className="font-semibold">
                               {message.Nome_do_contato}
                             </span>
@@ -316,24 +276,9 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                         </>
                       )}
                     </div>
-                    
-                    {/* Renderizar mídia se for uma mensagem de mídia */}
-                    {isMedia && mediaUrl && mediaType ? (
-                      <div className="mb-2">
-                        <MediaPlayer
-                          mediaUrl={mediaUrl}
-                          mediaType={mediaType}
-                          fileName={message.fileName}
-                          isDarkMode={isDarkMode}
-                          className="max-w-full"
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    )}
-                    
+                    <p className="text-sm whitespace-pre-wrap">
+                      {message.content}
+                    </p>
                     <p className="text-xs opacity-70 mt-1 text-right">{hora}</p>
                   </div>
                 </div>
