@@ -20,7 +20,9 @@ function getInitialPromptsState(): Record<AIPromptType, AIPrompt | null> {
     report_conversations: null,
     report_channels: null,
     report_custom: null,
-    report_exams: null, // <-- Adiciona corretamente a chave
+    report_exams: null,
+    summary: null,
+    report: null,
   };
   return initial;
 }
