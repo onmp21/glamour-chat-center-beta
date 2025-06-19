@@ -11,7 +11,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const callbackIdRef = useRef<string | null>(null);
+  const subscriberIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
@@ -59,13 +59,11 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations(true);
   }, [loadConversations]);
 
-  // Callback debounced para realtime
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
     
-    // Debounce para evitar atualizações excessivas
     setTimeout(() => {
       if (mountedRef.current) {
         loadConversations();
@@ -78,6 +76,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   }, [loadConversations]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!channelId) {
       return;
     }
@@ -88,18 +88,14 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       return;
     }
 
-    let mounted = true;
-
     const setupSubscription = async () => {
-      if (!mounted) return;
-      
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        const callbackId = await subscriptionManager.createSubscription(tableName, realtimeCallback);
+        const subscriberId = await subscriptionManager.subscribe(tableName, realtimeCallback);
         
-        if (mounted) {
-          callbackIdRef.current = callbackId;
-          DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} com callback ${callbackId}`);
+        if (mountedRef.current) {
+          subscriberIdRef.current = subscriberId;
+          DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} com ID ${subscriberId}`);
         }
       } catch (error) {
         DetailedLogger.error("useChannelConversationsRefactored", `Erro ao criar subscription:`, error);
@@ -109,14 +105,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     setupSubscription();
 
     return () => {
-      mounted = false;
       mountedRef.current = false;
       
-      if (callbackIdRef.current) {
-        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}, callback ${callbackIdRef.current}`);
+      if (subscriberIdRef.current) {
+        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}, subscriber ${subscriberIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableName, callbackIdRef.current);
+          subscriptionManager.unsubscribe(tableName, subscriberIdRef.current);
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }

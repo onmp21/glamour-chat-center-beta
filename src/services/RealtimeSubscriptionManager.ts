@@ -1,16 +1,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-interface ActiveSubscription {
+interface SubscriptionInfo {
   channel: any;
-  callbacks: Set<string>;
-  isActive: boolean;
+  subscribers: Map<string, (payload: any) => void>;
+  isSubscribed: boolean;
 }
 
 class RealtimeSubscriptionManager {
   private static instance: RealtimeSubscriptionManager;
-  private subscriptions: Map<string, ActiveSubscription> = new Map();
-  private callbackCounter = 0;
+  private subscriptions: Map<string, SubscriptionInfo> = new Map();
+  private subscriberCounter = 0;
 
   public static getInstance(): RealtimeSubscriptionManager {
     if (!RealtimeSubscriptionManager.instance) {
@@ -19,40 +19,29 @@ class RealtimeSubscriptionManager {
     return RealtimeSubscriptionManager.instance;
   }
 
-  public async createSubscription(
+  public async subscribe(
     tableName: string,
     callback: (payload: any) => void
   ): Promise<string> {
-    const callbackId = `${tableName}_${++this.callbackCounter}_${Date.now()}`;
+    const subscriberId = `${tableName}_${++this.subscriberCounter}_${Date.now()}`;
     
-    console.log(`[REALTIME_MANAGER] Creating subscription for table: ${tableName}, callback: ${callbackId}`);
+    console.log(`[REALTIME_MANAGER] Subscribing to ${tableName} with ID: ${subscriberId}`);
 
-    let subscription = this.subscriptions.get(tableName);
+    let subscriptionInfo = this.subscriptions.get(tableName);
     
-    if (subscription && subscription.isActive) {
-      // Usar subscrição existente
-      subscription.callbacks.add(callbackId);
-      console.log(`[REALTIME_MANAGER] Using existing subscription for ${tableName}, total callbacks: ${subscription.callbacks.size}`);
-      
-      // Armazenar callback para execução
-      this.storeCallback(callbackId, callback);
-      return callbackId;
-    }
-
-    // Criar nova subscrição
-    try {
+    if (!subscriptionInfo) {
+      // Criar nova subscription
       const channelName = `realtime_${tableName}_${Date.now()}`;
       const channel = supabase.channel(channelName);
       
-      subscription = {
+      subscriptionInfo = {
         channel,
-        callbacks: new Set([callbackId]),
-        isActive: false
+        subscribers: new Map(),
+        isSubscribed: false
       };
       
-      this.subscriptions.set(tableName, subscription);
-      this.storeCallback(callbackId, callback);
-
+      this.subscriptions.set(tableName, subscriptionInfo);
+      
       // Configurar listener
       channel.on(
         'postgres_changes',
@@ -63,107 +52,76 @@ class RealtimeSubscriptionManager {
         },
         (payload: any) => {
           console.log(`[REALTIME_MANAGER] Message received for ${tableName}:`, payload);
-          this.executeCallbacks(tableName, payload);
+          // Executar todos os callbacks registrados
+          subscriptionInfo?.subscribers.forEach(callback => {
+            try {
+              callback(payload);
+            } catch (error) {
+              console.error(`[REALTIME_MANAGER] Error in callback:`, error);
+            }
+          });
         }
       );
 
-      // Fazer subscribe uma única vez
-      await new Promise<void>((resolve, reject) => {
-        channel.subscribe((status: string) => {
-          console.log(`[REALTIME_MANAGER] Subscription status for ${tableName}: ${status}`);
-          
-          if (status === 'SUBSCRIBED') {
-            if (subscription) {
-              subscription.isActive = true;
-            }
-            resolve();
-          } else if (status === 'CHANNEL_ERROR') {
-            reject(new Error(`Failed to subscribe to ${tableName}`));
-          }
-        });
-      });
-
-      console.log(`[REALTIME_MANAGER] Successfully subscribed to ${tableName}`);
-      return callbackId;
-      
-    } catch (error) {
-      console.error(`[REALTIME_MANAGER] Error creating subscription for ${tableName}:`, error);
-      this.subscriptions.delete(tableName);
-      throw error;
-    }
-  }
-
-  private callbackStore: Map<string, (payload: any) => void> = new Map();
-
-  private storeCallback(callbackId: string, callback: (payload: any) => void) {
-    this.callbackStore.set(callbackId, callback);
-  }
-
-  private executeCallbacks(tableName: string, payload: any) {
-    const subscription = this.subscriptions.get(tableName);
-    if (!subscription) return;
-
-    subscription.callbacks.forEach(callbackId => {
-      const callback = this.callbackStore.get(callbackId);
-      if (callback) {
-        try {
-          callback(payload);
-        } catch (error) {
-          console.error(`[REALTIME_MANAGER] Error in callback ${callbackId}:`, error);
+      // Fazer subscribe apenas uma vez
+      channel.subscribe((status: string) => {
+        console.log(`[REALTIME_MANAGER] Subscription status for ${tableName}: ${status}`);
+        if (status === 'SUBSCRIBED' && subscriptionInfo) {
+          subscriptionInfo.isSubscribed = true;
         }
-      }
-    });
+      });
+    }
+
+    // Adicionar callback à lista de subscribers
+    subscriptionInfo.subscribers.set(subscriberId, callback);
+    console.log(`[REALTIME_MANAGER] Total subscribers for ${tableName}: ${subscriptionInfo.subscribers.size}`);
+
+    return subscriberId;
   }
 
-  public removeSubscription(tableName: string, callbackId: string): void {
-    console.log(`[REALTIME_MANAGER] Removing callback ${callbackId} from ${tableName}`);
+  public unsubscribe(tableName: string, subscriberId: string): void {
+    console.log(`[REALTIME_MANAGER] Unsubscribing ${subscriberId} from ${tableName}`);
     
-    const subscription = this.subscriptions.get(tableName);
-    if (!subscription) return;
+    const subscriptionInfo = this.subscriptions.get(tableName);
+    if (!subscriptionInfo) return;
 
-    subscription.callbacks.delete(callbackId);
-    this.callbackStore.delete(callbackId);
+    // Remover callback
+    subscriptionInfo.subscribers.delete(subscriberId);
+    console.log(`[REALTIME_MANAGER] Remaining subscribers for ${tableName}: ${subscriptionInfo.subscribers.size}`);
 
-    console.log(`[REALTIME_MANAGER] Remaining callbacks for ${tableName}: ${subscription.callbacks.size}`);
-
-    // Se não há mais callbacks, limpar subscrição
-    if (subscription.callbacks.size === 0) {
-      console.log(`[REALTIME_MANAGER] No more callbacks, cleaning up subscription for ${tableName}`);
+    // Se não há mais subscribers, limpar subscription
+    if (subscriptionInfo.subscribers.size === 0) {
+      console.log(`[REALTIME_MANAGER] No more subscribers, cleaning up ${tableName}`);
       
       try {
-        if (subscription.channel && subscription.isActive) {
-          supabase.removeChannel(subscription.channel);
-        }
+        supabase.removeChannel(subscriptionInfo.channel);
       } catch (error) {
-        console.warn(`[REALTIME_MANAGER] Error removing channel for ${tableName}:`, error);
+        console.warn(`[REALTIME_MANAGER] Error removing channel:`, error);
       }
       
       this.subscriptions.delete(tableName);
     }
+  }
+
+  public getActiveSubscriptions(): string[] {
+    return Array.from(this.subscriptions.keys()).filter(key => {
+      const info = this.subscriptions.get(key);
+      return info?.isSubscribed || false;
+    });
   }
 
   public cleanup(): void {
     console.log(`[REALTIME_MANAGER] Cleaning up all subscriptions`);
     
-    for (const [tableName, subscription] of this.subscriptions.entries()) {
+    for (const [tableName, info] of this.subscriptions.entries()) {
       try {
-        if (subscription.channel && subscription.isActive) {
-          supabase.removeChannel(subscription.channel);
-        }
+        supabase.removeChannel(info.channel);
       } catch (error) {
         console.warn(`[REALTIME_MANAGER] Error during cleanup for ${tableName}:`, error);
       }
     }
     
     this.subscriptions.clear();
-    this.callbackStore.clear();
-  }
-
-  public getActiveSubscriptions(): string[] {
-    return Array.from(this.subscriptions.keys()).filter(key => {
-      const sub = this.subscriptions.get(key);
-      return sub?.isActive || false;
-    });
   }
 }
 

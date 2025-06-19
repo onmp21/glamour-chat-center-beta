@@ -6,10 +6,9 @@ import RealtimeSubscriptionManager from '@/services/RealtimeSubscriptionManager'
 
 export const useConversationRealtime = (channelId: string, onNewMessage?: (message: RawMessage) => void) => {
   const [isConnected, setIsConnected] = useState(false);
-  const callbackIdRef = useRef<string | null>(null);
+  const subscriberIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
-  // Callback estável que não muda a cada render
   const stableCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
@@ -20,6 +19,8 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   }, [onNewMessage]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!channelId || !onNewMessage) {
       setIsConnected(false);
       return;
@@ -32,23 +33,19 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
       return;
     }
 
-    let mounted = true;
-
     const setupSubscription = async () => {
-      if (!mounted) return;
-      
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        const callbackId = await subscriptionManager.createSubscription(tableName, stableCallback);
+        const subscriberId = await subscriptionManager.subscribe(tableName, stableCallback);
         
-        if (mounted) {
-          callbackIdRef.current = callbackId;
+        if (mountedRef.current) {
+          subscriberIdRef.current = subscriberId;
           setIsConnected(true);
-          console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName} with callback ${callbackId}`);
+          console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName} with ID ${subscriberId}`);
         }
       } catch (error) {
         console.error('❌ [CONVERSATION_REALTIME] Error setting up subscription:', error);
-        if (mounted) {
+        if (mountedRef.current) {
           setIsConnected(false);
         }
       }
@@ -57,14 +54,13 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
     setupSubscription();
 
     return () => {
-      mounted = false;
       mountedRef.current = false;
       
-      if (callbackIdRef.current) {
-        console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription callback ${callbackIdRef.current}`);
+      if (subscriberIdRef.current) {
+        console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription ${subscriberIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableName, callbackIdRef.current);
+          subscriptionManager.unsubscribe(tableName, subscriberIdRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_REALTIME] Error cleaning up subscription:', error);
         }

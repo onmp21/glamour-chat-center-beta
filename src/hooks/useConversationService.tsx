@@ -10,7 +10,7 @@ export const useConversationService = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const callbackIdRef = useRef<string | null>(null);
+  const subscriberIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
@@ -78,13 +78,11 @@ export const useConversationService = (channelId: string) => {
     }
   };
 
-  // Callback debounced para realtime
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
     
-    // Debounce para evitar atualizações excessivas
     setTimeout(() => {
       if (mountedRef.current) {
         refreshConversations();
@@ -97,6 +95,8 @@ export const useConversationService = (channelId: string) => {
   }, [loadConversations]);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (!channelId) {
       return;
     }
@@ -107,18 +107,14 @@ export const useConversationService = (channelId: string) => {
       return;
     }
 
-    let mounted = true;
-
     const setupSubscription = async () => {
-      if (!mounted) return;
-      
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        const callbackId = await subscriptionManager.createSubscription(tableName, realtimeCallback);
+        const subscriberId = await subscriptionManager.subscribe(tableName, realtimeCallback);
         
-        if (mounted) {
-          callbackIdRef.current = callbackId;
-          console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName} with callback ${callbackId}`);
+        if (mountedRef.current) {
+          subscriberIdRef.current = subscriberId;
+          console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName} with ID ${subscriberId}`);
         }
       } catch (error) {
         console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
@@ -128,14 +124,13 @@ export const useConversationService = (channelId: string) => {
     setupSubscription();
 
     return () => {
-      mounted = false;
       mountedRef.current = false;
       
-      if (callbackIdRef.current) {
-        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing callback ${callbackIdRef.current}`);
+      if (subscriberIdRef.current) {
+        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing ${subscriberIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableName, callbackIdRef.current);
+          subscriptionManager.unsubscribe(tableName, subscriberIdRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_SERVICE_HOOK] Error cleaning up subscription:', error);
         }
