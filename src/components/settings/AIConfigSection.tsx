@@ -17,14 +17,14 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList
           className={cn(
-            "flex p-1 rounded-lg mb-6 w-full gap-4 justify-center",
+            "flex p-1 rounded-lg mb-6 w-full gap-4 justify-center h-16",
             isDarkMode ? "bg-[#18181b]" : "bg-gray-100 border-gray-200"
           )}
         >
           <TabsTrigger
             value="providers"
             className={cn(
-              "flex items-center gap-2 px-8 py-4 font-semibold rounded-lg text-base data-[state=active]:bg-[#b5103c] data-[state=active]:text-white transition-all",
+              "flex items-center gap-2 px-8 py-4 font-semibold rounded-lg text-base h-14 data-[state=active]:bg-[#b5103c] data-[state=active]:text-white transition-all",
               isDarkMode ? "text-gray-300" : "text-gray-700"
             )}
           >
@@ -34,7 +34,7 @@ export const AIConfigSection: React.FC<AIConfigSectionProps> = ({ isDarkMode }) 
           <TabsTrigger
             value="prompts"
             className={cn(
-              "flex items-center gap-2 px-8 py-4 font-semibold rounded-lg text-base data-[state=active]:bg-[#b5103c] data-[state=active]:text-white transition-all",
+              "flex items-center gap-2 px-8 py-4 font-semibold rounded-lg text-base h-14 data-[state=active]:bg-[#b5103c] data-[state=active]:text-white transition-all",
               isDarkMode ? "text-gray-300" : "text-gray-700"
             )}
           >
