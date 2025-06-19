@@ -1,8 +1,10 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContactNameResolver } from '@/services/ContactNameResolver';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
+import GlobalRealtimeManager from '@/services/GlobalRealtimeManager';
 
 interface SimpleConversation {
   id: string;
@@ -23,14 +25,19 @@ interface ConversationMessage {
   tipo_remetente?: string;
 }
 
-export const useSimpleConversations = (channelId: string | null) => {
+export const useSimpleConversationsWithRealtime = (
+  channelId: string | null,
+  enableRealtime: boolean = true
+) => {
   const [conversations, setConversations] = useState<SimpleConversation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated, user } = useAuth();
+  const subscriberIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
 
   const getTableName = (channelId: string): string => {
-    console.log(`🔍 [SIMPLE_CONVERSATIONS] Mapeando canal: ${channelId}`);
+    console.log(`🔍 [SIMPLE_CONVERSATIONS_RT] Mapeando canal: ${channelId}`);
     
     const mapping: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
@@ -45,7 +52,7 @@ export const useSimpleConversations = (channelId: string | null) => {
     };
     
     const tableName = mapping[channelId] || 'yelena_ai_conversas';
-    console.log(`✅ [SIMPLE_CONVERSATIONS] Canal: ${channelId} -> Tabela: ${tableName}`);
+    console.log(`✅ [SIMPLE_CONVERSATIONS_RT] Canal: ${channelId} -> Tabela: ${tableName}`);
     return tableName;
   };
 
@@ -54,15 +61,15 @@ export const useSimpleConversations = (channelId: string | null) => {
     return match ? match[1] : sessionId;
   };
 
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     if (!channelId) {
-      console.log('⚠️ [SIMPLE_CONVERSATIONS] Nenhum canal fornecido');
+      console.log('⚠️ [SIMPLE_CONVERSATIONS_RT] Nenhum canal fornecido');
       setConversations([]);
       return;
     }
 
     if (!isAuthenticated) {
-      console.log('⚠️ [SIMPLE_CONVERSATIONS] Usuário não autenticado');
+      console.log('⚠️ [SIMPLE_CONVERSATIONS_RT] Usuário não autenticado');
       setConversations([]);
       return;
     }
@@ -72,7 +79,7 @@ export const useSimpleConversations = (channelId: string | null) => {
       setError(null);
       
       const tableName = getTableName(channelId);
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Iniciando query na tabela: ${tableName}, usuário: ${user?.name}`);
+      console.log(`📋 [SIMPLE_CONVERSATIONS_RT] Iniciando query na tabela: ${tableName}, usuário: ${user?.name}`);
 
       const queryResult = await supabase
         .from(tableName as any)
@@ -81,13 +88,13 @@ export const useSimpleConversations = (channelId: string | null) => {
         .limit(200);
 
       if (queryResult.error) {
-        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryResult.error);
+        console.error('❌ [SIMPLE_CONVERSATIONS_RT] Erro na query:', queryResult.error);
         setError(queryResult.error.message);
         return;
       }
 
       const rawData = queryResult.data;
-      console.log(`📋 [SIMPLE_CONVERSATIONS] Query executada. Registros recebidos:`, rawData?.length || 0);
+      console.log(`📋 [SIMPLE_CONVERSATIONS_RT] Query executada. Registros recebidos:`, rawData?.length || 0);
 
       const conversationsMap = new Map<string, SimpleConversation>();
       
@@ -120,34 +127,89 @@ export const useSimpleConversations = (channelId: string | null) => {
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
-      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas com nomes resolvidos`);
+      console.log(`✅ [SIMPLE_CONVERSATIONS_RT] ${conversations.length} conversas únicas processadas com nomes resolvidos`);
       
-      setConversations(conversations);
+      if (mountedRef.current) {
+        setConversations(conversations);
+      }
 
     } catch (err) {
-      console.error('❌ [SIMPLE_CONVERSATIONS] Erro inesperado:', err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
-      setConversations([]);
+      console.error('❌ [SIMPLE_CONVERSATIONS_RT] Erro inesperado:', err);
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido');
+        setConversations([]);
+      }
     } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    console.log(`🚀 [SIMPLE_CONVERSATIONS] Effect acionado:`, {
-      channelId,
-      isAuthenticated,
-      user: user?.name
-    });
-    
-    if (isAuthenticated && channelId) {
-      loadConversations();
-    } else {
-      console.log('⏳ [SIMPLE_CONVERSATIONS] Aguardando parâmetros necessários...');
-      setConversations([]);
-      setError(null);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [channelId, isAuthenticated, user?.name]);
+
+  // Setup realtime subscription
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    if (!enableRealtime || !channelId || !isAuthenticated) {
+      return;
+    }
+
+    const tableName = getTableNameForChannelSync(channelId);
+    if (!tableName) {
+      console.warn(`[SIMPLE_CONVERSATIONS_RT] No table mapping found for channel: ${channelId}`);
+      return;
+    }
+
+    const realtimeCallback = (payload: any) => {
+      if (!mountedRef.current) return;
+      
+      console.log(`🔴 [SIMPLE_CONVERSATIONS_RT] Nova mensagem via realtime:`, payload);
+      
+      // Refresh conversations after a short delay
+      setTimeout(() => {
+        if (mountedRef.current) {
+          loadConversations();
+        }
+      }, 300);
+    };
+
+    const setupSubscription = async () => {
+      try {
+        const manager = GlobalRealtimeManager.getInstance();
+        const subscriberId = await manager.subscribe(tableName, realtimeCallback);
+        
+        if (mountedRef.current) {
+          subscriberIdRef.current = subscriberId;
+          console.log(`✅ [SIMPLE_CONVERSATIONS_RT] Realtime subscription iniciado para o canal ${channelId} com ID ${subscriberId}`);
+        }
+      } catch (error) {
+        console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao criar subscription:`, error);
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      mountedRef.current = false;
+      
+      if (subscriberIdRef.current) {
+        console.log(`🔌 [SIMPLE_CONVERSATIONS_RT] Realtime subscription interrompido para o canal ${channelId}, subscriber ${subscriberIdRef.current}`);
+        try {
+          const manager = GlobalRealtimeManager.getInstance();
+          manager.unsubscribe(tableName, subscriberIdRef.current);
+        } catch (error) {
+          console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao fazer cleanup do realtime subscription:`, error);
+        }
+      }
+    };
+  }, [channelId, enableRealtime, isAuthenticated, loadConversations]);
+
+  // Initial load
+  useEffect(() => {
+    if (isAuthenticated && channelId) {
+      loadConversations();
+    }
+  }, [isAuthenticated, channelId, loadConversations]);
 
   return {
     conversations,
