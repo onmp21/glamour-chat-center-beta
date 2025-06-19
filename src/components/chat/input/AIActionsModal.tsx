@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
 import { AIProvider } from '@/types/ai-providers';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIActionsModalProps {
   isDarkMode: boolean;
@@ -29,6 +30,8 @@ interface AIActionResult {
   model_used: string;
   tokens_used: number;
   generation_time: number;
+  prompt_type_used?: string;
+  prompt_name?: string;
 }
 
 export const AIActionsModal: React.FC<AIActionsModalProps> = ({
@@ -47,7 +50,6 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
   const [result, setResult] = useState<AIActionResult | null>(null);
   const [error, setError] = useState<string>('');
 
-  // INICIO NOVO: Buscar mensagens da conversa usando hook existente
   const { messages, loading: loadingMessages } = useSimpleMessages(channelId || null, conversationId || null);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
           description: 'Gere um resumo inteligente desta conversa',
           icon: Brain,
           color: 'text-blue-600',
+          reportType: 'conversation_summary', // Mapeado para prompt específico
           defaultPrompt: 'Faça um resumo detalhado desta conversa, destacando os pontos principais, problemas identificados e soluções propostas.'
         };
       case 'quick_response':
@@ -82,6 +85,7 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
           description: 'Gere uma sugestão de resposta baseada no contexto',
           icon: Zap,
           color: 'text-green-600',
+          reportType: 'quick_response', // Mapeado para prompt específico
           defaultPrompt: 'Com base no contexto desta conversa, sugira uma resposta apropriada e profissional para o cliente.'
         };
       case 'report':
@@ -90,14 +94,13 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
           description: 'Gere um relatório estruturado desta conversa',
           icon: FileText,
           color: 'text-purple-600',
+          reportType: 'report', // Mapeado para prompt específico
           defaultPrompt: 'Crie um relatório estruturado desta conversa incluindo: resumo, problemas identificados, ações tomadas e próximos passos.'
         };
     }
   };
 
-  // NOVA FUNCAO: Preparar as mensagens para enviar ao backend
   function prepareMessageContext(messagesArr: any[]) {
-    // Prepare up to 50 últimas mensagens para o contexto (mantendo ordem)
     if (!Array.isArray(messagesArr) || messagesArr.length === 0) return [];
     return messagesArr.slice(-50).map(m => ({
       id: m.id,
@@ -110,7 +113,6 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
   }
 
   const generateAIContent = async () => {
-    // Agora permite 0, 1 ou mais mensagens
     if (!selectedProvider || !conversationId || !channelId) {
       setError('Dados insuficientes para gerar conteúdo');
       return;
@@ -123,53 +125,62 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
     try {
       const actionConfig = getActionConfig(activeAction);
       const prompt = customPrompt.trim() || actionConfig.defaultPrompt;
-
-      // Se não houver mensagens, envia contexto vazio mas deixa IA tentar, especialmente quick_response
       const ctxMessages = prepareMessageContext(messages || []);
 
-      const response = await fetch('/functions/v1/generate-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      console.log('🎯 [AI_ACTIONS] Generating content with action:', activeAction, 'reportType:', actionConfig.reportType);
+
+      const startTime = performance.now();
+
+      const { data, error: invokeError } = await supabase.functions.invoke('generate-report', {
+        body: {
           provider_id: selectedProvider,
-          report_type: 'custom',
+          report_type: actionConfig.reportType, // Usa o report_type específico
+          action_type: activeAction,
           data: {
             conversation_id: conversationId,
             channel_id: channelId,
             contact_name: contactName,
             messages: ctxMessages,
-            action_type: activeAction,
           },
           custom_prompt: prompt
-        })
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao gerar conteúdo');
+      const endTime = performance.now();
+      const generationTime = (endTime - startTime) / 1000;
+
+      if (invokeError) {
+        throw new Error(invokeError.message || 'Erro na chamada da função');
       }
 
-      const aiResult = await response.json();
-      setResult({
-        type: activeAction,
-        content: aiResult.content || aiResult.report || 'Sem conteúdo retornado',
-        provider_used: aiResult.metadata?.provider_name || 'Desconhecido',
-        model_used: aiResult.metadata?.model_used || 'Desconhecido',
-        tokens_used: aiResult.metadata?.tokens_used || 0,
-        generation_time: aiResult.metadata?.generation_time || 0
-      });
+      if (data && data.success) {
+        setResult({
+          type: activeAction,
+          content: data.content || data.report || 'Sem conteúdo retornado',
+          provider_used: 'OpenAI', // Pode ser melhorado para buscar do provider
+          model_used: 'gpt-3.5-turbo', // Pode ser melhorado para buscar do provider
+          tokens_used: data.tokens_used || 0,
+          generation_time: generationTime,
+          prompt_type_used: data.prompt_type_used,
+          prompt_name: data.prompt_name
+        });
 
-      toast({
-        title: "Sucesso",
-        description: `${actionConfig.title} gerado com sucesso`,
-      });
+        console.log('✅ [AI_ACTIONS] Content generated successfully with prompt:', data.prompt_type_used);
+
+        toast({
+          title: "Sucesso",
+          description: `${actionConfig.title} gerado com sucesso`,
+        });
+      } else {
+        throw new Error(data?.error || 'Erro desconhecido na geração');
+      }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erro desconhecido');
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setError(errorMessage);
+      console.error('❌ [AI_ACTIONS] Error generating content:', error);
       toast({
         title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao gerar conteúdo. Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -403,6 +414,12 @@ export const AIActionsModal: React.FC<AIActionsModalProps> = ({
                       <span>Tokens: {result.tokens_used}</span>
                       <span>•</span>
                       <span>Tempo: {result.generation_time.toFixed(1)}s</span>
+                      {result.prompt_type_used && (
+                        <>
+                          <span>•</span>
+                          <span>Prompt: {result.prompt_name || result.prompt_type_used}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

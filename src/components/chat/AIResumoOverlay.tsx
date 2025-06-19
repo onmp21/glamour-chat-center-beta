@@ -1,9 +1,13 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Brain, X } from "lucide-react";
+import { Brain, X, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { AIProviderService } from "@/services/AIProviderService";
+import { AIProvider } from "@/types/ai-providers";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AIResumoOverlayProps {
   open: boolean;
@@ -14,21 +18,132 @@ interface AIResumoOverlayProps {
   isDarkMode?: boolean;
   onCopy?: () => void;
   onDownload?: () => void;
+  conversationId?: string;
+  channelId?: string;
+  contactName?: string;
+  messages?: any[];
 }
 
 export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   open,
   onClose,
-  summary,
-  isLoading,
-  error,
+  summary: externalSummary,
+  isLoading: externalLoading,
+  error: externalError,
   isDarkMode,
   onCopy,
-  onDownload
+  onDownload,
+  conversationId,
+  channelId,
+  contactName,
+  messages = []
 }) => {
+  const { toast } = useToast();
+  const [internalSummary, setInternalSummary] = useState<string>('');
+  const [internalLoading, setInternalLoading] = useState(false);
+  const [internalError, setInternalError] = useState<string>('');
+  const [providers, setProviders] = useState<AIProvider[]>([]);
+
+  // Use external props or internal state
+  const summary = externalSummary || internalSummary;
+  const isLoading = externalLoading || internalLoading;
+  const error = externalError || internalError;
+
+  useEffect(() => {
+    if (open && !summary && !isLoading && conversationId && channelId) {
+      loadProvidersAndGenerateSummary();
+    }
+  }, [open, conversationId, channelId]);
+
+  const loadProvidersAndGenerateSummary = async () => {
+    try {
+      const activeProviders = await AIProviderService.getActiveProviders();
+      setProviders(activeProviders);
+      
+      if (activeProviders.length > 0) {
+        await generateSummary(activeProviders[0].id);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar provedores:', error);
+      setInternalError('Erro ao carregar configurações de IA');
+    }
+  };
+
+  const generateSummary = async (providerId?: string) => {
+    if (!conversationId || !channelId) {
+      setInternalError('Dados da conversa não disponíveis');
+      return;
+    }
+
+    const selectedProvider = providerId || providers[0]?.id;
+    if (!selectedProvider) {
+      setInternalError('Nenhum provedor de IA configurado');
+      return;
+    }
+
+    setInternalLoading(true);
+    setInternalError('');
+
+    try {
+      console.log('📝 [AI_RESUMO] Gerando resumo com prompt conversation_summary...');
+
+      // Preparar contexto das mensagens
+      const contextMessages = messages.slice(-50).map(m => ({
+        id: m.id,
+        nome_do_contato: m.nome_do_contato,
+        tipo_remetente: m.tipo_remetente,
+        message: m.message,
+        read_at: m.read_at,
+      }));
+
+      const { data, error } = await supabase.functions.invoke('generate-report', {
+        body: {
+          provider_id: selectedProvider,
+          report_type: 'conversation_summary', // Mudado para usar prompt específico
+          action_type: 'conversation_summary',
+          data: {
+            conversation_id: conversationId,
+            channel_id: channelId,
+            contact_name: contactName,
+            messages: contextMessages,
+          }
+        }
+      });
+
+      console.log('📊 [AI_RESUMO] Resposta da edge function:', { data, error });
+
+      if (error) {
+        console.error('❌ [AI_RESUMO] Erro na edge function:', error);
+        setInternalError('Erro ao gerar resumo: ' + (error.message || 'Erro desconhecido'));
+        return;
+      }
+
+      if (data && data.success) {
+        const generatedSummary = data.report || data.content || 'Resumo não disponível';
+        setInternalSummary(generatedSummary);
+        toast({
+          title: "Resumo gerado",
+          description: "Resumo da conversa gerado com sucesso",
+        });
+      } else {
+        setInternalError(data?.error || 'Erro desconhecido na geração do resumo');
+      }
+
+    } catch (error) {
+      console.error('❌ [AI_RESUMO] Erro geral:', error);
+      setInternalError('Erro ao gerar resumo. Tente novamente.');
+    } finally {
+      setInternalLoading(false);
+    }
+  };
+
   const handleCopy = () => {
     if (!summary) return;
     navigator.clipboard.writeText(summary);
+    toast({
+      title: "Copiado",
+      description: "Resumo copiado para a área de transferência",
+    });
     if (onCopy) onCopy();
   };
 
@@ -40,6 +155,16 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     link.download = "resumo-conversa.txt";
     link.click();
     if (onDownload) onDownload();
+  };
+
+  const handleRefresh = () => {
+    setInternalSummary('');
+    setInternalError('');
+    if (providers.length > 0) {
+      generateSummary();
+    } else {
+      loadProvidersAndGenerateSummary();
+    }
   };
 
   return (
@@ -55,16 +180,31 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
               Resumo da Conversa
             </DialogTitle>
           </div>
-          <button
-            className={cn(
-              "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
-              isDarkMode ? "text-gray-400" : "text-gray-500"
+          <div className="flex items-center gap-2">
+            {conversationId && channelId && (
+              <button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className={cn(
+                  "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                )}
+                aria-label="Atualizar resumo"
+              >
+                <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              </button>
             )}
-            aria-label="Fechar"
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
+            <button
+              className={cn(
+                "rounded-full p-1 transition hover:bg-zinc-200 dark:hover:bg-zinc-700",
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              )}
+              aria-label="Fechar"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
         <div className={cn(
           "p-6 pb-4 max-h-[60vh] min-h-[120px] overflow-y-auto text-base transition-all",

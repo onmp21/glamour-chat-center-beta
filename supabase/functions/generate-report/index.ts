@@ -7,6 +7,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Mapeamento de report_type para prompt_type
+function getPromptTypeFromReportType(reportType: string): string {
+  const mapping: Record<string, string> = {
+    'quick_response': 'quick_response',
+    'conversation_summary': 'conversation_summary',
+    'summary': 'summary',
+    'report': 'report',
+    'conversations': 'report_conversations',
+    'channels': 'report_channels',
+    'custom': 'report_custom',
+    'exams': 'report_exams'
+  };
+  
+  return mapping[reportType] || 'report_custom';
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -20,7 +36,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get request body
-    const { provider_id, report_type, action_type, data } = await req.json()
+    const { provider_id, report_type, action_type, data, custom_prompt } = await req.json()
 
     console.log('📊 [GENERATE_REPORT] Request received:', { provider_id, report_type, action_type })
 
@@ -48,25 +64,39 @@ serve(async (req) => {
       )
     }
 
-    // Get appropriate prompt based on action type
-    let promptType = 'conversation_summary'
-    if (action_type === 'quick_response') {
-      promptType = 'quick_response'
-    }
+    // Determine prompt type from report type
+    const promptType = getPromptTypeFromReportType(report_type);
+    console.log('🎯 [GENERATE_REPORT] Using prompt type:', promptType, 'for report type:', report_type);
 
-    const { data: promptData } = await supabase
+    // Get appropriate prompt from database
+    const { data: promptData, error: promptError } = await supabase
       .from('ai_prompts')
-      .select('prompt_content')
+      .select('prompt_content, name')
       .eq('prompt_type', promptType)
       .eq('is_active', true)
       .single()
 
-    const systemPrompt = promptData?.prompt_content || 'Você é um assistente útil que gera relatórios baseados em dados de conversas.'
+    if (promptError) {
+      console.warn('⚠️ [GENERATE_REPORT] Prompt not found for type:', promptType, promptError);
+    }
+
+    // Use custom prompt if provided, otherwise use database prompt, fallback to default
+    let systemPrompt = '';
+    if (custom_prompt && custom_prompt.trim()) {
+      systemPrompt = custom_prompt.trim();
+      console.log('📝 [GENERATE_REPORT] Using custom prompt');
+    } else if (promptData?.prompt_content) {
+      systemPrompt = promptData.prompt_content;
+      console.log('📝 [GENERATE_REPORT] Using database prompt:', promptData.name);
+    } else {
+      systemPrompt = 'Você é um assistente útil que gera relatórios baseados em dados de conversas.';
+      console.log('📝 [GENERATE_REPORT] Using fallback prompt');
+    }
 
     // Prepare messages for AI
     let userMessage = ''
     
-    if (action_type === 'quick_response') {
+    if (action_type === 'quick_response' || report_type === 'quick_response') {
       // For quick responses, format the conversation messages
       const messages = data?.messages || []
       const conversationText = messages.map((msg: any) => 
@@ -74,10 +104,20 @@ serve(async (req) => {
       ).join('\n')
       
       userMessage = `Baseado na seguinte conversa, sugira 3-5 respostas rápidas apropriadas:\n\n${conversationText}`
+    } else if (action_type === 'conversation_summary' || report_type === 'conversation_summary') {
+      // For conversation summary
+      const messages = data?.messages || []
+      const conversationText = messages.map((msg: any) => 
+        `[${msg.tipo_remetente === 'USUARIO_INTERNO' ? 'Agente' : msg.nome_do_contato || 'Cliente'}] (${msg.read_at || 'data não disponível'}): ${msg.message}`
+      ).join('\n')
+      
+      userMessage = `Analise a seguinte conversa e forneça um resumo detalhado:\n\nContato: ${data?.contact_name || 'N/A'}\nCanal: ${data?.channel_id || 'N/A'}\n\nConversa:\n${conversationText}`
     } else {
       // For reports, use the existing format
       userMessage = `Gere um relatório detalhado baseado nos dados fornecidos: ${JSON.stringify(data)}`
     }
+
+    console.log('🤖 [GENERATE_REPORT] Calling OpenAI with model:', provider.default_model || 'gpt-3.5-turbo');
 
     // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -110,26 +150,32 @@ serve(async (req) => {
     const generatedContent = aiResult.choices[0]?.message?.content || 'Erro ao gerar conteúdo'
 
     // Save to report history if it's a report (not quick response)
-    if (action_type !== 'quick_response') {
-      await supabase.from('report_history').insert({
+    if (action_type !== 'quick_response' && report_type !== 'quick_response') {
+      const { error: saveError } = await supabase.from('report_history').insert({
         report_type,
         generated_report: generatedContent,
         provider_id,
         model_used: provider.default_model || 'gpt-3.5-turbo',
         tokens_used: aiResult.usage?.total_tokens || 0,
-        prompt: userMessage,
+        prompt: systemPrompt,
         report_metadata: data
       })
+      
+      if (saveError) {
+        console.error('⚠️ [GENERATE_REPORT] Error saving to history:', saveError);
+      }
     }
 
-    console.log('✅ [GENERATE_REPORT] Report generated successfully')
+    console.log('✅ [GENERATE_REPORT] Report generated successfully using prompt type:', promptType);
 
     return new Response(
       JSON.stringify({
         success: true,
         report: generatedContent,
         content: generatedContent,
-        tokens_used: aiResult.usage?.total_tokens || 0
+        tokens_used: aiResult.usage?.total_tokens || 0,
+        prompt_type_used: promptType,
+        prompt_name: promptData?.name || 'Prompt padrão'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

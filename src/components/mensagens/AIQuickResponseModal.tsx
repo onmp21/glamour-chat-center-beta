@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -75,7 +74,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
     setIsGenerating(true);
 
     try {
-      console.log('🤖 [AI_QUICK_RESPONSE] Gerando respostas rápidas com IA...');
+      console.log('🤖 [AI_QUICK_RESPONSE] Gerando respostas rápidas com prompt quick_response...');
 
       // Preparar contexto das mensagens
       const contextMessages = messages.slice(-20).map(m => ({
@@ -89,7 +88,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,
-          report_type: 'custom',
+          report_type: 'quick_response', // Mudado de 'custom' para 'quick_response'
           action_type: 'quick_response',
           data: {
             conversation_id: conversationId,
