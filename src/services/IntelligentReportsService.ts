@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { AIProviderService } from './AIProviderService';
 
@@ -247,6 +246,27 @@ Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
       }));
     } catch (error) {
       console.error('❌ [INTELLIGENT_REPORTS] Erro inesperado:', error);
+      throw error;
+    }
+  }
+
+  static async deleteReport(reportId: string): Promise<void> {
+    try {
+      console.log('🗑️ [INTELLIGENT_REPORTS] Removendo relatório:', reportId);
+      
+      const { error } = await supabase
+        .from('report_history')
+        .delete()
+        .eq('id', reportId);
+
+      if (error) {
+        console.error('❌ [INTELLIGENT_REPORTS] Erro ao remover relatório:', error);
+        throw error;
+      }
+
+      console.log('✅ [INTELLIGENT_REPORTS] Relatório removido com sucesso');
+    } catch (error) {
+      console.error('❌ [INTELLIGENT_REPORTS] Erro inesperado ao remover relatório:', error);
       throw error;
     }
   }
