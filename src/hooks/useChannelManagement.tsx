@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { ChannelManagementService, CreateChannelData, UpdateChannelData } from '@/services/ChannelManagementService';
 import { useChannels } from '@/contexts/ChannelContext';
+import { invalidateChannelCache } from '@/utils/channelMapping';
 
 export const useChannelManagement = () => {
   const [loading, setLoading] = useState(false);
@@ -13,6 +14,7 @@ export const useChannelManagement = () => {
     try {
       const result = await channelService.createChannel(data);
       if (result.success) {
+        invalidateChannelCache(); // Invalidar cache após criar canal
         await refetch(); // Recarregar lista de canais
       }
       return result;
@@ -26,6 +28,7 @@ export const useChannelManagement = () => {
     try {
       const result = await channelService.updateChannel(channelId, data);
       if (result.success) {
+        invalidateChannelCache(); // Invalidar cache após atualizar canal
         await refetch(); // Recarregar lista de canais
       }
       return result;
@@ -39,6 +42,7 @@ export const useChannelManagement = () => {
     try {
       const result = await channelService.deleteChannel(channelId, createBackup);
       if (result.success) {
+        invalidateChannelCache(); // Invalidar cache após excluir canal
         await refetch(); // Recarregar lista de canais
       }
       return result;

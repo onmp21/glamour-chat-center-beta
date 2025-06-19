@@ -1,6 +1,7 @@
+
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
-import { TableName, getTableNameForChannel } from '@/utils/channelMapping';
+import { TableName, getTableNameForChannelSync } from '@/utils/channelMapping';
 import { supabase } from '@/integrations/supabase/client.ts';
 
 export class MessageService {
@@ -17,7 +18,7 @@ export class MessageService {
   private getRepository(channelId?: string): MessageRepository {
     const targetChannelId = channelId || this.channelId;
     if (!this.repositories.has(targetChannelId)) {
-      const tableName = getTableNameForChannel(targetChannelId);
+      const tableName = getTableNameForChannelSync(targetChannelId);
       this.repositories.set(targetChannelId, new MessageRepository(tableName));
     }
     return this.repositories.get(targetChannelId)!;
@@ -224,14 +225,16 @@ export class MessageService {
     const tableName = repository.getTableName();
     const subscriptionKey = `${tableName}-${channelSuffix}`;
     
-    // Check if subscription already exists
+    // Check if subscription already exists and remove it first
     if (MessageService.activeSubscriptions.has(subscriptionKey)) {
-      console.log(`🔌 [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, reusing`);
-      return MessageService.activeSubscriptions.get(subscriptionKey);
+      console.log(`🔌 [MESSAGE_SERVICE] Removing existing subscription for ${subscriptionKey}`);
+      const existingChannel = MessageService.activeSubscriptions.get(subscriptionKey);
+      supabase.removeChannel(existingChannel);
+      MessageService.activeSubscriptions.delete(subscriptionKey);
     }
     
     const channel = supabase
-      .channel(`${tableName}-changes${channelSuffix}`)
+      .channel(`${tableName}-changes${channelSuffix}-${Date.now()}`) // Add timestamp to make unique
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: tableName as any },
         (payload) => {

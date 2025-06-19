@@ -103,7 +103,7 @@ export const DeleteChannelModal: React.FC<DeleteChannelModalProps> = ({
               <Checkbox
                 id="backup"
                 checked={createBackup}
-                onCheckedChange={setCreateBackup}
+                onCheckedChange={(checked) => setCreateBackup(checked === true)}
                 disabled={loading}
               />
               <label 
@@ -121,7 +121,7 @@ export const DeleteChannelModal: React.FC<DeleteChannelModalProps> = ({
               <Checkbox
                 id="confirm"
                 checked={confirmDelete}
-                onCheckedChange={setConfirmDelete}
+                onCheckedChange={(checked) => setConfirmDelete(checked === true)}
                 disabled={loading}
               />
               <label 
