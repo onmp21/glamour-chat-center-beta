@@ -74,45 +74,48 @@ export const useSimpleConversations = (channelId: string | null) => {
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_CONVERSATIONS] Iniciando query na tabela: ${tableName}, usuário: ${user?.name}`);
 
-      const { data: rawData, error: queryError } = await supabase
+      const queryResult = await supabase
         .from(tableName as any)
         .select('session_id, nome_do_contato, message, read_at, tipo_remetente')
         .order('read_at', { ascending: false })
         .limit(200);
 
-      if (queryError) {
-        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryError);
-        setError(queryError.message);
+      if (queryResult.error) {
+        console.error('❌ [SIMPLE_CONVERSATIONS] Erro na query:', queryResult.error);
+        setError(queryResult.error.message);
         return;
       }
 
+      const rawData = queryResult.data;
       console.log(`📋 [SIMPLE_CONVERSATIONS] Query executada. Registros recebidos:`, rawData?.length || 0);
 
       const conversationsMap = new Map<string, SimpleConversation>();
       
       // Processar mensagens e resolver nomes usando ContactNameResolver
-      for (const message of (rawData as ConversationMessage[]) || []) {
-        const sessionId = message.session_id;
-        
-        if (!conversationsMap.has(sessionId)) {
-          const phoneNumber = extractPhoneFromSession(sessionId);
+      if (rawData && Array.isArray(rawData)) {
+        for (const message of rawData as unknown as ConversationMessage[]) {
+          const sessionId = message.session_id;
           
-          // USAR ContactNameResolver para obter nome correto da tabela de contatos
-          const contactName = await ContactNameResolver.resolveName(
-            phoneNumber, 
-            message.nome_do_contato
-          );
+          if (!conversationsMap.has(sessionId)) {
+            const phoneNumber = extractPhoneFromSession(sessionId);
+            
+            // USAR ContactNameResolver para obter nome correto da tabela de contatos
+            const contactName = await ContactNameResolver.resolveName(
+              phoneNumber, 
+              message.nome_do_contato
+            );
 
-          conversationsMap.set(sessionId, {
-            id: sessionId,
-            contact_name: contactName,
-            contact_phone: phoneNumber,
-            last_message: message.message || '',
-            last_message_time: message.read_at || new Date().toISOString(),
-            status: 'unread' as const,
-            unread_count: 0,
-            updated_at: message.read_at || new Date().toISOString()
-          });
+            conversationsMap.set(sessionId, {
+              id: sessionId,
+              contact_name: contactName,
+              contact_phone: phoneNumber,
+              last_message: message.message || '',
+              last_message_time: message.read_at || new Date().toISOString(),
+              status: 'unread' as const,
+              unread_count: 0,
+              updated_at: message.read_at || new Date().toISOString()
+            });
+          }
         }
       }
 

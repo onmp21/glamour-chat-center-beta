@@ -124,18 +124,19 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_MESSAGES] Iniciando query na tabela: ${tableName}, sessão: ${sessionId}, usuário: ${user?.name}`);
 
-      const { data: rawData, error: queryError } = await supabase
+      const queryResult = await supabase
         .from(tableName as any)
         .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_url")
         .eq("session_id", sessionId)
         .order("read_at", { ascending: true });
 
-      if (queryError) {
-        console.error("❌ [SIMPLE_MESSAGES] Erro na query:", queryError);
-        setError(queryError.message);
+      if (queryResult.error) {
+        console.error("❌ [SIMPLE_MESSAGES] Erro na query:", queryResult.error);
+        setError(queryResult.error.message);
         return;
       }
 
+      const rawData = queryResult.data;
       console.log(`✅ [SIMPLE_MESSAGES] Query executada com sucesso. Dados recebidos:`, rawData?.length || 0);
       
       if (rawData && rawData.length > 0) {
@@ -145,25 +146,27 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       // Processar mensagens e resolver nomes usando ContactNameResolver
       const processedMessages: SimpleMessage[] = [];
       
-      for (const row of (rawData as DatabaseMessage[]) || []) {
-        const phoneNumber = extractPhoneFromSession(row.session_id);
-        
-        // Resolver nome do contato usando tabela unificada
-        const resolvedName = await ContactNameResolver.resolveName(
-          phoneNumber, 
-          row.nome_do_contato
-        );
+      if (rawData && Array.isArray(rawData)) {
+        for (const row of rawData as unknown as DatabaseMessage[]) {
+          const phoneNumber = extractPhoneFromSession(row.session_id);
+          
+          // Resolver nome do contato usando tabela unificada
+          const resolvedName = await ContactNameResolver.resolveName(
+            phoneNumber, 
+            row.nome_do_contato
+          );
 
-        processedMessages.push({
-          id: row.id?.toString() || "",
-          session_id: row.session_id || "",
-          message: row.message || "",
-          read_at: row.read_at || new Date().toISOString(),
-          tipo_remetente: row.tipo_remetente,
-          nome_do_contato: resolvedName,
-          mensagemtype: mapMessageType(row.mensagemtype),
-          media_url: completeMediaUrl(row.media_url)
-        });
+          processedMessages.push({
+            id: row.id?.toString() || "",
+            session_id: row.session_id || "",
+            message: row.message || "",
+            read_at: row.read_at || new Date().toISOString(),
+            tipo_remetente: row.tipo_remetente,
+            nome_do_contato: resolvedName,
+            mensagemtype: mapMessageType(row.mensagemtype),
+            media_url: completeMediaUrl(row.media_url)
+          });
+        }
       }
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas com nomes resolvidos`);
@@ -199,7 +202,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
             async (payload) => {
               console.log(`📨 [SIMPLE_MESSAGES] Nova mensagem recebida via realtime:`, payload);
               if (payload && payload.new) {
-                const novo = payload.new as DatabaseMessage;
+                const novo = payload.new as unknown as DatabaseMessage;
                 
                 // Resolver nome da nova mensagem
                 const phoneNumber = extractPhoneFromSession(novo.session_id);

@@ -58,15 +58,15 @@ export const useUnifiedContacts = () => {
 
             try {
               // Buscar mensagens mais recentes
-              const { data: messages } = await supabase
+              const messagesResult = await supabase
                 .from(tableName as any)
                 .select('message, read_at, is_read, mensagemtype')
                 .ilike('session_id', `%${contact.phone_number}%`)
                 .order('read_at', { ascending: false })
                 .limit(1);
 
-              if (messages && messages.length > 0) {
-                const msg = messages[0] as DatabaseMessage;
+              if (messagesResult.data && messagesResult.data.length > 0) {
+                const msg = messagesResult.data[0] as unknown as DatabaseMessage;
                 const msgTime = new Date(msg.read_at || '').toISOString();
                 
                 // Se esta mensagem é mais recente
