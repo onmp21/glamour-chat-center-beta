@@ -43,16 +43,18 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     return `${Math.round(seconds)}s`;
   }
 
-  // CORRIGIDO: Usar import dinâmico ao invés de require
+  // CORRIGIDO: Usar import dinâmico e type assertion para resolver erro TypeScript
   async function fetchReportData(report_type: string, channel_id?: string) {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
       if (report_type === 'conversations' && channel_id) {
-        // Buscar até 30 conversas recentes do canal selecionado
+        // CORRIGIDO: Usar type assertion para resolver erro do Supabase
         const { getTableNameForChannel } = await import('@/utils/channelMapping');
         const tableName = getTableNameForChannel(channel_id);
-        const { data } = await supabase
+        
+        // Type assertion para resolver o erro do TypeScript
+        const { data } = await (supabase as any)
           .from(tableName)
           .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
           .limit(30)

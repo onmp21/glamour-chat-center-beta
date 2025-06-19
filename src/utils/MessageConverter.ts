@@ -25,10 +25,10 @@ export class MessageConverter {
                    rawMessage.tipo_remetente === 'Yelena-ai' ||
                    rawMessage.tipo_remetente === 'Andressa-ai';
 
-    // Usar ContactNameResolver para obter o nome correto
+    // CORRIGIDO: Usar versão síncrona do ContactNameResolver
     const contactName = isAgent 
       ? 'Atendente'
-      : ContactNameResolver.resolveContactName(
+      : ContactNameResolver.resolveContactNameSync(
           phone,
           rawMessage.session_id,
           rawMessage.Nome_do_contato || rawMessage.nome_do_contato
