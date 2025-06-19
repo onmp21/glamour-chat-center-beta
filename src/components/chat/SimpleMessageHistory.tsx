@@ -31,79 +31,30 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages.length]);
 
-  // CORRIGIDO: Função expandida para detectar agentes vs clientes
+  // CORRIGIDO: Função simplificada para detectar agentes vs clientes
   const isAgentMessage = (message: any): boolean => {
-    // Lista expandida de tipos de agente (interno)
-    const agentTypes = [
-      'USUARIO_INTERNO',
-      'Yelena-ai',
-      'Yelena AI',
-      'Andressa-ai',
-      'Andressa AI',
-      'AGENTE',
-      'AGENT',
-      'INTERNAL_USER',
-      'AI_ASSISTANT',
-      'Canarana',
-      'Souto Soares',
-      'João Dourado',
-      'America Dourada',
-      'Gerente Lojas',
-      'Gerente Externo',
-      'GerenteLojas',
-      'GerenteExterno'
-    ];
-    
-    // PRIORIDADE 1: Verificar tipo_remetente
-    if (message.tipo_remetente && agentTypes.includes(message.tipo_remetente)) {
-      console.log(`🤖 [AGENT_CHECK] Mensagem de agente detectada via tipo_remetente:`, message.tipo_remetente);
-      return true;
-    }
-    
-    // PRIORIDADE 2: Verificar se é uma mensagem enviada pela interface (sem nome de contato válido)
-    if (!message.nome_do_contato || message.nome_do_contato ===  'Cliente' || message.nome_do_contato.trim() === '') {
-      console.log(`✏️ [AGENT_CHECK] Mensagem de agente detectada via interface interna (sem nome contato)`);
-      return true;
-    }
-    
-    // PRIORIDADE 3: Verificar por nomes específicos de agente no nome do contato
-    if (message.nome_do_contato) {
-      const agentNames = [
-        'Yelena', 'yelena', 'YELENA',
-        'Andressa', 'andressa', 'ANDRESSA', 
-        'Gerente', 'gerente', 'GERENTE',
-        'Admin', 'admin', 'ADMIN',
-        'Sistema', 'sistema', 'SISTEMA'
-      ];
-      
-      for (const agentName of agentNames) {
-        if (message.nome_do_contato.includes(agentName)) {
-          console.log(`👤 [AGENT_CHECK] Mensagem de agente detectada via nome:`, message.nome_do_contato);
-          return true;
-        }
-      }
-    }
-    
-    return false;
+    // CORREÇÃO: Verificar apenas tipo_remetente conforme especificado
+    const isInternal = message.tipo_remetente === 'CONTATO_INTERNO';
+    console.log(`🤖 [AGENT_CHECK] Mensagem ${message.id}: tipo_remetente=${message.tipo_remetente}, isInternal=${isInternal}`);
+    return isInternal;
   };
 
   const isMediaMessage = (message: any): boolean => {
-    // PRIORIDADE 1: Verificar se mensagem contém "media("
-    if (message.message && message.message.includes('media(')) {
-      console.log(`📄 [MEDIA_CHECK] Mídia detectada via "media(" na mensagem:`, message.message.substring(0, 50));
+    // CORREÇÃO: Verificar se mensagem contém "media(" E tem media_url
+    if (message.message && message.message.includes('media(') && message.media_url) {
+      console.log(`📄 [MEDIA_CHECK] Mídia detectada - message: ${message.message.substring(0, 50)}, media_url: ${message.media_url.substring(0, 50)}`);
       return true;
     }
 
-    // PRIORIDADE 2: media_url (link direto)
+    // Verificar se tem media_url diretamente (mesmo sem "media(" na mensagem)
     if (message.media_url && message.media_url.trim() !== '') {
-      console.log(`🔗 [MEDIA_CHECK] Mídia detectada via media_url:`, message.media_url.substring(0, 50));
+      console.log(`🔗 [MEDIA_CHECK] Mídia detectada via media_url: ${message.media_url.substring(0, 50)}`);
       return true;
     }
 
-    // PRIORIDADE 3: tipo de mensagem não texto
-    if (message.mensagemtype && 
-        !['text', 'conversation'].includes(message.mensagemtype)) {
-      console.log(`🎭 [MEDIA_CHECK] Mídia detectada via mensagemtype:`, message.mensagemtype);
+    // Verificar tipo de mensagem não texto
+    if (message.mensagemtype && !['text', 'conversation'].includes(message.mensagemtype)) {
+      console.log(`🎭 [MEDIA_CHECK] Mídia detectada via mensagemtype: ${message.mensagemtype}`);
       return true;
     }
 
@@ -111,21 +62,21 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
   };
 
   const getMediaContent = (message: any): string => {
-    // PRIORIDADE: media_url (mais confiável e já completada)
+    // CORREÇÃO: Priorizar sempre media_url
     if (message.media_url && message.media_url.trim() !== '') {
-      console.log(`🔗 [MEDIA_CONTENT] Usando media_url:`, message.media_url.substring(0, 50));
+      console.log(`🔗 [MEDIA_CONTENT] Usando media_url: ${message.media_url.substring(0, 50)}`);
       return message.media_url;
     }
 
-    // FALLBACK: message se parecer mídia
+    // Fallback: message se parecer mídia
     if (message.message && 
         (message.message.startsWith('data:') || 
          message.message.startsWith('http'))) {
-      console.log(`📄 [MEDIA_CONTENT] Usando message como fallback:`, message.message.substring(0, 50));
+      console.log(`📄 [MEDIA_CONTENT] Usando message como fallback: ${message.message.substring(0, 50)}`);
       return message.message;
     }
 
-    console.log(`❌ [MEDIA_CONTENT] Nenhum conteúdo de mídia encontrado`);
+    console.log(`❌ [MEDIA_CONTENT] Nenhum conteúdo de mídia encontrado para mensagem ${message.id}`);
     return '';
   };
 
@@ -188,7 +139,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
               key={`${message.id}-${index}`}
               className={cn(
                 "flex mb-3",
-                isAgent ? "justify-end" : "justify-start" // APLICAR CORREÇÃO CORRETA
+                isAgent ? "justify-end" : "justify-start" // CORREÇÃO: CONTATO_INTERNO = DIREITA, CONTATO_EXTERNO = ESQUERDA
               )}
             >
               <div className={cn(
@@ -198,10 +149,10 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                 <div className={cn(
                   "px-3 py-2 text-sm shadow-sm rounded-lg",
                   isAgent
-                    ? "bg-[#b5103c] text-white" // AGENTE = DIREITA = VERMELHO
+                    ? "bg-[#b5103c] text-white" // INTERNO = DIREITA = VERMELHO
                     : isDarkMode
-                      ? "bg-[#18181b] text-white border border-zinc-800" // CLIENTE = ESQUERDA = ESCURO
-                      : "bg-white text-gray-900 border border-gray-200" // CLIENTE = ESQUERDA = CLARO
+                      ? "bg-[#18181b] text-white border border-zinc-800" // EXTERNO = ESQUERDA = ESCURO
+                      : "bg-white text-gray-900 border border-gray-200" // EXTERNO = ESQUERDA = CLARO
                 )}>
                   {isMedia ? (
                     <MediaRendererFixed 
@@ -214,7 +165,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                         ) || undefined
                       }
                       isDarkMode={isDarkMode}
-                      balloonColor={isAgent ? 'sent' : 'received'} // CORRIGIR balloonColor
+                      balloonColor={isAgent ? 'sent' : 'received'} // CORREÇÃO: balloonColor baseado no tipo correto
                     />
                   ) : (
                     <p className="break-words whitespace-pre-wrap">

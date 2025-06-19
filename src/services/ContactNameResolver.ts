@@ -12,9 +12,12 @@ export class ContactNameResolver {
   private static cacheExpiry = new Map<string, number>();
   private static readonly CACHE_DURATION = 60000; // 1 minuto
 
-  // Resolver nome do contato usando tabela unificada como fonte primária
+  // CORRIGIDO: Resolver nome do contato priorizando tabela contacts
   static async resolveName(phoneNumber: string, fallbackName?: string): Promise<string> {
-    if (!phoneNumber) return fallbackName || 'Cliente';
+    if (!phoneNumber) {
+      console.log(`📞 [CONTACT_RESOLVER] Número vazio, usando fallback: ${fallbackName || 'Cliente'}`);
+      return fallbackName || 'Cliente';
+    }
 
     const now = Date.now();
     const cacheKey = phoneNumber;
@@ -23,34 +26,79 @@ export class ContactNameResolver {
     if (this.cache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
       const expiry = this.cacheExpiry.get(cacheKey)!;
       if (now < expiry) {
-        return this.cache.get(cacheKey)!.contact_name;
+        const cachedName = this.cache.get(cacheKey)!.contact_name;
+        console.log(`✅ [CONTACT_RESOLVER] Nome do cache para ${phoneNumber}: ${cachedName}`);
+        return cachedName;
       }
     }
 
     try {
-      // Consultar tabela contacts primeiro
+      // CORREÇÃO: Consultar tabela contacts SEMPRE primeiro
+      console.log(`🔍 [CONTACT_RESOLVER] Buscando ${phoneNumber} na tabela contacts`);
       const { data: contact, error } = await supabase
         .from('contacts')
         .select('phone_number, contact_name, channels')
         .eq('phone_number', phoneNumber)
         .single();
 
-      if (!error && contact) {
+      if (!error && contact && contact.contact_name) {
         // Atualizar cache
         this.cache.set(cacheKey, contact);
         this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
+        console.log(`🎯 [CONTACT_RESOLVER] Nome encontrado na tabela contacts para ${phoneNumber}: ${contact.contact_name}`);
         return contact.contact_name;
       }
 
-      // Se não encontrou na tabela contacts, usar fallback
+      // CORREÇÃO: Se tem fallbackName, salvar na tabela contacts para próximas consultas
+      if (fallbackName && fallbackName.trim() && fallbackName !== 'Cliente') {
+        console.log(`💾 [CONTACT_RESOLVER] Salvando nome ${fallbackName} para ${phoneNumber} na tabela contacts`);
+        
+        try {
+          const { error: insertError } = await supabase
+            .from('contacts')
+            .upsert(
+              { 
+                phone_number: phoneNumber, 
+                contact_name: fallbackName.trim(),
+                channels: []
+              },
+              { 
+                onConflict: 'phone_number',
+                ignoreDuplicates: false 
+              }
+            );
+
+          if (!insertError) {
+            // Atualizar cache com o nome salvo
+            const newContact = {
+              phone_number: phoneNumber,
+              contact_name: fallbackName.trim(),
+              channels: []
+            };
+            this.cache.set(cacheKey, newContact);
+            this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
+            console.log(`✅ [CONTACT_RESOLVER] Nome ${fallbackName} salvo com sucesso para ${phoneNumber}`);
+            return fallbackName.trim();
+          } else {
+            console.error(`❌ [CONTACT_RESOLVER] Erro ao salvar contato:`, insertError);
+          }
+        } catch (saveError) {
+          console.error(`❌ [CONTACT_RESOLVER] Erro ao salvar contato:`, saveError);
+        }
+      }
+
+      // Se não encontrou na tabela e não tem fallback válido, usar número
+      const phoneDisplay = phoneNumber.length > 4 ? `...${phoneNumber.slice(-4)}` : phoneNumber;
+      console.log(`📞 [CONTACT_RESOLVER] Nenhum nome encontrado, exibindo número: ${phoneDisplay} para ${phoneNumber}`);
+      return phoneDisplay;
+
+    } catch (err) {
+      console.error('❌ [CONTACT_RESOLVER] Erro na busca:', err);
+      // Em caso de erro, usar fallback ou número
       if (fallbackName && fallbackName.trim()) {
         return fallbackName.trim();
       }
-
-      return 'Cliente';
-    } catch (err) {
-      console.error('❌ [CONTACT_NAME_RESOLVER] Error resolving name:', err);
-      return fallbackName || 'Cliente';
+      return phoneNumber.length > 4 ? `...${phoneNumber.slice(-4)}` : phoneNumber;
     }
   }
 
@@ -67,7 +115,7 @@ export class ContactNameResolver {
 
       return error ? null : contact;
     } catch (err) {
-      console.error('❌ [CONTACT_NAME_RESOLVER] Error getting contact:', err);
+      console.error('❌ [CONTACT_RESOLVER] Erro ao buscar contato completo:', err);
       return null;
     }
   }
@@ -76,5 +124,6 @@ export class ContactNameResolver {
   static clearCache(): void {
     this.cache.clear();
     this.cacheExpiry.clear();
+    console.log('🧹 [CONTACT_RESOLVER] Cache limpo');
   }
 }
