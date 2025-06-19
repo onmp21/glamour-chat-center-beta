@@ -11,6 +11,7 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
 
     const messageService = new MessageService(channelId);
     let channel: any = null;
+    const channelSuffix = `-realtime-${Date.now()}`;
 
     try {
       channel = messageService.createRealtimeSubscription((payload) => {
@@ -18,9 +19,11 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
         if (payload.new && onNewMessage) {
           onNewMessage(payload.new as RawMessage);
         }
-      });
+      }, channelSuffix);
 
+      // Subscribe only once
       channel.subscribe((status: string) => {
+        console.log(`🔌 [CONVERSATION_REALTIME] Status: ${status}`);
         setIsConnected(status === 'SUBSCRIBED');
       });
     } catch (error) {
@@ -29,9 +32,14 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
 
     return () => {
       if (channel) {
-        const repository = messageService['getRepository']();
-        const tableName = repository.getTableName();
-        MessageService.unsubscribeChannel('', tableName);
+        console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription for ${channelId}`);
+        try {
+          const repository = messageService['getRepository']();
+          const tableName = repository.getTableName();
+          MessageService.unsubscribeChannel(channelSuffix, tableName);
+        } catch (error) {
+          console.error('Error cleaning up realtime subscription:', error);
+        }
         setIsConnected(false);
       }
     };

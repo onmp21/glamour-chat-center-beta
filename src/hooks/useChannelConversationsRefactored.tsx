@@ -58,20 +58,28 @@ export const useChannelConversationsRefactored = (channelId: string) => {
 
     if (channelId) {
       const messageService = new MessageService(channelId);
-      channelSuffix = `-conversations-${Date.now()}`;
+      channelSuffix = `-conversations-${channelId}-${Date.now()}`;
       
-      channel = messageService.createRealtimeSubscription((payload) => {
-        DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-        // Recarregar conversas para refletir as novas mensagens
-        loadConversations();
-      }, channelSuffix);
+      try {
+        channel = messageService.createRealtimeSubscription((payload) => {
+          DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
+          // Recarregar conversas para refletir as novas mensagens
+          loadConversations();
+        }, channelSuffix);
 
-      channel.subscribe();
-      DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
+        // Subscribe only once
+        channel.subscribe((status: string) => {
+          console.log(`🔌 [CONVERSATIONS_REFACTORED] Subscription status: ${status}`);
+        });
+        
+        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
+      } catch (error) {
+        DetailedLogger.error("useChannelConversationsRefactored", `Erro ao criar subscription:`, error);
+      }
     }
 
     return () => {
-      if (channel && channelId && channelSuffix) {
+      if (channel && channelSuffix) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         try {
           const messageService = new MessageService(channelId);

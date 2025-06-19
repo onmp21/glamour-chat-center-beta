@@ -74,24 +74,37 @@ export const useConversationService = (channelId: string) => {
 
     // Setup realtime subscription with proper cleanup
     let channel: any = null;
+    let channelSuffix = '';
 
     if (channelId) {
       const messageService = new MessageService(channelId);
+      channelSuffix = `-service-${channelId}-${Date.now()}`;
+      
       channel = messageService.createRealtimeSubscription((payload) => {
         console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
         // Refresh conversations when new message arrives
         setTimeout(() => {
           refreshConversations();
         }, 1000);
-      }, `-service-${Date.now()}`);
+      }, channelSuffix);
 
-      channel.subscribe();
+      // Subscribe only once
+      channel.subscribe((status: string) => {
+        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status}`);
+      });
     }
 
     return () => {
-      if (channel) {
+      if (channel && channelSuffix) {
         console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from channel ${channelId}`);
-        channel.unsubscribe();
+        try {
+          const messageService = new MessageService(channelId);
+          const repository = messageService['getRepository']();
+          const tableName = repository.getTableName();
+          MessageService.unsubscribeChannel(channelSuffix, tableName);
+        } catch (error) {
+          console.error('Error cleaning up subscription:', error);
+        }
       }
     };
   }, [channelId]);
