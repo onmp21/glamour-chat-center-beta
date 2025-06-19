@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { AIProviderService } from '@/services/AIProviderService';
 import { AIProvider } from '@/types/ai-providers';
-import { useSimpleMessages } from '@/hooks/useSimpleMessages';
 import { supabase } from '@/integrations/supabase/client';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 
 interface AIQuickResponseModalProps {
   isDarkMode: boolean;
@@ -34,8 +34,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiResponses, setAiResponses] = useState<string[]>([]);
   const [initialGenerated, setInitialGenerated] = useState(false);
-
-  const { messages, loading: loadingMessages } = useSimpleMessages(channelId || null, conversationId || null);
+  const [conversationMessages, setConversationMessages] = useState<any[]>([]);
 
   useEffect(() => {
     loadProviders();
@@ -43,11 +42,11 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
 
   // Auto-generate responses when modal opens and data is ready
   useEffect(() => {
-    if (providers.length > 0 && !loadingMessages && messages.length > 0 && !initialGenerated) {
-      generateAIResponses();
+    if (providers.length > 0 && !initialGenerated && conversationId && channelId) {
+      loadMessagesAndGenerate();
       setInitialGenerated(true);
     }
-  }, [providers, loadingMessages, messages, initialGenerated]);
+  }, [providers, initialGenerated, conversationId, channelId]);
 
   const loadProviders = async () => {
     try {
@@ -61,7 +60,48 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
     }
   };
 
-  const generateAIResponses = async () => {
+  const loadConversationMessages = async () => {
+    if (!channelId || !conversationId) return [];
+
+    try {
+      const tableName = getTableNameForChannelSync(channelId);
+      
+      const { data, error: queryError } = await supabase
+        .from(tableName as any)
+        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+        .eq('session_id', conversationId)
+        .order('read_at', { ascending: true })
+        .limit(20);
+
+      if (queryError) {
+        console.error('❌ [AI_QUICK_RESPONSE] Error loading messages:', queryError);
+        return [];
+      }
+
+      console.log(`📊 [AI_QUICK_RESPONSE] Loaded ${data?.length || 0} messages from ${tableName}`);
+      return data || [];
+
+    } catch (error) {
+      console.error('❌ [AI_QUICK_RESPONSE] Error loading conversation messages:', error);
+      return [];
+    }
+  };
+
+  const loadMessagesAndGenerate = async () => {
+    const messages = await loadConversationMessages();
+    setConversationMessages(messages);
+    if (messages.length > 0) {
+      generateAIResponses(messages);
+    } else {
+      toast({
+        title: "Aviso",
+        description: "Nenhuma mensagem encontrada nesta conversa",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const generateAIResponses = async (messagesData?: any[]) => {
     if (!selectedProvider || !conversationId || !channelId) {
       toast({
         title: "Erro",
@@ -76,8 +116,21 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
     try {
       console.log('🤖 [AI_QUICK_RESPONSE] Gerando respostas rápidas com prompt quick_response...');
 
+      // Use mensagens carregadas ou as do estado
+      const messagesToUse = messagesData || conversationMessages;
+      
+      if (messagesToUse.length === 0) {
+        console.warn('⚠️ [AI_QUICK_RESPONSE] Nenhuma mensagem encontrada para gerar respostas');
+        toast({
+          title: "Aviso",
+          description: "Nenhuma mensagem encontrada para gerar respostas",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Preparar contexto das mensagens
-      const contextMessages = messages.slice(-20).map(m => ({
+      const contextMessages = messagesToUse.slice(-20).map(m => ({
         id: m.id,
         nome_do_contato: m.nome_do_contato,
         tipo_remetente: m.tipo_remetente,
@@ -85,10 +138,12 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
         read_at: m.read_at,
       }));
 
+      console.log(`📊 [AI_QUICK_RESPONSE] Enviando ${contextMessages.length} mensagens para análise`);
+
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,
-          report_type: 'quick_response', // Mudado de 'custom' para 'quick_response'
+          report_type: 'quick_response',
           action_type: 'quick_response',
           data: {
             conversation_id: conversationId,
@@ -149,6 +204,11 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
     }
   };
 
+  const handleRefresh = () => {
+    setAiResponses([]);
+    loadMessagesAndGenerate();
+  };
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className={cn(
@@ -176,7 +236,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
 
             {providers.length > 0 && (
               <Button
-                onClick={generateAIResponses}
+                onClick={handleRefresh}
                 disabled={isGenerating || !selectedProvider}
                 variant="outline"
                 size="sm"
@@ -242,6 +302,19 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
                 <p>Nenhum provedor de IA configurado</p>
                 <p className="text-sm mt-1">
                   Configure um provedor de IA para gerar respostas personalizadas
+                </p>
+              </div>
+            )}
+
+            {aiResponses.length === 0 && !isGenerating && providers.length > 0 && conversationMessages.length === 0 && (
+              <div className={cn(
+                "text-center py-8",
+                isDarkMode ? "text-gray-400" : "text-gray-500"
+              )}>
+                <Sparkles className="mx-auto h-12 w-12 opacity-30 mb-3" />
+                <p>Nenhuma mensagem encontrada</p>
+                <p className="text-sm mt-1">
+                  Esta conversa não possui mensagens para analisar
                 </p>
               </div>
             )}

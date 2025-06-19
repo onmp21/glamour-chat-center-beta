@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AIProviderService } from "@/services/AIProviderService";
 import { AIProvider } from "@/types/ai-providers";
 import { supabase } from "@/integrations/supabase/client";
+import { getTableNameForChannelSync } from "@/utils/channelMapping";
 
 interface AIResumoOverlayProps {
   open: boolean;
@@ -43,6 +43,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   const [internalLoading, setInternalLoading] = useState(false);
   const [internalError, setInternalError] = useState<string>('');
   const [providers, setProviders] = useState<AIProvider[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<any[]>([]);
 
   // Use external props or internal state
   const summary = externalSummary || internalSummary;
@@ -55,13 +56,42 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     }
   }, [open, conversationId, channelId]);
 
+  const loadConversationMessages = async () => {
+    if (!channelId || !conversationId) return [];
+
+    try {
+      const tableName = getTableNameForChannelSync(channelId);
+      
+      const { data, error: queryError } = await supabase
+        .from(tableName as any)
+        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+        .eq('session_id', conversationId)
+        .order('read_at', { ascending: true })
+        .limit(50);
+
+      if (queryError) {
+        console.error('❌ [AI_RESUMO] Error loading messages:', queryError);
+        return [];
+      }
+
+      console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
+      return data || [];
+
+    } catch (error) {
+      console.error('❌ [AI_RESUMO] Error loading conversation messages:', error);
+      return [];
+    }
+  };
+
   const loadProvidersAndGenerateSummary = async () => {
     try {
       const activeProviders = await AIProviderService.getActiveProviders();
       setProviders(activeProviders);
       
       if (activeProviders.length > 0) {
-        await generateSummary(activeProviders[0].id);
+        const messages = await loadConversationMessages();
+        setConversationMessages(messages);
+        await generateSummary(activeProviders[0].id, messages);
       }
     } catch (error) {
       console.error('Erro ao carregar provedores:', error);
@@ -69,7 +99,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     }
   };
 
-  const generateSummary = async (providerId?: string) => {
+  const generateSummary = async (providerId?: string, messagesData?: any[]) => {
     if (!conversationId || !channelId) {
       setInternalError('Dados da conversa não disponíveis');
       return;
@@ -87,8 +117,17 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     try {
       console.log('📝 [AI_RESUMO] Gerando resumo com prompt conversation_summary...');
 
+      // Use mensagens carregadas ou as passadas como prop
+      const messagesToUse = messagesData || conversationMessages || messages;
+      
+      if (messagesToUse.length === 0) {
+        console.warn('⚠️ [AI_RESUMO] Nenhuma mensagem encontrada para resumir');
+        setInternalError('Nenhuma mensagem encontrada para resumir');
+        return;
+      }
+
       // Preparar contexto das mensagens
-      const contextMessages = messages.slice(-50).map(m => ({
+      const contextMessages = messagesToUse.slice(-50).map(m => ({
         id: m.id,
         nome_do_contato: m.nome_do_contato,
         tipo_remetente: m.tipo_remetente,
@@ -96,10 +135,12 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
         read_at: m.read_at,
       }));
 
+      console.log(`📊 [AI_RESUMO] Enviando ${contextMessages.length} mensagens para análise`);
+
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,
-          report_type: 'conversation_summary', // Mudado para usar prompt específico
+          report_type: 'conversation_summary',
           action_type: 'conversation_summary',
           data: {
             conversation_id: conversationId,
