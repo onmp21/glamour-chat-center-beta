@@ -50,6 +50,22 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     return tableName;
   };
 
+  // NOVA: Função para completar URLs de mídia
+  const completeMediaUrl = (media_url?: string): string | undefined => {
+    if (!media_url) return undefined;
+    
+    // Se já é uma URL completa, retorna como está
+    if (media_url.startsWith('http')) {
+      return media_url;
+    }
+    
+    // Se é um link curto, completa com o base URL do Supabase Storage
+    const baseUrl = 'https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/';
+    const fullUrl = baseUrl + media_url;
+    console.log(`🔗 [MEDIA_URL] Completando URL: ${media_url} -> ${fullUrl}`);
+    return fullUrl;
+  };
+
   // CORRIGIDA: Função para mapear nomenclaturas de mídia com suporte completo
   const mapMessageType = (mensagemtype?: string): string => {
     if (!mensagemtype) return 'text';
@@ -98,7 +114,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_MESSAGES] Iniciando query na tabela: ${tableName}, sessão: ${sessionId}, usuário: ${user?.name}`);
 
-      // CORRIGIDO: Removido media_base64 da query, mantendo apenas media_url
+      // CORRIGIDO: Query atualizada sem media_base64
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
         .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_url")
@@ -124,8 +140,8 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         read_at: row.read_at || new Date().toISOString(),
         tipo_remetente: row.tipo_remetente,
         nome_do_contato: row.nome_do_contato,
-        mensagemtype: mapMessageType(row.mensagemtype), // APLICAR MAPEAMENTO CORRIGIDO
-        media_url: row.media_url // APENAS media_url, sem media_base64
+        mensagemtype: mapMessageType(row.mensagemtype),
+        media_url: completeMediaUrl(row.media_url) // APLICAR COMPLETAR URL
       }));
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
@@ -178,7 +194,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
                     tipo_remetente: novo.tipo_remetente,
                     nome_do_contato: novo.nome_do_contato,
                     mensagemtype: mapMessageType(novo.mensagemtype), 
-                    media_url: novo.media_url // APENAS media_url
+                    media_url: completeMediaUrl(novo.media_url) // APLICAR COMPLETAR URL
                   };
                   
                   console.log(`✅ [SIMPLE_MESSAGES] Adicionando nova mensagem:`, newMessage.id);

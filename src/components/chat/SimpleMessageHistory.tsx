@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
@@ -31,15 +30,48 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages.length]);
 
-  // CORRIGIDO: Função melhorada para detectar mídia usando APENAS media_url
-  const isMediaMessage = (message: any) => {
-    // PRIORIDADE: media_url (link direto)
+  // CORRIGIDO: Função melhorada para detectar agentes vs clientes
+  const isAgentMessage = (message: any): boolean => {
+    const agentTypes = [
+      'USUARIO_INTERNO',
+      'Yelena-ai',
+      'Andressa-ai',
+      'AGENTE',
+      'AGENT',
+      'INTERNAL_USER',
+      'AI_ASSISTANT'
+    ];
+    
+    // Verificar tipo_remetente
+    if (message.tipo_remetente && agentTypes.includes(message.tipo_remetente)) {
+      console.log(`🤖 [AGENT_CHECK] Mensagem de agente detectada via tipo_remetente:`, message.tipo_remetente);
+      return true;
+    }
+    
+    // Verificar se é uma mensagem enviada pela interface (sem nome de contato)
+    if (!message.nome_do_contato && message.tipo_remetente === 'USUARIO_INTERNO') {
+      console.log(`✏️ [AGENT_CHECK] Mensagem de agente detectada via interface interna`);
+      return true;
+    }
+    
+    return false;
+  };
+
+  // CORRIGIDO: Função melhorada para detectar mídia
+  const isMediaMessage = (message: any): boolean => {
+    // PRIORIDADE 1: Verificar se mensagem contém "media("
+    if (message.message && message.message.includes('media(')) {
+      console.log(`📄 [MEDIA_CHECK] Mídia detectada via "media(" na mensagem:`, message.message.substring(0, 50));
+      return true;
+    }
+
+    // PRIORIDADE 2: media_url (link direto)
     if (message.media_url && message.media_url.trim() !== '') {
       console.log(`🔗 [MEDIA_CHECK] Mídia detectada via media_url:`, message.media_url.substring(0, 50));
       return true;
     }
 
-    // PRIORIDADE 2: tipo de mensagem não texto
+    // PRIORIDADE 3: tipo de mensagem não texto
     if (message.mensagemtype && 
         !['text', 'conversation'].includes(message.mensagemtype)) {
       console.log(`🎭 [MEDIA_CHECK] Mídia detectada via mensagemtype:`, message.mensagemtype);
@@ -49,9 +81,9 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     return false;
   };
 
-  // CORRIGIDO: Função para obter conteúdo da mídia usando APENAS media_url
+  // CORRIGIDO: Função para obter conteúdo da mídia
   const getMediaContent = (message: any): string => {
-    // PRIORIDADE: media_url (mais confiável)
+    // PRIORIDADE: media_url (mais confiável e já completada)
     if (message.media_url && message.media_url.trim() !== '') {
       console.log(`🔗 [MEDIA_CONTENT] Usando media_url:`, message.media_url.substring(0, 50));
       return message.media_url;
@@ -112,7 +144,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     <div className={cn("flex-1 overflow-y-auto p-4", className)}>
       <div className="space-y-4">
         {messages.map((message, index) => {
-          const isAgent = message.tipo_remetente === 'USUARIO_INTERNO' || message.tipo_remetente === 'Yelena-ai';
+          const isAgent = isAgentMessage(message); // USAR FUNÇÃO CORRIGIDA
           const contactName = message.nome_do_contato || 'Cliente';
           const isMedia = isMediaMessage(message);
 
@@ -128,7 +160,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
               key={`${message.id}-${index}`}
               className={cn(
                 "flex mb-3",
-                isAgent ? "justify-end" : "justify-start"
+                isAgent ? "justify-end" : "justify-start" // APLICAR CORREÇÃO
               )}
             >
               <div className={cn(
@@ -154,7 +186,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                         ) || undefined
                       }
                       isDarkMode={isDarkMode}
-                      balloonColor={isAgent ? 'sent' : 'received'}
+                      balloonColor={isAgent ? 'sent' : 'received'} // CORRIGIR balloonColor
                     />
                   ) : (
                     <p className="break-words whitespace-pre-wrap">
