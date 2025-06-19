@@ -22,13 +22,6 @@ export class OptimizedMessageService {
     return this.instances.get(channelId)!;
   }
 
-  // Public constructor for direct instantiation (fixing the private constructor issue)
-  constructor(channelId: string) {
-    this.channelId = channelId;
-    const tableName = getTableNameForChannelSync(channelId);
-    this.repository = new MessageRepository(tableName);
-  }
-
   async getMessages(limit = 50): Promise<RawMessage[]> {
     try {
       return await this.repository.findAll(limit);
@@ -68,6 +61,7 @@ export class OptimizedMessageService {
       const messages: RawMessage[] = (data || []).map((record: any) => ({
         id: record.id?.toString() || Math.random().toString(),
         content: record.message || '',
+        message: record.message || '', // Add required message property
         timestamp: record.read_at || new Date().toISOString(),
         sender: record.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
         tipo_remetente: record.tipo_remetente,
