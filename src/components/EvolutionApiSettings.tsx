@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -602,7 +601,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           </CardContent>
         </Card>
 
-        {/* SEÇÃO 2: Instâncias da API Evolution */}
+        {/* SEÇÃO 2: Gerenciar Instâncias */}
         {apiConnection.isValidated && (
           <Card className={cn(
             "border-2",
@@ -611,15 +610,50 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                Instâncias da API Evolution
+                Gerenciar Instâncias
               </CardTitle>
               <CardDescription>
-                Instâncias encontradas na API Evolution
+                Crie novas instâncias ou gerencie as existentes.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {/* Criar Nova Instância */}
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Ex: minha-loja-principal"
+                  value={newInstanceName}
+                  onChange={(e) => setNewInstanceName(e.target.value)}
+                  disabled={creatingInstance}
+                  className={cn(
+                    "flex-grow",
+                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
+                  )}
+                />
+                <Button
+                  onClick={createNewInstance}
+                  disabled={creatingInstance}
+                  className={cn(
+                    "bg-blue-600 hover:bg-blue-700 text-white",
+                    creatingInstance && "bg-gray-400 hover:bg-gray-400"
+                  )}
+                >
+                  {creatingInstance ? (
+                    <>
+                      <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Criar Instância
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Lista de Instâncias Existentes */}
               <div className="space-y-2">
-                <Label>Instâncias Disponíveis ({apiConnection.instances.length}):</Label>
+                <Label>Instâncias Existentes ({apiConnection.instances.length}):</Label>
                 {apiConnection.instances.length === 0 ? (
                   <p className={cn(
                     "text-sm p-4 rounded-lg border border-dashed text-center",
@@ -651,7 +685,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                                 "text-sm",
                                 isDarkMode ? "text-gray-400" : "text-gray-600"
                               )}>
-                                Perfil: {instance.profileName}
+                                {instance.profileName}
                               </p>
                             )}
                             {instance.number && (
@@ -659,7 +693,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                                 "text-sm",
                                 isDarkMode ? "text-gray-400" : "text-gray-600"
                               )}>
-                                Número: {instance.number}
+                                {instance.number}
                               </p>
                             )}
                           </div>
@@ -739,6 +773,23 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                               Desconectar
                             </Button>
                           )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteInstance(instance.instanceName)}
+                            disabled={deletingInstance === instance.instanceName}
+                            className={cn(
+                              "border-red-500 text-red-600 hover:bg-red-50",
+                              isDarkMode ? "border-red-400 text-red-400 hover:bg-red-900/20" : ""
+                            )}
+                          >
+                            {deletingInstance === instance.instanceName ? (
+                              <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            Remover
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -749,59 +800,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           </Card>
         )}
 
-        {/* SEÇÃO 3: Gerenciar Instâncias */}
-        {apiConnection.isValidated && (
-          <Card className={cn(
-            "border-2",
-            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
-          )}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="w-5 h-5" />
-                Gerenciar Instâncias
-              </CardTitle>
-              <CardDescription>
-                Crie novas instâncias ou gerencie as existentes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Ex: minha-loja-principal"
-                  value={newInstanceName}
-                  onChange={(e) => setNewInstanceName(e.target.value)}
-                  disabled={creatingInstance}
-                  className={cn(
-                    "flex-grow",
-                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
-                  )}
-                />
-                <Button
-                  onClick={createNewInstance}
-                  disabled={creatingInstance}
-                  className={cn(
-                    "bg-blue-600 hover:bg-blue-700 text-white",
-                    creatingInstance && "bg-gray-400 hover:bg-gray-400"
-                  )}
-                >
-                  {creatingInstance ? (
-                    <>
-                      <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                      Criando...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Criar Instância
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* SEÇÃO 4: Vincular Canal à Instância */}
+        {/* SEÇÃO 3: Vincular Canal à Instância */}
         {apiConnection.isValidated && (
           <Card className={cn(
             "border-2",
