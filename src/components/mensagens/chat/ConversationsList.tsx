@@ -40,11 +40,18 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
     }
   };
 
+  // Ordenar conversas por data mais recente no topo
+  const sortedConversations = [...conversations].sort((a, b) => {
+    const dateA = new Date(a.last_message_time || a.updated_at).getTime();
+    const dateB = new Date(b.last_message_time || b.updated_at).getTime();
+    return dateB - dateA; // Mais recente primeiro
+  });
+
   return (
     <div className="flex-1 overflow-hidden">
       <ScrollArea className="h-full">
         <div className="p-2 space-y-1">
-          {conversations.map((conversation) => {
+          {sortedConversations.map((conversation) => {
             const status = getConversationStatus(channelId, conversation.id);
             
             return (
