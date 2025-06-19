@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -42,31 +43,36 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     return `${Math.round(seconds)}s`;
   }
 
-  // BUSCA DADOS REAIS para o relatório
+  // CORRIGIDO: Usar import dinâmico ao invés de require
   async function fetchReportData(report_type: string, channel_id?: string) {
-    const supabaseClient = require('@/integrations/supabase/client').supabase;
-    if (report_type === 'conversations' && channel_id) {
-      // Buscar até 30 conversas recentes do canal selecionado
-      // Determinar a tabela pelo channel_id
-      const { getTableNameForChannel } = require('@/utils/channelMapping');
-      const tableName = getTableNameForChannel(channel_id);
-      const { data } = await supabaseClient
-        .from(tableName)
-        .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
-        .limit(30)
-        .order('read_at', { ascending: false });
-      return data || [];
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      if (report_type === 'conversations' && channel_id) {
+        // Buscar até 30 conversas recentes do canal selecionado
+        const { getTableNameForChannel } = await import('@/utils/channelMapping');
+        const tableName = getTableNameForChannel(channel_id);
+        const { data } = await supabase
+          .from(tableName)
+          .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
+          .limit(30)
+          .order('read_at', { ascending: false });
+        return data || [];
+      }
+      if (report_type === 'exams') {
+        // Buscar até 30 exames
+        const { data } = await supabase
+          .from('exams')
+          .select('*')
+          .limit(30)
+          .order('appointment_date', { ascending: false });
+        return data || [];
+      }
+      return {}; // Para custom, retorna vazio
+    } catch (error) {
+      console.error('❌ [REPORT_DATA] Erro ao buscar dados:', error);
+      return {};
     }
-    if (report_type === 'exams') {
-      // Buscar até 30 exames
-      const { data } = await supabaseClient
-        .from('exams')
-        .select('*')
-        .limit(30)
-        .order('appointment_date', { ascending: false });
-      return data || [];
-    }
-    return {}; // Para custom, retorna vazio
   }
 
   useEffect(() => {
@@ -134,11 +140,12 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
-      // Busca dados REAIS conforme tipo do relatório
+      // CORRIGIDO: Busca dados REAIS conforme tipo do relatório usando import dinâmico
       let reportData: any = {};
       if (filters.report_type === "conversations" || filters.report_type === "exams") {
         reportData = await fetchReportData(filters.report_type, filters.channel_id);
       }
+      
       const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
         report_type: filters.report_type,

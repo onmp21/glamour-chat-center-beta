@@ -24,8 +24,9 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   const getTableName = (channelId: string): string => {
     console.log(`🔍 [SIMPLE_MESSAGES] Mapeando canal: ${channelId}`);
     
-    // CORRIGIDO: Mapeamento padronizado usando apenas UUIDs
+    // CORRIGIDO: Mapeamento padronizado usando apenas UUIDs com fallbacks melhorados
     const mapping: Record<string, string> = {
+      // UUIDs principais
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
       '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas',
       'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas',
@@ -36,6 +37,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       // Fallbacks para nomes legados
       'chat': 'yelena_ai_conversas',
       'yelena': 'yelena_ai_conversas',
+      'yelena-ai': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
       'souto-soares': 'souto_soares_conversas',
       'joao-dourado': 'joao_dourado_conversas',
@@ -49,20 +51,31 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     return tableName;
   };
 
-  // NOVA: Função para mapear nomenclaturas de mídia
+  // CORRIGIDA: Função para mapear nomenclaturas de mídia com suporte completo
   const mapMessageType = (mensagemtype?: string): string => {
     if (!mensagemtype) return 'text';
     
     const typeMapping: Record<string, string> = {
+      // Nomenclaturas do WhatsApp/Evolution
       'audioMessage': 'audio',
       'imageMessage': 'image', 
       'videoMessage': 'video',
       'documentMessage': 'document',
       'stickerMessage': 'sticker',
-      'conversation': 'text'
+      'conversation': 'text',
+      // Nomenclaturas diretas
+      'audio': 'audio',
+      'image': 'image',
+      'video': 'video',
+      'document': 'document',
+      'file': 'document',
+      'sticker': 'sticker',
+      'text': 'text'
     };
     
-    return typeMapping[mensagemtype] || mensagemtype;
+    const mapped = typeMapping[mensagemtype] || mensagemtype;
+    console.log(`🔄 [MESSAGE_TYPE] ${mensagemtype} -> ${mapped}`);
+    return mapped;
   };
 
   const loadMessages = async () => {
@@ -111,9 +124,9 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         read_at: row.read_at || new Date().toISOString(),
         tipo_remetente: row.tipo_remetente,
         nome_do_contato: row.nome_do_contato,
-        mensagemtype: mapMessageType(row.mensagemtype), // APLICAR MAPEAMENTO
+        mensagemtype: mapMessageType(row.mensagemtype), // APLICAR MAPEAMENTO CORRIGIDO
         media_base64: row.media_base64,
-        media_url: row.media_url // NOVA COLUNA
+        media_url: row.media_url // NOVA COLUNA COM PRIORIDADE
       }));
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
@@ -135,38 +148,57 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       loadMessages();
       const tableName = getTableName(channelId);
 
-      realtimeChannel = supabase
-        .channel(`public:${tableName}:${sessionId}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: tableName, filter: `session_id=eq.${sessionId}` },
-          (payload) => {
-            if (payload && payload.new) {
-              const novo = payload.new;
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === (novo.id?.toString() || ''))) return prev;
-                return [...prev, {
-                  id: novo.id?.toString() || '',
-                  session_id: novo.session_id || '',
-                  message: novo.message || '',
-                  read_at: novo.read_at || new Date().toISOString(),
-                  tipo_remetente: novo.tipo_remetente,
-                  nome_do_contato: novo.nome_do_contato,
-                  mensagemtype: mapMessageType(novo.mensagemtype), // APLICAR MAPEAMENTO
-                  media_base64: novo.media_base64,
-                  media_url: novo.media_url // NOVA COLUNA
-                }];
-              });
+      // CORRIGIDO: Melhor configuração de realtime com fallback
+      try {
+        realtimeChannel = supabase
+          .channel(`public:${tableName}:${sessionId}`)
+          .on(
+            'postgres_changes',
+            { 
+              event: 'INSERT', 
+              schema: 'public', 
+              table: tableName, 
+              filter: `session_id=eq.${sessionId}` 
+            },
+            (payload) => {
+              console.log(`📨 [SIMPLE_MESSAGES] Nova mensagem recebida via realtime:`, payload);
+              if (payload && payload.new) {
+                const novo = payload.new;
+                setMessages((prev) => {
+                  const exists = prev.some((m) => m.id === novo.id?.toString());
+                  if (exists) {
+                    console.log(`⚠️ [SIMPLE_MESSAGES] Mensagem já existe, ignorando:`, novo.id);
+                    return prev;
+                  }
+                  
+                  const newMessage = {
+                    id: novo.id?.toString() || '',
+                    session_id: novo.session_id || '',
+                    message: novo.message || '',
+                    read_at: novo.read_at || new Date().toISOString(),
+                    tipo_remetente: novo.tipo_remetente,
+                    nome_do_contato: novo.nome_do_contato,
+                    mensagemtype: mapMessageType(novo.mensagemtype), 
+                    media_base64: novo.media_base64,
+                    media_url: novo.media_url
+                  };
+                  
+                  console.log(`✅ [SIMPLE_MESSAGES] Adicionando nova mensagem:`, newMessage.id);
+                  return [...prev, newMessage];
+                });
+              }
             }
-          }
-        )
-        .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-            console.log(`✅ [SIMPLE_MESSAGES] Realtime subscription for ${tableName}:${sessionId} SUBSCRIBED`);
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error(`❌ [SIMPLE_MESSAGES] Realtime subscription error for ${tableName}:${sessionId}:`, err);
-          }
-        });
+          )
+          .subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+              console.log(`✅ [SIMPLE_MESSAGES] Realtime subscription for ${tableName}:${sessionId} SUBSCRIBED`);
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT')  {
+              console.error(`❌ [SIMPLE_MESSAGES] Realtime subscription error for ${tableName}:${sessionId}:`, err);
+            }
+          });
+      } catch (realtimeError) {
+        console.error(`❌ [SIMPLE_MESSAGES] Erro ao configurar realtime:`, realtimeError);
+      }
     } else {
       console.log('⏳ [SIMPLE_MESSAGES] Aguardando parâmetros necessários para carregar mensagens ou autenticação...');
       setMessages([]);

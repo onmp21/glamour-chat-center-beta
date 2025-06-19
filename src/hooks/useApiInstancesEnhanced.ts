@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,10 +54,10 @@ export const useApiInstancesEnhanced = () => {
       console.log('✅ [API_INSTANCES] Instâncias carregadas:', data?.length || 0);
       setInstances(data || []);
       
-      // CORRIGIDO: Resetar antes de buscar novas instâncias
+      // CORRIGIDO: Resetar sempre antes de buscar novas instâncias
       setEvolutionInstances([]);
       
-      // Buscar instâncias do Evolution API
+      // Buscar instâncias do Evolution API com melhor tratamento de erro
       if (data && data.length > 0) {
         await fetchEvolutionInstances(data);
       }
@@ -81,16 +82,23 @@ export const useApiInstancesEnhanced = () => {
       try {
         console.log(`📡 [EVOLUTION_INSTANCES] Verificando instâncias para: ${apiInstance.base_url}`);
         
+        // CORRIGIDO: Adicionar timeout e melhor tratamento de erro
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        
         const response = await fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
           method: 'GET',
           headers: {
             'apikey': apiInstance.api_key,
             'Content-Type': 'application/json'
-          }
+          },
+          signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${response.status} para ${apiInstance.base_url}`);
+          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${response.status} para ${apiInstance.base_url}: ${response.statusText}`);
           continue;
         }
 
@@ -99,22 +107,29 @@ export const useApiInstancesEnhanced = () => {
         
         if (Array.isArray(data)) {
           const formattedInstances = data.map((item: any) => ({
-            instanceName: item.instance?.instanceName || item.instanceName,
-            instanceId: item.instance?.instanceId || item.instanceId,
+            instanceName: item.instance?.instanceName || item.instanceName || 'Sem nome',
+            instanceId: item.instance?.instanceId || item.instanceId || '',
             owner: item.instance?.owner || item.owner,
             profileName: item.instance?.profileName || item.profileName,
             profilePictureUrl: item.instance?.profilePictureUrl || item.profilePictureUrl,
             profileStatus: item.instance?.profileStatus || item.profileStatus,
-            status: item.instance?.status || item.status,
+            status: item.instance?.status || item.status || 'unknown',
             serverUrl: item.instance?.serverUrl || apiInstance.base_url,
             apikey: item.instance?.apikey || apiInstance.api_key,
             apiInstanceId: apiInstance.id
           }));
           
           allEvolutionInstances.push(...formattedInstances);
+          console.log(`📊 [EVOLUTION_INSTANCES] ${formattedInstances.length} instâncias processadas de ${apiInstance.base_url}`);
+        } else {
+          console.log(`⚠️ [EVOLUTION_INSTANCES] Resposta não é um array de ${apiInstance.base_url}:`, typeof data);
         }
       } catch (error) {
-        console.error(`❌ [EVOLUTION_INSTANCES] Erro ao buscar instâncias de ${apiInstance.base_url}:`, error);
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.error(`⏱️ [EVOLUTION_INSTANCES] Timeout ao buscar instâncias de ${apiInstance.base_url}`);
+        } else {
+          console.error(`❌ [EVOLUTION_INSTANCES] Erro ao buscar instâncias de ${apiInstance.base_url}:`, error);
+        }
       }
     }
     
@@ -127,6 +142,7 @@ export const useApiInstancesEnhanced = () => {
     setCheckingStatus(instance.id);
     
     try {
+      // CORRIGIDO: Usar import dinâmico ao invés de require
       const { EvolutionApiService } = await import('@/services/EvolutionApiService');
       const service = new EvolutionApiService({
         baseUrl: instance.base_url,

@@ -31,36 +31,41 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages.length]);
 
-  // CORRIGIDO: Função melhorada para detectar mídia com prioridade para media_url
+  // CORRIGIDO: Função melhorada para detectar mídia com PRIORIDADE para media_url
   const isMediaMessage = (message: any) => {
-    // PRIORIDADE 1: media_url (link curto)
+    // PRIORIDADE 1: media_url (link direto - novo)
     if (message.media_url && message.media_url.trim() !== '') {
+      console.log(`🔗 [MEDIA_CHECK] Mídia detectada via media_url:`, message.media_url.substring(0, 50));
       return true;
     }
     
-    // PRIORIDADE 2: media_base64
+    // PRIORIDADE 2: media_base64 (base64 - antigo)
     if (message.media_base64 && message.media_base64.trim() !== '') {
+      console.log(`📱 [MEDIA_CHECK] Mídia detectada via media_base64:`, message.media_base64.substring(0, 50));
       return true;
     }
 
-    // PRIORIDADE 3: mensagemtype não texto
+    // PRIORIDADE 3: tipo de mensagem não texto
     if (message.mensagemtype && 
         !['text', 'conversation'].includes(message.mensagemtype)) {
+      console.log(`🎭 [MEDIA_CHECK] Mídia detectada via mensagemtype:`, message.mensagemtype);
       return true;
     }
 
     return false;
   };
 
-  // CORRIGIDO: Função para obter conteúdo da mídia com prioridade para media_url
+  // CORRIGIDO: Função para obter conteúdo da mídia com PRIORIDADE para media_url
   const getMediaContent = (message: any): string => {
-    // PRIORIDADE 1: media_url
+    // PRIORIDADE 1: media_url (mais confiável)
     if (message.media_url && message.media_url.trim() !== '') {
+      console.log(`🔗 [MEDIA_CONTENT] Usando media_url:`, message.media_url.substring(0, 50));
       return message.media_url;
     }
 
     // PRIORIDADE 2: media_base64
     if (message.media_base64 && message.media_base64.trim() !== '') {
+      console.log(`📱 [MEDIA_CONTENT] Usando media_base64:`, message.media_base64.substring(0, 50));
       return message.media_base64;
     }
 
@@ -68,9 +73,11 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     if (message.message && 
         (message.message.startsWith('data:') || 
          message.message.startsWith('http'))) {
+      console.log(`📄 [MEDIA_CONTENT] Usando message como fallback:`, message.message.substring(0, 50));
       return message.message;
     }
 
+    console.log(`❌ [MEDIA_CONTENT] Nenhum conteúdo de mídia encontrado`);
     return '';
   };
 

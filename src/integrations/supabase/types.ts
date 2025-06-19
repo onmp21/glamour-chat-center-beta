@@ -291,30 +291,27 @@ export type Database = {
         }
         Relationships: []
       }
-      contact_tags: {
+      contacts: {
         Row: {
-          applied_at: string | null
-          contact_phone: string
-          expires_at: string | null
+          contact_name: string
+          created_at: string
           id: string
-          is_active: boolean
-          tag_id: string | null
+          phone_number: string
+          updated_at: string
         }
         Insert: {
-          applied_at?: string | null
-          contact_phone: string
-          expires_at?: string | null
+          contact_name: string
+          created_at?: string
           id?: string
-          is_active?: boolean
-          tag_id?: string | null
+          phone_number: string
+          updated_at?: string
         }
         Update: {
-          applied_at?: string | null
-          contact_phone?: string
-          expires_at?: string | null
+          contact_name?: string
+          created_at?: string
           id?: string
-          is_active?: boolean
-          tag_id?: string | null
+          phone_number?: string
+          updated_at?: string
         }
         Relationships: []
       }
