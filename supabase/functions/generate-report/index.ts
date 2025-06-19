@@ -36,9 +36,15 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get request body
-    const { provider_id, report_type, action_type, data, custom_prompt } = await req.json()
+    const { provider_id, report_type, action_type, data, custom_prompt, selected_sheets, table_data } = await req.json()
 
-    console.log('📊 [GENERATE_REPORT] Request received:', { provider_id, report_type, action_type })
+    console.log('📊 [GENERATE_REPORT] Request received:', { 
+      provider_id, 
+      report_type, 
+      action_type, 
+      selected_sheets,
+      table_data_keys: table_data ? Object.keys(table_data) : 'none'
+    })
 
     // Validate required parameters
     if (!provider_id) {
@@ -76,7 +82,7 @@ serve(async (req) => {
       .eq('is_active', true)
       .single()
 
-    if (promptError) {
+    if (promptError && report_type !== 'custom') {
       console.warn('⚠️ [GENERATE_REPORT] Prompt not found for type:', promptType, promptError);
     }
 
@@ -113,11 +119,57 @@ serve(async (req) => {
       
       userMessage = `Analise a seguinte conversa e forneça um resumo detalhado:\n\nContato: ${data?.contact_name || 'N/A'}\nCanal: ${data?.channel_id || 'N/A'}\n\nConversa:\n${conversationText}`
     } else {
-      // For reports, use the existing format
-      userMessage = `Gere um relatório detalhado baseado nos dados fornecidos: ${JSON.stringify(data)}`
+      // For reports, use table data if available
+      if (table_data && Object.keys(table_data).length > 0) {
+        let dataDescription = '';
+        
+        for (const [tableName, records] of Object.entries(table_data)) {
+          const recordsArray = records as any[];
+          dataDescription += `\n\n=== DADOS DA TABELA: ${tableName.toUpperCase()} ===\n`;
+          dataDescription += `Total de registros: ${recordsArray.length}\n`;
+          
+          if (recordsArray.length > 0) {
+            // Mostrar estrutura dos dados
+            const sampleRecord = recordsArray[0];
+            dataDescription += `Campos disponíveis: ${Object.keys(sampleRecord).join(', ')}\n`;
+            
+            // Incluir alguns registros de exemplo
+            const samplesToShow = Math.min(5, recordsArray.length);
+            dataDescription += `\nPrimeiros ${samplesToShow} registros:\n`;
+            
+            for (let i = 0; i < samplesToShow; i++) {
+              const record = recordsArray[i];
+              dataDescription += `${i + 1}. `;
+              
+              if (tableName === 'exams') {
+                dataDescription += `Paciente: ${record.patient_name || 'N/A'} | `;
+                dataDescription += `Data: ${record.appointment_date || 'N/A'} | `;
+                dataDescription += `Cidade: ${record.city || 'N/A'} | `;
+                dataDescription += `Status: ${record.status || 'N/A'}`;
+              } else {
+                dataDescription += `Contato: ${record.nome_do_contato || 'N/A'} | `;
+                dataDescription += `Tipo: ${record.tipo_remetente || 'N/A'} | `;
+                dataDescription += `Mensagem: ${(record.message || '').substring(0, 100)}${record.message && record.message.length > 100 ? '...' : ''}`;
+              }
+              dataDescription += '\n';
+            }
+          }
+        }
+        
+        if (report_type === 'custom') {
+          userMessage = `${systemPrompt}\n\nDados disponíveis para análise:${dataDescription}`;
+          // Para custom, usar o prompt personalizado como system prompt
+          systemPrompt = 'Você é um assistente especializado em análise de dados. Analise os dados fornecidos conforme solicitado.';
+        } else {
+          userMessage = `Gere um relatório detalhado baseado nos dados fornecidos:${dataDescription}`;
+        }
+      } else {
+        // Fallback para quando não há dados de tabela
+        userMessage = custom_prompt || `Gere um relatório do tipo ${report_type}`;
+      }
     }
 
-    console.log('🤖 [GENERATE_REPORT] Calling OpenAI with model:', provider.default_model || 'gpt-3.5-turbo');
+    console.log('🤖 [GENERATE_REPORT] Calling OpenAI with model:', provider.default_model || 'gpt-4o-mini');
 
     // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -127,12 +179,12 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: provider.default_model || 'gpt-3.5-turbo',
+        model: provider.default_model || 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        max_tokens: 1000,
+        max_tokens: 2000,
         temperature: 0.7,
       }),
     })
@@ -155,10 +207,17 @@ serve(async (req) => {
         report_type,
         generated_report: generatedContent,
         provider_id,
-        model_used: provider.default_model || 'gpt-3.5-turbo',
+        model_used: provider.default_model || 'gpt-4o-mini',
         tokens_used: aiResult.usage?.total_tokens || 0,
         prompt: systemPrompt,
-        report_metadata: data
+        report_metadata: {
+          selected_sheets: selected_sheets || [],
+          table_data_summary: table_data ? Object.keys(table_data).map(table => ({
+            table,
+            count: table_data[table]?.length || 0
+          })) : [],
+          custom_prompt: custom_prompt || null
+        }
       })
       
       if (saveError) {
@@ -175,7 +234,7 @@ serve(async (req) => {
         content: generatedContent,
         tokens_used: aiResult.usage?.total_tokens || 0,
         prompt_type_used: promptType,
-        prompt_name: promptData?.name || 'Prompt padrão'
+        prompt_name: promptData?.name || 'Prompt personalizado'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

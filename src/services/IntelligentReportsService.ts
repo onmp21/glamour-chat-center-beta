@@ -80,10 +80,16 @@ export class IntelligentReportsService {
         console.log(`✅ [INTELLIGENT_REPORTS] ${data?.length || 0} registros encontrados em ${tableName}`);
       }
       
+      // Verificar se há pelo menos uma conversa nos dados
+      const totalRecords = Object.values(allData).reduce((sum, records) => sum + records.length, 0);
+      if (totalRecords === 0 && selectedSheets.length > 0) {
+        throw new Error('Nenhum dado encontrado nas tabelas selecionadas. Certifique-se de que há pelo menos uma conversa ou registro.');
+      }
+      
       return allData;
     } catch (error) {
       console.error('❌ [INTELLIGENT_REPORTS] Erro ao buscar dados:', error);
-      return {};
+      throw error;
     }
   }
 
@@ -103,81 +109,63 @@ export class IntelligentReportsService {
         return { success: false, error: 'Provedor de IA não encontrado' };
       }
 
-      // Construir prompt baseado no tipo de relatório
-      let prompt = '';
-      if (request.report_type === 'conversations') {
-        prompt = `Analise as conversas fornecidas e gere um relatório detalhado com insights sobre:
-- Volume de mensagens
-- Padrões de comunicação
-- Tipos de conteúdo mais frequentes
-- Tendências temporais
-- Recomendações de melhoria
-
-Dados das conversas: ${JSON.stringify(reportData, null, 2)}`;
-      } else if (request.report_type === 'exams') {
-        prompt = `Analise os dados de exames fornecidos e gere um relatório com:
-- Estatísticas de agendamentos
-- Distribuição por cidade
-- Análise temporal
-- Status dos exames
-- Insights e recomendações
-
-Dados dos exames: ${JSON.stringify(reportData, null, 2)}`;
-      } else if (request.report_type === 'custom') {
-        prompt = request.custom_prompt || 'Gere um relatório com base nos dados fornecidos.';
-        if (Object.keys(reportData).length > 0) {
-          prompt += `\n\nDados disponíveis: ${JSON.stringify(reportData, null, 2)}`;
-        }
-      }
-
       const startTime = Date.now();
 
-      // Fazer chamada para IA
-      const response = await fetch('/api/ai/generate-report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider_id: request.provider_id,
-          prompt: prompt
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return { success: false, error: `Erro na API: ${errorText}` };
-      }
-
-      const aiResult = await response.json();
-      const generationTime = (Date.now() - startTime) / 1000;
-
-      // Salvar no histórico
-      const { data: savedReport, error: saveError } = await supabase
-        .from('report_history')
-        .insert({
+      // Fazer chamada para a edge function com dados reais
+      const { data: aiResult, error } = await supabase.functions.invoke('generate-report', {
+        body: {
           provider_id: request.provider_id,
           report_type: request.report_type,
-          prompt: prompt,
-          generated_report: aiResult.content,
-          model_used: aiResult.model || provider.default_model,
-          tokens_used: aiResult.tokens || 0,
-          generation_time: generationTime,
-          report_metadata: {
-            selected_sheets: request.selected_sheets,
-            data_summary: Object.keys(reportData).map(table => ({
-              table,
-              count: reportData[table]?.length || 0
-            }))
-          }
-        })
-        .select()
-        .single();
+          custom_prompt: request.custom_prompt,
+          selected_sheets: request.selected_sheets || [],
+          table_data: reportData // Enviando dados reais das tabelas
+        }
+      });
 
-      if (saveError) {
-        console.error('❌ [INTELLIGENT_REPORTS] Erro ao salvar relatório:', saveError);
-        return { success: false, error: 'Erro ao salvar relatório' };
+      if (error) {
+        console.error('❌ [INTELLIGENT_REPORTS] Erro na edge function:', error);
+        return { success: false, error: `Erro na API: ${error.message}` };
       }
+
+      if (!aiResult || !aiResult.success) {
+        return { success: false, error: aiResult?.error || 'Erro desconhecido na geração do relatório' };
+      }
+
+      const generationTime = (Date.now() - startTime) / 1000;
+
+      // Buscar o relatório salvo no histórico (a edge function já salva automaticamente)
+      const { data: savedReports, error: fetchError } = await supabase
+        .from('report_history')
+        .select('*')
+        .eq('provider_id', request.provider_id)
+        .eq('report_type', request.report_type)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (fetchError || !savedReports || savedReports.length === 0) {
+        console.error('❌ [INTELLIGENT_REPORTS] Erro ao buscar relatório salvo:', fetchError);
+        // Criar resultado sem ID se não conseguir buscar do histórico
+        return {
+          success: true,
+          result: {
+            id: 'temp-' + Date.now(),
+            title: `Relatório ${request.report_type}`,
+            content: aiResult.report,
+            provider_id: request.provider_id,
+            report_content: aiResult.report,
+            generated_report: aiResult.report,
+            model_used: aiResult.model_used || provider.default_model,
+            tokens_used: aiResult.tokens_used || 0,
+            generation_time: generationTime,
+            created_at: new Date().toISOString(),
+            generated_at: new Date().toISOString(),
+            report_type: request.report_type,
+            status: 'completed'
+          }
+        };
+      }
+
+      const savedReport = savedReports[0];
 
       console.log('✅ [INTELLIGENT_REPORTS] Relatório gerado com sucesso:', savedReport.id);
       

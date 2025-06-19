@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileText, Zap, Trash2 } from 'lucide-react';
+import { FileText, Zap, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AIProvider } from '@/types/ai-providers';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +53,8 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
   channelsLoading
 }) => {
 
+  const [loadingStep, setLoadingStep] = React.useState<string>('');
+
   const handleSheetToggle = (sheetId: string, checked: boolean) => {
     const currentSheets = filters.selected_sheets || [];
     if (checked) {
@@ -65,6 +67,37 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         ...filters,
         selected_sheets: currentSheets.filter((id: string) => id !== sheetId)
       });
+    }
+  };
+
+  // Função para buscar dados reais das tabelas selecionadas
+  const fetchTableData = async (tableName: string) => {
+    console.log(`🔍 [REPORT_GENERATOR] Buscando dados da tabela: ${tableName}`);
+    
+    try {
+      if (tableName === 'exams') {
+        const { data, error } = await supabase
+          .from('exams')
+          .select('*')
+          .limit(50)
+          .order('appointment_date', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
+      } else {
+        // Tabelas de conversas
+        const { data, error } = await (supabase as any)
+          .from(tableName)
+          .select('session_id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+          .limit(100)
+          .order('read_at', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
+      }
+    } catch (error) {
+      console.error(`❌ [REPORT_GENERATOR] Erro ao buscar dados de ${tableName}:`, error);
+      return [];
     }
   };
 
@@ -91,14 +124,56 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         return;
       }
 
-      console.log('✅ [REPORT_GENERATOR] Validações passaram, chamando edge function...');
+      // Para relatórios que não são custom, validar seleção de tabelas
+      if (filters.report_type !== 'custom' && (!filters.selected_sheets || filters.selected_sheets.length === 0)) {
+        toast({
+          title: "Erro",
+          description: "Selecione pelo menos uma tabela para análise",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setLoadingStep('Buscando dados das tabelas...');
+
+      // Buscar dados das tabelas selecionadas
+      let tableData: Record<string, any[]> = {};
+      
+      if (filters.selected_sheets && filters.selected_sheets.length > 0) {
+        for (const tableName of filters.selected_sheets) {
+          console.log(`📊 [REPORT_GENERATOR] Processando tabela: ${tableName}`);
+          const data = await fetchTableData(tableName);
+          tableData[tableName] = data;
+          
+          // Validar se há dados suficientes
+          if (data.length === 0) {
+            console.warn(`⚠️ [REPORT_GENERATOR] Tabela ${tableName} não possui dados`);
+          }
+        }
+
+        // Verificar se pelo menos uma tabela tem dados
+        const totalRecords = Object.values(tableData).reduce((sum, records) => sum + records.length, 0);
+        if (totalRecords === 0) {
+          toast({
+            title: "Aviso",
+            description: "As tabelas selecionadas não possuem dados para análise",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      setLoadingStep('Gerando relatório com IA...');
+
+      console.log('✅ [REPORT_GENERATOR] Dados coletados, chamando edge function...');
 
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,
           report_type: filters.report_type,
           custom_prompt: filters.custom_prompt,
-          selected_sheets: filters.selected_sheets || []
+          selected_sheets: filters.selected_sheets || [],
+          table_data: tableData // Enviando dados reais das tabelas
         }
       });
 
@@ -135,6 +210,8 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         description: "Erro ao gerar relatório. Tente novamente.",
         variant: "destructive"
       });
+    } finally {
+      setLoadingStep('');
     }
   };
 
@@ -189,47 +266,45 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
           </Select>
         </div>
 
-        {/* Seleção de Planilhas */}
-        {(filters.report_type === 'conversations' || filters.report_type === 'exams') && (
-          <div className="space-y-3">
-            <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
-              Selecionar Planilhas
-            </Label>
-            <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
-              {availableSheets
-                .filter(sheet => 
-                  filters.report_type === 'exams' ? sheet.id === 'exams' : sheet.id !== 'exams'
-                )
-                .map((sheet) => (
-                <div key={sheet.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border">
-                  <Checkbox
-                    id={sheet.id}
-                    checked={filters.selected_sheets?.includes(sheet.id) || false}
-                    onCheckedChange={(checked) => handleSheetToggle(sheet.id, checked as boolean)}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <Label 
-                      htmlFor={sheet.id} 
-                      className={cn(
-                        "text-sm font-medium cursor-pointer",
-                        isDarkMode ? "text-card-foreground" : "text-gray-900"
-                      )}
-                    >
-                      {sheet.name}
-                    </Label>
-                    <p className={cn(
-                      "text-xs mt-1",
-                      isDarkMode ? "text-muted-foreground" : "text-gray-500"
-                    )}>
-                      {sheet.description}
-                    </p>
-                  </div>
+        {/* Seleção de Planilhas - Agora também para custom */}
+        <div className="space-y-3">
+          <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
+            Selecionar Tabelas {filters.report_type === 'custom' ? '(Opcional)' : ''}
+          </Label>
+          <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
+            {availableSheets
+              .filter(sheet => 
+                filters.report_type === 'exams' ? sheet.id === 'exams' : sheet.id !== 'exams'
+              )
+              .map((sheet) => (
+              <div key={sheet.id} className="flex items-start space-x-3 p-3 rounded-lg border border-border">
+                <Checkbox
+                  id={sheet.id}
+                  checked={filters.selected_sheets?.includes(sheet.id) || false}
+                  onCheckedChange={(checked) => handleSheetToggle(sheet.id, checked as boolean)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <Label 
+                    htmlFor={sheet.id} 
+                    className={cn(
+                      "text-sm font-medium cursor-pointer",
+                      isDarkMode ? "text-card-foreground" : "text-gray-900"
+                    )}
+                  >
+                    {sheet.name}
+                  </Label>
+                  <p className={cn(
+                    "text-xs mt-1",
+                    isDarkMode ? "text-muted-foreground" : "text-gray-500"
+                  )}>
+                    {sheet.description}
+                  </p>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Prompt Personalizado */}
         {filters.report_type === 'custom' && (
@@ -249,6 +324,22 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
           </div>
         )}
 
+        {/* Indicador de Loading */}
+        {loadingStep && (
+          <div className={cn(
+            "flex items-center gap-2 p-3 rounded-lg",
+            isDarkMode ? "bg-muted" : "bg-gray-100"
+          )}>
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className={cn(
+              "text-sm",
+              isDarkMode ? "text-muted-foreground" : "text-gray-600"
+            )}>
+              {loadingStep}
+            </span>
+          </div>
+        )}
+
         {/* Botões de Ação */}
         <div className="flex gap-3 pt-4">
           <Button
@@ -258,8 +349,8 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
           >
             {isGenerating ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Gerando...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {loadingStep || 'Gerando...'}
               </>
             ) : (
               <>
