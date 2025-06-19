@@ -8,17 +8,21 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   const [isConnected, setIsConnected] = useState(false);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const subscriptionManagerRef = useRef<RealtimeSubscriptionManager | null>(null);
+  const isSetupRef = useRef(false);
 
   useEffect(() => {
-    if (!channelId || !onNewMessage) {
-      setIsConnected(false);
+    if (!channelId || !onNewMessage || isSetupRef.current) {
       return;
     }
 
     const tableName = getTableNameForChannelSync(channelId);
+    if (!tableName) {
+      console.warn(`[CONVERSATION_REALTIME] No table mapping found for channel: ${channelId}`);
+      return;
+    }
+
     tableNameRef.current = tableName;
-    subscriptionManagerRef.current = RealtimeSubscriptionManager.getInstance();
+    isSetupRef.current = true;
 
     const callback = (payload: any) => {
       console.log('🔴 [CONVERSATION_REALTIME] New realtime message:', payload);
@@ -31,9 +35,8 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
 
     const setupSubscription = async () => {
       try {
-        if (!subscriptionManagerRef.current) return;
-        
-        const channel = await subscriptionManagerRef.current.createSubscription(tableName, callback);
+        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        const channel = await subscriptionManager.createSubscription(tableName, callback);
 
         if (channel) {
           setIsConnected(true);
@@ -48,15 +51,17 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
     setupSubscription();
 
     return () => {
-      if (tableNameRef.current && callbackRef.current && subscriptionManagerRef.current) {
+      if (tableNameRef.current && callbackRef.current) {
         console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription for table ${tableNameRef.current}`);
         try {
-          subscriptionManagerRef.current.removeSubscription(tableNameRef.current, callbackRef.current);
+          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_REALTIME] Error cleaning up subscription:', error);
         }
         setIsConnected(false);
       }
+      isSetupRef.current = false;
     };
   }, [channelId, onNewMessage]);
 

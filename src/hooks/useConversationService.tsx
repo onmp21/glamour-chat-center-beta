@@ -12,7 +12,7 @@ export const useConversationService = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const subscriptionManagerRef = useRef<RealtimeSubscriptionManager | null>(null);
+  const isSetupRef = useRef(false);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -76,46 +76,55 @@ export const useConversationService = (channelId: string) => {
 
   useEffect(() => {
     loadConversations();
+  }, [channelId]);
 
-    // Setup realtime subscription only if we have a valid channelId
-    if (channelId) {
-      const tableName = getTableNameForChannelSync(channelId);
-      tableNameRef.current = tableName;
-      subscriptionManagerRef.current = RealtimeSubscriptionManager.getInstance();
-      
-      const callback = (payload: any) => {
-        console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-        // Refresh conversations when new message arrives
-        setTimeout(() => {
-          refreshConversations();
-        }, 1000);
-      };
-
-      callbackRef.current = callback;
-
-      const setupSubscription = async () => {
-        try {
-          if (!subscriptionManagerRef.current) return;
-          
-          await subscriptionManagerRef.current.createSubscription(tableName, callback);
-          console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName}`);
-        } catch (error) {
-          console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
-        }
-      };
-
-      setupSubscription();
+  useEffect(() => {
+    if (!channelId || isSetupRef.current) {
+      return;
     }
 
+    const tableName = getTableNameForChannelSync(channelId);
+    if (!tableName) {
+      console.warn(`[CONVERSATION_SERVICE_HOOK] No table mapping found for channel: ${channelId}`);
+      return;
+    }
+
+    tableNameRef.current = tableName;
+    isSetupRef.current = true;
+    
+    const callback = (payload: any) => {
+      console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
+      // Refresh conversations when new message arrives
+      setTimeout(() => {
+        refreshConversations();
+      }, 1000);
+    };
+
+    callbackRef.current = callback;
+
+    const setupSubscription = async () => {
+      try {
+        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        await subscriptionManager.createSubscription(tableName, callback);
+        console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName}`);
+      } catch (error) {
+        console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
+      }
+    };
+
+    setupSubscription();
+
     return () => {
-      if (tableNameRef.current && callbackRef.current && subscriptionManagerRef.current) {
+      if (tableNameRef.current && callbackRef.current) {
         console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from table ${tableNameRef.current}`);
         try {
-          subscriptionManagerRef.current.removeSubscription(tableNameRef.current, callbackRef.current);
+          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_SERVICE_HOOK] Error cleaning up subscription:', error);
         }
       }
+      isSetupRef.current = false;
     };
   }, [channelId]);
 
