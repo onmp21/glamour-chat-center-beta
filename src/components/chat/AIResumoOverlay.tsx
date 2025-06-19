@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,10 +30,11 @@ const MINIMUM_MESSAGES_FOR_SUMMARY = 4; // Número mínimo de mensagens para per
 interface MessageData {
   id: string;
   message: string;
-  nome_do_contato?: string;
-  tipo_remetente?: string;
-  read_at?: string;
-  mensagemtype?: string;
+  nome_do_contato?: string | null;
+  tipo_remetente?: string | null;
+  read_at?: string | null;
+  mensagemtype?: string | null;
+  session_id?: string;
 }
 
 export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
@@ -82,7 +81,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
       
       const { data, error: queryError } = await supabase
         .from(tableName as any)
-        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype, session_id')
         .eq('session_id', conversationId)
         .order('read_at', { ascending: true })
         .limit(100);
@@ -94,8 +93,8 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
 
       console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
       
-      // Type guard to ensure data is an array of MessageData
-      if (!data || !Array.isArray(data)) {
+      // Verificar se há dados válidos
+      if (!data || !Array.isArray(data) || data.length === 0) {
         setInternalError('Não há mensagens nesta conversa para resumir.');
         return [];
       }
@@ -107,7 +106,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
       }
 
       // Filtrar mensagens muito curtas ou vazias para uma contagem mais precisa
-      const meaningfulMessages = data.filter((msg: MessageData) => 
+      const meaningfulMessages = data.filter((msg: any) => 
         msg.message && 
         typeof msg.message === 'string' &&
         msg.message.trim().length > 10 && // Mensagens com pelo menos 10 caracteres
@@ -119,7 +118,18 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
         return [];
       }
 
-      return data as MessageData[];
+      // Mapear para o tipo MessageData
+      const typedMessages: MessageData[] = data.map((item: any) => ({
+        id: String(item.id),
+        message: item.message || '',
+        nome_do_contato: item.nome_do_contato,
+        tipo_remetente: item.tipo_remetente,
+        read_at: item.read_at,
+        mensagemtype: item.mensagemtype,
+        session_id: item.session_id
+      }));
+
+      return typedMessages;
 
     } catch (error) {
       console.error('❌ [AI_RESUMO] Error loading conversation messages:', error);
@@ -347,4 +357,3 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     </Dialog>
   );
 };
-
