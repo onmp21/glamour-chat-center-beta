@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,6 +10,7 @@ import { ReportGenerator } from './ReportGenerator';
 import { ReportDisplay } from './ReportDisplay';
 import { ReportHistory as ReportHistoryComponent } from './ReportHistory';
 import { useActiveChannels } from '@/hooks/useActiveChannels';
+import { ChatGPTService } from '@/services/ChatGPTService';
 
 interface ReportDashboardEnhancedProps {
   isDarkMode: boolean;
@@ -37,32 +37,27 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
   });
   const { channels: availableChannels, loading: channelsLoading } = useActiveChannels();
 
-  // Função utilitária para formatar segundos em mm:ss
   function formatSeconds(seconds: number): string {
     if (!seconds || isNaN(seconds)) return "0s";
     return `${Math.round(seconds)}s`;
   }
 
-  // CORRIGIDO: Usar import dinâmico e type assertion para resolver erro TypeScript
   async function fetchReportData(report_type: string, channel_id?: string) {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
       if (report_type === 'conversations' && channel_id) {
-        // CORRIGIDO: Usar type assertion para resolver erro do Supabase
         const { getTableNameForChannel } = await import('@/utils/channelMapping');
         const tableName = getTableNameForChannel(channel_id);
         
-        // Type assertion para resolver o erro do TypeScript
         const { data } = await (supabase as any)
           .from(tableName)
-          .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
+          .select('session_id, message, nome_do_contato, tipo_remetente, read_at, media_url')
           .limit(30)
           .order('read_at', { ascending: false });
         return data || [];
       }
       if (report_type === 'exams') {
-        // Buscar até 30 exames
         const { data } = await supabase
           .from('exams')
           .select('*')
@@ -70,7 +65,7 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
           .order('appointment_date', { ascending: false });
         return data || [];
       }
-      return {}; // Para custom, retorna vazio
+      return {};
     } catch (error) {
       console.error('❌ [REPORT_DATA] Erro ao buscar dados:', error);
       return {};
@@ -106,7 +101,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       const reports = await IntelligentReportsService.getReports();
       setRecentReports(reports);
       
-      // Calculate stats
       const total = reports.length;
       const thisMonth = reports.filter(report => {
         const reportDate = new Date(report.created_at);
@@ -142,12 +136,29 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
     setReportResult(null);
 
     try {
-      // CORRIGIDO: Busca dados REAIS conforme tipo do relatório usando import dinâmico
+      const startTime = Date.now();
+      
+      // Buscar dados conforme tipo do relatório
       let reportData: any = {};
       if (filters.report_type === "conversations" || filters.report_type === "exams") {
         reportData = await fetchReportData(filters.report_type, filters.channel_id);
       }
       
+      // Gerar relatório usando ChatGPTService diretamente
+      const provider = providers.find(p => String(p.id) === selectedProvider);
+      if (!provider) {
+        throw new Error('Provedor não encontrado');
+      }
+
+      const prompt = filters.custom_prompt || 
+        `Gere um relatório detalhado baseado nos seguintes dados de ${filters.report_type}: ${JSON.stringify(reportData)}`;
+
+      const generatedReport = await ChatGPTService.generateCompletion(prompt, provider.api_key);
+      
+      const endTime = Date.now();
+      const generationTime = (endTime - startTime) / 1000;
+
+      // Salvar relatório no banco
       const result = await IntelligentReportsService.generateReport({
         provider_id: selectedProvider,
         report_type: filters.report_type,
@@ -156,26 +167,22 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
         selected_sheets: filters.selected_sheets
       });
 
-      if (!result.success || !result.result) {
-        setError(result.error || 'Erro desconhecido na geração do relatório');
-        setReportResult(null);
+      if (result.success && result.result) {
+        // Atualizar com o conteúdo gerado
+        const updatedResult = {
+          ...result.result,
+          generated_report: generatedReport,
+          generation_time: generationTime
+        };
+        
+        setReportResult(updatedResult);
+        toast({
+          title: "Sucesso",
+          description: "Relatório gerado com sucesso",
+        });
+        loadRecentReports();
       } else {
-        // Exibe mensagem customizada se houver erro no conteúdo do relatório
-        if (
-          result.result.generated_report?.includes("Erro: Nenhum provedor de IA configurado")
-          || result.result.generated_report?.includes("chave de API")
-          || result.result.generated_report?.toLowerCase().startsWith("falha ao gerar relatório")
-        ) {
-          setError(result.result.generated_report);
-          setReportResult(null);
-        } else {
-          setReportResult(result.result);
-          toast({
-            title: "Sucesso",
-            description: "Relatório gerado com sucesso",
-          });
-          loadRecentReports();
-        }
+        throw new Error(result.error || 'Erro na geração do relatório');
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro desconhecido');
@@ -268,7 +275,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
       {/* Main Content */}
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Generator e Display juntos */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ReportGenerator
               isDarkMode={isDarkMode}
@@ -291,7 +297,6 @@ export const ReportDashboardEnhanced: React.FC<ReportDashboardEnhancedProps> = (
               onDownloadReport={downloadReport}
             />
           </div>
-          {/* Relatórios Recentes fora do card, com margem em cima */}
           <div className="mt-10">
             <ReportHistoryComponent
               isDarkMode={isDarkMode}

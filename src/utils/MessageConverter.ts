@@ -9,12 +9,12 @@ export class MessageConverter {
     const phone = PhoneExtractor.extractPhoneFromSessionId(rawMessage.session_id);
     const messageType = MessageTypeMapper.mapMessageType(rawMessage.mensagemtype);
     
-    // Usar media_base64 se existir para conteúdo de mídia, senão usar message
-    const content = rawMessage.media_base64 || rawMessage.message;
+    // Usar media_url se existir, senão usar message
+    const content = rawMessage.media_url || rawMessage.message;
     
     console.log('🔄 [MESSAGE_CONVERTER] Converting raw message:', {
       id: rawMessage.id,
-      hasMediaBase64: !!rawMessage.media_base64,
+      hasMediaUrl: !!rawMessage.media_url,
       messageType,
       contentLength: content.length,
       originalMessageLength: rawMessage.message.length,
@@ -25,7 +25,6 @@ export class MessageConverter {
                    rawMessage.tipo_remetente === 'Yelena-ai' ||
                    rawMessage.tipo_remetente === 'Andressa-ai';
 
-    // CORRIGIDO: Usar versão síncrona do ContactNameResolver
     const contactName = isAgent 
       ? 'Atendente'
       : ContactNameResolver.resolveContactNameSync(
@@ -46,7 +45,8 @@ export class MessageConverter {
       mensagemtype: messageType,
       Nome_do_contato: contactName,
       nome_do_contato: rawMessage.nome_do_contato,
-      contactName: contactName
+      contactName: contactName,
+      mediaUrl: rawMessage.media_url
     };
   }
 
