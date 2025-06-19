@@ -194,22 +194,24 @@ export const SettingsGrid: React.FC<SettingsGridProps> = ({
         ))}
       </div>
 
-      {/* Compact Action cards (appearance and logout) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-        <ActionCard
-          title="Aparência"
-          description={`Alternar para modo ${isDarkMode ? 'claro' : 'escuro'}`}
-          icon={isDarkMode ? Sun : Moon}
-          onClick={toggleDarkMode}
-          isDarkMode={isDarkMode}
-        />
-        <ActionCard
-          title="Sair da Conta"
-          description="Encerre sua sessão atual"
-          icon={LogOut}
-          onClick={handleLogout}
-          isDarkMode={isDarkMode}
-        />
+      {/* Compact Action cards (appearance and logout) - Centralized */}
+      <div className="flex justify-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
+          <ActionCard
+            title="Aparência"
+            description={`Alternar para modo ${isDarkMode ? 'claro' : 'escuro'}`}
+            icon={isDarkMode ? Sun : Moon}
+            onClick={toggleDarkMode}
+            isDarkMode={isDarkMode}
+          />
+          <ActionCard
+            title="Sair da Conta"
+            description="Encerre sua sessão atual"
+            icon={LogOut}
+            onClick={handleLogout}
+            isDarkMode={isDarkMode}
+          />
+        </div>
       </div>
     </div>
   );
