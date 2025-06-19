@@ -31,21 +31,15 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages.length]);
 
-  // CORRIGIDO: Função melhorada para detectar mídia com PRIORIDADE para media_url
+  // CORRIGIDO: Função melhorada para detectar mídia usando APENAS media_url
   const isMediaMessage = (message: any) => {
-    // PRIORIDADE 1: media_url (link direto - novo)
+    // PRIORIDADE: media_url (link direto)
     if (message.media_url && message.media_url.trim() !== '') {
       console.log(`🔗 [MEDIA_CHECK] Mídia detectada via media_url:`, message.media_url.substring(0, 50));
       return true;
     }
-    
-    // PRIORIDADE 2: media_base64 (base64 - antigo)
-    if (message.media_base64 && message.media_base64.trim() !== '') {
-      console.log(`📱 [MEDIA_CHECK] Mídia detectada via media_base64:`, message.media_base64.substring(0, 50));
-      return true;
-    }
 
-    // PRIORIDADE 3: tipo de mensagem não texto
+    // PRIORIDADE 2: tipo de mensagem não texto
     if (message.mensagemtype && 
         !['text', 'conversation'].includes(message.mensagemtype)) {
       console.log(`🎭 [MEDIA_CHECK] Mídia detectada via mensagemtype:`, message.mensagemtype);
@@ -55,18 +49,12 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     return false;
   };
 
-  // CORRIGIDO: Função para obter conteúdo da mídia com PRIORIDADE para media_url
+  // CORRIGIDO: Função para obter conteúdo da mídia usando APENAS media_url
   const getMediaContent = (message: any): string => {
-    // PRIORIDADE 1: media_url (mais confiável)
+    // PRIORIDADE: media_url (mais confiável)
     if (message.media_url && message.media_url.trim() !== '') {
       console.log(`🔗 [MEDIA_CONTENT] Usando media_url:`, message.media_url.substring(0, 50));
       return message.media_url;
-    }
-
-    // PRIORIDADE 2: media_base64
-    if (message.media_base64 && message.media_base64.trim() !== '') {
-      console.log(`📱 [MEDIA_CONTENT] Usando media_base64:`, message.media_base64.substring(0, 50));
-      return message.media_base64;
     }
 
     // FALLBACK: message se parecer mídia

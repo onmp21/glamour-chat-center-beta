@@ -11,7 +11,6 @@ interface SimpleMessage {
   tipo_remetente?: string;
   nome_do_contato?: string;
   mensagemtype?: string;
-  media_base64?: string;
   media_url?: string;
 }
 
@@ -99,9 +98,10 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_MESSAGES] Iniciando query na tabela: ${tableName}, sessão: ${sessionId}, usuário: ${user?.name}`);
 
+      // CORRIGIDO: Removido media_base64 da query, mantendo apenas media_url
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
-        .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_base64, media_url")
+        .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_url")
         .eq("session_id", sessionId)
         .order("read_at", { ascending: true });
 
@@ -125,8 +125,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         tipo_remetente: row.tipo_remetente,
         nome_do_contato: row.nome_do_contato,
         mensagemtype: mapMessageType(row.mensagemtype), // APLICAR MAPEAMENTO CORRIGIDO
-        media_base64: row.media_base64,
-        media_url: row.media_url // NOVA COLUNA COM PRIORIDADE
+        media_url: row.media_url // APENAS media_url, sem media_base64
       }));
 
       console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
@@ -179,8 +178,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
                     tipo_remetente: novo.tipo_remetente,
                     nome_do_contato: novo.nome_do_contato,
                     mensagemtype: mapMessageType(novo.mensagemtype), 
-                    media_base64: novo.media_base64,
-                    media_url: novo.media_url
+                    media_url: novo.media_url // APENAS media_url
                   };
                   
                   console.log(`✅ [SIMPLE_MESSAGES] Adicionando nova mensagem:`, newMessage.id);
