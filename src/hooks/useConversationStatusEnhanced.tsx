@@ -30,7 +30,7 @@ export const useConversationStatusEnhanced = () => {
         return {
           status: parsed.status || 'unread',
           lastActivity: parsed.lastActivity || new Date().toISOString(),
-          lastViewed: parsed.lastViewed || new Date().toISOIS(),
+          lastViewed: parsed.lastViewed || new Date().toISOString(),
           lastMessageTime: parsed.lastMessageTime,
           autoResolvedAt: parsed.autoResolvedAt
         };
