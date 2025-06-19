@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, Filter, CalendarDays, CheckSquare, Plus, Trash2, Edit, Calendar } from 'lucide-react';
 import { useExams, Exam } from '@/hooks/useExams';
 import { ExamModal } from './ExamModal';
+import { EditExamModal } from './EditExamModal';
 import { toast } from '@/hooks/use-toast';
 
 interface ExamesTableProps {
@@ -22,6 +24,8 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({
   const {
     exams,
     loading,
+    createExam,
+    updateExam,
     deleteExam,
     deleteMultipleExams
   } = useExams();
@@ -105,8 +109,59 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({
     setShowAddModal(true);
   };
 
+  const handleAddExamSubmit = async (examData: {
+    name: string;
+    phone: string;
+    instagram?: string;
+    city: string;
+    appointmentDate: string;
+  }) => {
+    try {
+      await createExam({
+        ...examData,
+        status: 'agendado',
+        examType: 'Exame de Vista',
+        observations: null
+      });
+      toast({
+        title: "Exame criado",
+        description: "Exame adicionado com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao criar exame:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao criar exame.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleEdit = (exam: Exam) => {
     setEditingExam(exam);
+  };
+
+  const handleEditExamSubmit = async (examId: string, examData: {
+    name: string;
+    phone: string;
+    instagram?: string;
+    city: string;
+    appointmentDate: string;
+  }) => {
+    try {
+      await updateExam(examId, examData);
+      toast({
+        title: "Exame atualizado",
+        description: "Exame editado com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar exame:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar exame.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleMultiSelect = () => {
@@ -296,14 +351,16 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({
         <ExamModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
+          onSubmit={handleAddExamSubmit}
           isDarkMode={isDarkMode}
         />
       )}
 
       {editingExam && (
-        <ExamModal
+        <EditExamModal
           isOpen={!!editingExam}
           onClose={() => setEditingExam(null)}
+          onSubmit={handleEditExamSubmit}
           exam={editingExam}
           isDarkMode={isDarkMode}
         />
