@@ -60,13 +60,18 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations(true);
   }, [channelId, loadConversations]);
 
-  // Memoizar o callback do realtime
+  // Callback memoizado do realtime com debounce
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-    // Recarregar conversas para refletir as novas mensagens
-    loadConversations();
+    
+    // Debounce para evitar muitas atualizações
+    setTimeout(() => {
+      if (mountedRef.current) {
+        loadConversations();
+      }
+    }, 300);
   }, [loadConversations]);
 
   useEffect(() => {

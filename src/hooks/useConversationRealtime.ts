@@ -10,7 +10,7 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   const tableNameRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
-  // Memoizar o callback para evitar recriações desnecessárias
+  // Callback memoizado para evitar recriações desnecessárias
   const stableCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
@@ -43,9 +43,9 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        const channel = await subscriptionManager.createSubscription(tableName, stableCallback);
+        await subscriptionManager.createSubscription(tableName, stableCallback);
 
-        if (channel && mountedRef.current) {
+        if (mountedRef.current) {
           setIsConnected(true);
           console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName}`);
         }

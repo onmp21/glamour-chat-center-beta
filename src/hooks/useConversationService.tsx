@@ -79,17 +79,18 @@ export const useConversationService = (channelId: string) => {
     }
   };
 
-  // Memoizar o callback do realtime
+  // Callback memoizado do realtime com debounce
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-    // Aguardar um pouco antes de atualizar para evitar muitas requisições
+    
+    // Debounce para evitar muitas requisições
     setTimeout(() => {
       if (mountedRef.current) {
         refreshConversations();
       }
-    }, 1000);
+    }, 500);
   }, [refreshConversations]);
 
   useEffect(() => {
