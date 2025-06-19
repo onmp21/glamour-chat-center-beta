@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Users, History, Settings, Folder, Shield, Bell, Palette, Database, Sun, Moon, LogOut, Brain, MessageSquare } from 'lucide-react';
@@ -21,6 +22,50 @@ interface SettingsItem {
   badge?: string;
   onClick?: () => void;
 }
+
+// Compact Action Card Component
+interface ActionCardProps {
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  onClick: () => void;
+  isDarkMode: boolean;
+}
+
+const ActionCard: React.FC<ActionCardProps> = ({
+  title,
+  description,
+  icon: Icon,
+  onClick,
+  isDarkMode
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full p-4 rounded-lg border transition-all hover:shadow-md hover:scale-[1.02] text-left",
+        "flex items-center gap-3",
+        isDarkMode ? "bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]" : "bg-white border-gray-200 hover:bg-gray-50"
+      )}
+    >
+      <div className={cn(
+        "p-2 rounded-lg flex-shrink-0",
+        isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
+      )}>
+        <Icon size={20} className="text-[#b5103c]" />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <h3 className={cn("font-medium text-sm", isDarkMode ? "text-white" : "text-gray-900")}>
+          {title}
+        </h3>
+        <p className={cn("text-xs mt-0.5", isDarkMode ? "text-gray-400" : "text-gray-600")}>
+          {description}
+        </p>
+      </div>
+    </button>
+  );
+};
 
 export const SettingsGrid: React.FC<SettingsGridProps> = ({
   isDarkMode,
@@ -121,28 +166,7 @@ export const SettingsGrid: React.FC<SettingsGridProps> = ({
     }
   ];
 
-  // Action items (appearance and logout)
-  const actionItems: SettingsItem[] = [
-    {
-      id: 'appearance',
-      title: 'Aparência',
-      description: `Alternar para modo ${isDarkMode ? 'claro' : 'escuro'}`,
-      icon: isDarkMode ? Sun : Moon,
-      show: true,
-      onClick: toggleDarkMode
-    },
-    {
-      id: 'logout',
-      title: 'Sair da Conta',
-      description: 'Encerre sua sessão atual',
-      icon: LogOut,
-      show: true,
-      onClick: handleLogout
-    }
-  ];
-
   const visibleMainItems = mainItems.filter(item => item.show);
-  const visibleActionItems = actionItems.filter(item => item.show);
 
   const handleItemClick = (item: SettingsItem) => {
     if (item.onClick) {
@@ -169,19 +193,22 @@ export const SettingsGrid: React.FC<SettingsGridProps> = ({
         ))}
       </div>
 
-      {/* Action cards (appearance and logout) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {visibleActionItems.map((item) => (
-          <SettingsCard
-            key={item.id}
-            title={item.title}
-            description={item.description}
-            icon={item.icon}
-            onClick={() => handleItemClick(item)}
-            isDarkMode={isDarkMode}
-            badge={item.badge}
-          />
-        ))}
+      {/* Compact Action cards (appearance and logout) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+        <ActionCard
+          title="Aparência"
+          description={`Alternar para modo ${isDarkMode ? 'claro' : 'escuro'}`}
+          icon={isDarkMode ? Sun : Moon}
+          onClick={toggleDarkMode}
+          isDarkMode={isDarkMode}
+        />
+        <ActionCard
+          title="Sair da Conta"
+          description="Encerre sua sessão atual"
+          icon={LogOut}
+          onClick={handleLogout}
+          isDarkMode={isDarkMode}
+        />
       </div>
     </div>
   );
