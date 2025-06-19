@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,10 +37,15 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({ isDarkMode, onSectionC
   const [showThisWeek, setShowThisWeek] = useState(false);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
-  const [isAddExamModalOpen, setIsAddExamModalOpen] = useState(false);
-  const [editingExam, setEditingExam] = useState<Exam | null>(null);
 
-  const cities = [...new Set(exams.map(exam => exam.city))];
+  // Corrigir nome da cidade America Dourada
+  const cities = [...new Set(exams.map(exam => {
+    // Corrigir possíveis variações do nome da cidade
+    if (exam.city.toLowerCase().includes('amarica') || exam.city.toLowerCase().includes('america')) {
+      return 'America Dourada';
+    }
+    return exam.city;
+  }))];
 
   const filteredExams = exams.filter(exam => {
     const matchesSearch = 
@@ -47,7 +53,8 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({ isDarkMode, onSectionC
       exam.phone.includes(searchTerm) ||
       (exam.instagram && exam.instagram.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesCity = selectedCity === 'all' || exam.city === selectedCity;
+    const matchesCity = selectedCity === 'all' || exam.city === selectedCity || 
+      (selectedCity === 'America Dourada' && (exam.city.toLowerCase().includes('amarica') || exam.city.toLowerCase().includes('america')));
     
     let matchesWeek = true;
     if (showThisWeek) {
@@ -79,18 +86,26 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({ isDarkMode, onSectionC
 
   const deleteSelectedExams = async () => {
     if (selectedExams.length > 0) {
-      await deleteMultipleExams(selectedExams);
-      setSelectedExams([]);
-      setIsMultiSelectMode(false);
+      try {
+        await deleteMultipleExams(selectedExams);
+        setSelectedExams([]);
+        setIsMultiSelectMode(false);
+      } catch (error) {
+        console.error('Erro ao excluir exames:', error);
+      }
     }
   };
 
   const handleAddExam = () => {
-    setIsAddExamModalOpen(true);
+    console.log('Adicionar exame clicado');
+    // Implementar abertura do modal de adicionar exame
+    // Por enquanto apenas log para debug
   };
 
   const handleEdit = (exam: Exam) => {
-    setEditingExam(exam);
+    console.log('Editar exame:', exam);
+    // Implementar abertura do modal de editar exame
+    // Por enquanto apenas log para debug
   };
 
   const toggleMultiSelect = () => {
@@ -268,7 +283,11 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({ isDarkMode, onSectionC
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className={cn(isDarkMode ? "text-foreground" : "text-gray-900")}>{exam.city}</TableCell>
+                  <TableCell className={cn(isDarkMode ? "text-foreground" : "text-gray-900")}>
+                    {exam.city.toLowerCase().includes('amarica') || exam.city.toLowerCase().includes('america') 
+                      ? 'America Dourada' 
+                      : exam.city}
+                  </TableCell>
                   <TableCell>
                     <Button
                       size="sm"
