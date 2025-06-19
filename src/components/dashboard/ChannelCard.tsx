@@ -39,8 +39,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Total de conversas no canal (usando dados reais)
-  const totalCount = counts.total;
+  // Mostrar apenas conversas não lidas (pendentes)
+  const unreadCount = counts.pending;
   
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
@@ -100,13 +100,13 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
               
-              {/* Badge de contagem no canto superior esquerdo do ícone */}
-              {totalCount > 0 && (
+              {/* Badge de contagem no canto superior esquerdo do ícone - apenas se houver conversas não lidas */}
+              {unreadCount > 0 && (
                 <div className={cn(
                   "absolute -top-1 -left-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg",
                   isDarkMode ? "bg-[#b5103c]" : "bg-[#b5103c]"
                 )}>
-                  {totalCount > 99 ? '99+' : totalCount}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </div>
               )}
             </div>
@@ -154,12 +154,16 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
           
-          {/* Texto de contagem de conversas */}
+          {/* Texto de contagem de conversas não lidas */}
           <p className={cn(
             "text-xs font-medium",
             isDarkMode ? "text-gray-400" : "text-gray-600"
           )}>
-            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
+            {unreadCount > 0 ? (
+              `${unreadCount} ${unreadCount === 1 ? 'não vista' : 'não vistas'}`
+            ) : (
+              'Todas vistas'
+            )}
           </p>
         </div>
       </CardContent>
