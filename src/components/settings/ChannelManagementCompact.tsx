@@ -8,24 +8,27 @@ import { useChannels } from '@/contexts/ChannelContext';
 import { cn } from '@/lib/utils';
 import { MessageSquare, Search, Settings, CheckCircle, XCircle, Hash, Users, Phone, Bot } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-
 interface ChannelManagementCompactProps {
   isDarkMode: boolean;
 }
-
-export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> = ({ isDarkMode }) => {
-  const { channels, loading, updateChannelStatus, refetch } = useChannels();
+export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> = ({
+  isDarkMode
+}) => {
+  const {
+    channels,
+    loading,
+    updateChannelStatus,
+    refetch
+  } = useChannels();
   const [searchTerm, setSearchTerm] = useState('');
   const [optimisticChannels, setOptimisticChannels] = useState<typeof channels | null>(null);
 
   // Usar optimisticChannels se houver, senão channels do contexto
   const shownChannels = optimisticChannels ?? channels;
-
   useEffect(() => {
     // Quando channels do contexto mudar (ex: após refetch), limpa otimismo
     setOptimisticChannels(null);
   }, [channels]);
-
   const getChannelIcon = (channelName: string) => {
     if (channelName.includes('Yelena') || channelName.includes('AI') || channelName.includes('Óticas')) {
       return Bot;
@@ -41,7 +44,6 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
     }
     return MessageSquare;
   };
-
   const getTypeLabel = (type: 'general' | 'store' | 'manager' | 'admin') => {
     const labels = {
       general: 'Geral',
@@ -51,18 +53,15 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
     };
     return labels[type];
   };
-
   const handleToggleChannel = async (channelId: string, isActive: boolean) => {
     // Otimismo: altera estado local imediatamente
-    setOptimisticChannels((prev) => {
+    setOptimisticChannels(prev => {
       const oldList = prev ?? channels;
-      return oldList.map(c =>
-        c.id === channelId
-          ? { ...c, isActive }
-          : c
-      );
+      return oldList.map(c => c.id === channelId ? {
+        ...c,
+        isActive
+      } : c);
     });
-
     try {
       await updateChannelStatus(channelId, isActive);
       // O estado global do contexto reflete após o refetch que já existe no hook
@@ -77,38 +76,28 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
         variant: 'destructive'
       });
       // Se falhar, volta ao valor anterior imediatamente
-      setOptimisticChannels((prev) => {
+      setOptimisticChannels(prev => {
         const oldList = prev ?? channels;
-        return oldList.map(c =>
-          c.id === channelId
-            ? { ...c, isActive: !isActive }
-            : c
-        );
+        return oldList.map(c => c.id === channelId ? {
+          ...c,
+          isActive: !isActive
+        } : c);
       });
     }
   };
-
-  const filteredChannels = shownChannels.filter(channel => 
-    channel.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
+  const filteredChannels = shownChannels.filter(channel => channel.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const stats = {
     total: shownChannels.length,
     active: shownChannels.filter(c => c.isActive).length,
     inactive: shownChannels.filter(c => !c.isActive).length,
     stores: shownChannels.filter(c => c.type === 'store').length
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
+    return <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Estatísticas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -171,31 +160,18 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
       {/* Busca */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar canais..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+        <Input placeholder="Buscar canais..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10" />
       </div>
 
       {/* Lista de Canais */}
       <Card>
         <CardContent className="p-0">
           <div className="space-y-2 p-4">
-            {filteredChannels.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+            {filteredChannels.length === 0 ? <div className="text-center py-8 text-muted-foreground">
                 {searchTerm ? 'Nenhum canal encontrado.' : 'Nenhum canal disponível.'}
-              </div>
-            ) : (
-              filteredChannels.map(channel => {
-                const ChannelIcon = getChannelIcon(channel.name);
-                
-                return (
-                  <div 
-                    key={channel.id} 
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
-                  >
+              </div> : filteredChannels.map(channel => {
+            const ChannelIcon = getChannelIcon(channel.name);
+            return <div key={channel.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                         <ChannelIcon className="h-5 w-5 text-primary" />
@@ -203,20 +179,15 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{channel.name}</p>
-                          {channel.isDefault && (
-                            <Badge variant="outline" className="text-xs">
+                          {channel.isDefault && <Badge variant="outline" className="text-xs">
                               Padrão
-                            </Badge>
-                          )}
+                            </Badge>}
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary" className="text-xs">
                             {getTypeLabel(channel.type)}
                           </Badge>
-                          <Badge className={channel.isActive ? 
-                            "bg-green-100 text-green-800 text-xs" : 
-                            "bg-red-100 text-red-800 text-xs"
-                          }>
+                          <Badge className={channel.isActive ? "bg-green-100 text-green-800 text-xs" : "bg-red-100 text-red-800 text-xs"}>
                             {channel.isActive ? 'Ativo' : 'Inativo'}
                           </Badge>
                         </div>
@@ -224,29 +195,18 @@ export const ChannelManagementCompact: React.FC<ChannelManagementCompactProps> =
                     </div>
                     
                     <div className="flex items-center gap-3">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                      
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
                           {channel.isActive ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Switch
-                          checked={channel.isActive}
-                          onCheckedChange={(checked) => handleToggleChannel(channel.id, checked)}
-                        />
+                        <Switch checked={channel.isActive} onCheckedChange={checked => handleToggleChannel(channel.id, checked)} />
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  </div>;
+          })}
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
