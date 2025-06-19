@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { invalidateChannelCache } from '@/utils/channelMapping';
@@ -18,6 +17,7 @@ export interface UpdateChannelData {
 
 export class ChannelManagementService {
   private static instance: ChannelManagementService;
+  private creatingChannels = new Set<string>(); // Prevenir criações duplicadas
 
   static getInstance(): ChannelManagementService {
     if (!ChannelManagementService.instance) {
@@ -43,65 +43,108 @@ export class ChannelManagementService {
         return { success: false, error: 'Nome do canal é obrigatório' };
       }
 
-      // Verificar se já existe um canal com mesmo nome
-      const { data: existingChannel } = await supabase
-        .from('channels')
-        .select('id')
-        .eq('name', data.name.trim())
-        .maybeSingle();
-
-      if (existingChannel) {
-        return { success: false, error: 'Já existe um canal com este nome' };
-      }
-
-      // Gerar nome da tabela
-      const tableName = this.generateTableName(data.name);
-
-      // Criar canal na tabela channels
-      const { data: newChannel, error: channelError } = await supabase
-        .from('channels')
-        .insert([{
-          name: data.name.trim(),
-          type: data.type,
-          is_active: true,
-          is_default: data.isDefault || false
-        }])
-        .select()
-        .single();
-
-      if (channelError) {
-        console.error('❌ [CHANNEL_MANAGEMENT] Error creating channel:', channelError);
-        return { success: false, error: 'Erro ao criar canal no banco de dados' };
-      }
-
-      // Criar tabela de conversas usando o parâmetro correto
-      const { error: tableError } = await supabase.rpc('create_conversation_table', {
-        table_name: tableName
-      });
-
-      if (tableError) {
-        console.error('❌ [CHANNEL_MANAGEMENT] Error creating conversation table:', tableError);
-        
-        // Reverter criação do canal
-        await supabase.from('channels').delete().eq('id', newChannel.id);
-        
-        return { success: false, error: 'Erro ao criar tabela de conversas' };
-      }
-
-      // IMPORTANTE: Invalidar cache para que novos canais sejam reconhecidos
-      invalidateChannelCache();
-
-      console.log('✅ [CHANNEL_MANAGEMENT] Channel created successfully:', newChannel.id);
-      console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
+      const channelName = data.name.trim();
       
-      toast({
-        title: 'Sucesso',
-        description: `Canal "${data.name}" criado com sucesso!`
-      });
+      // Verificar se já está sendo criado um canal com este nome
+      if (this.creatingChannels.has(channelName)) {
+        console.warn('⚠️ [CHANNEL_MANAGEMENT] Channel creation already in progress:', channelName);
+        return { success: false, error: 'Criação de canal já em andamento' };
+      }
 
-      return { success: true, channelId: newChannel.id };
+      // Marcar como em criação
+      this.creatingChannels.add(channelName);
+
+      try {
+        // Verificar se já existe um canal com mesmo nome
+        const { data: existingChannel } = await supabase
+          .from('channels')
+          .select('id')
+          .eq('name', channelName)
+          .maybeSingle();
+
+        if (existingChannel) {
+          return { success: false, error: 'Já existe um canal com este nome' };
+        }
+
+        // Gerar nome da tabela
+        const tableName = this.generateTableName(channelName);
+        console.log('📋 [CHANNEL_MANAGEMENT] Generated table name:', tableName);
+
+        // Verificar se tabela já existe
+        const { data: tableExists } = await supabase.rpc('create_conversation_table', {
+          table_name: tableName
+        }).select().single().then(
+          () => ({ data: false }), // Se a função executou sem erro, tabela não existia
+          (error) => {
+            if (error.message?.includes('já existe')) {
+              return { data: true }; // Tabela já existe
+            }
+            throw error; // Outro erro
+          }
+        );
+
+        if (tableExists) {
+          console.warn('⚠️ [CHANNEL_MANAGEMENT] Table already exists:', tableName);
+          return { success: false, error: 'Tabela de conversas já existe para este canal' };
+        }
+
+        // Criar canal na tabela channels PRIMEIRO
+        const { data: newChannel, error: channelError } = await supabase
+          .from('channels')
+          .insert([{
+            name: channelName,
+            type: data.type,
+            is_active: true,
+            is_default: data.isDefault || false
+          }])
+          .select()
+          .single();
+
+        if (channelError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error creating channel:', channelError);
+          return { success: false, error: 'Erro ao criar canal no banco de dados' };
+        }
+
+        console.log('✅ [CHANNEL_MANAGEMENT] Channel record created:', newChannel.id);
+
+        // Só agora criar a tabela de conversas
+        const { error: tableError } = await supabase.rpc('create_conversation_table', {
+          table_name: tableName
+        });
+
+        if (tableError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error creating conversation table:', tableError);
+          
+          // Reverter criação do canal
+          await supabase.from('channels').delete().eq('id', newChannel.id);
+          console.log('🔄 [CHANNEL_MANAGEMENT] Channel record deleted due to table creation failure');
+          
+          return { success: false, error: 'Erro ao criar tabela de conversas' };
+        }
+
+        console.log('✅ [CHANNEL_MANAGEMENT] Conversation table created successfully:', tableName);
+
+        // Invalidar cache para que novos canais sejam reconhecidos
+        invalidateChannelCache();
+
+        console.log('✅ [CHANNEL_MANAGEMENT] Channel created successfully:', newChannel.id);
+        console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
+        
+        toast({
+          title: 'Sucesso',
+          description: `Canal "${channelName}" criado com sucesso!`
+        });
+
+        return { success: true, channelId: newChannel.id };
+
+      } finally {
+        // Sempre remover da lista de criação
+        this.creatingChannels.delete(channelName);
+      }
+
     } catch (error) {
       console.error('❌ [CHANNEL_MANAGEMENT] Unexpected error:', error);
+      this.creatingChannels.delete(data.name?.trim() || '');
       return { success: false, error: 'Erro inesperado ao criar canal' };
     }
   }
