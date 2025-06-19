@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -119,6 +118,7 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({
     try {
       await createExam({
         ...examData,
+        instagram: examData.instagram || null, // Ensure instagram is always provided
         status: 'agendado',
         examType: 'Exame de Vista',
         observations: null
