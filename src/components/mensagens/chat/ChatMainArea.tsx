@@ -4,8 +4,8 @@ import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
-import { openaiService } from '@/services/openaiService';
 import { AIResumoOverlay } from '@/components/chat/AIResumoOverlay';
+import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 
 interface Message {
   id: string;
@@ -55,9 +55,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
 }) => {
   console.log("🐛 [ChatMainArea] Renderizando. selectedConv:", selectedConv, "conversationForHeader:", conversationForHeader);
   const [isResumoOpen, setIsResumoOpen] = useState(false);
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [summaryContent, setSummaryContent] = useState<string | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const { updateConversationStatus } = useConversationStatusEnhanced();
 
   // ==== SCROLL AUTOMÁTICO ROBUSTO ====
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -116,25 +114,50 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     return mapping[channel] || channel;
   };
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateSummary = () => {
     if (!selectedConv || !channelId) {
       console.error('❌ [AI_SUMMARY] Conversa ou canal não selecionado');
       return;
     }
+    
+    console.log('🤖 [AI_SUMMARY] Abrindo modal de resumo para:', {
+      conversationId: selectedConv.id,
+      channelId,
+      contactName: selectedConv.contact_name
+    });
+    
+    setIsResumoOpen(true);
+  };
+
+  const handleMarkAsResolved = async () => {
+    if (!selectedConv || !channelId) {
+      console.error('❌ [MARK_RESOLVED] Conversa ou canal não selecionado');
+      return;
+    }
+
     try {
-      setIsGeneratingSummary(true);
-      setSummaryError(null);
-      setSummaryContent(null);
-      setIsResumoOpen(true);
-      const summary = await openaiService.generateConversationSummary(channelId, selectedConv.contact_phone);
-      setSummaryContent(summary);
+      console.log('✅ [MARK_RESOLVED] Marcando conversa como resolvida:', {
+        conversationId: selectedConv.id,
+        channelId,
+        contactName: selectedConv.contact_name
+      });
+
+      const success = await updateConversationStatus(channelId, selectedConv.id, 'resolved', true);
+      
+      if (success) {
+        console.log('✅ [MARK_RESOLVED] Conversa marcada como resolvida com sucesso');
+        // Chamar callback para atualizar a lista se existir
+        if (onMarkAsResolved) {
+          onMarkAsResolved();
+        }
+      } else {
+        console.error('❌ [MARK_RESOLVED] Falha ao marcar conversa como resolvida');
+      }
     } catch (error) {
-      console.error('❌ [AI_SUMMARY] Erro ao gerar resumo:', error);
-      setSummaryError('Erro ao gerar resumo da conversa. Verifique a configuração da API OpenAI.');
-    } finally {
-      setIsGeneratingSummary(false);
+      console.error('❌ [MARK_RESOLVED] Erro ao marcar conversa como resolvida:', error);
     }
   };
+
   if (!selectedConv) {
     return <div className={cn("flex-1 flex items-center justify-center", isDarkMode ? "bg-[#09090b] text-white" : "bg-gray-50 text-gray-900")}>
         <p className="text-lg">Selecione uma conversa para começar</p>
@@ -154,27 +177,36 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         </div>
         
         <div className="flex items-center space-x-2">
-          {/* Botão de Resumo com IA */}
+          {/* Botão de Resumo com IA - ALTURA CORRIGIDA */}
           <Button
             onClick={handleGenerateSummary}
-            disabled={isGeneratingSummary}
             variant="outline"
             size="sm"
-            className={cn("flex items-center space-x-2", isDarkMode ? "border-[#3f3f46] text-white hover:bg-[#27272a]" : "border-gray-300 text-gray-700 hover:bg-gray-50")}
+            className={cn(
+              "flex items-center space-x-2 h-9", // ALTURA FIXA IGUAL AO BOTÃO AO LADO
+              isDarkMode ? "border-[#3f3f46] text-white hover:bg-[#27272a]" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+            )}
           >
-            {isGeneratingSummary ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
-            <span>{isGeneratingSummary ? 'Gerando...' : 'Resumo IA'}</span>
+            <Brain size={16} />
+            <span>Resumo IA</span>
           </Button>
+
+          {/* Modal de Resumo */}
           <AIResumoOverlay
             open={isResumoOpen}
             onClose={() => setIsResumoOpen(false)}
-            summary={summaryContent}
-            isLoading={isGeneratingSummary}
-            error={summaryError}
             isDarkMode={isDarkMode}
+            conversationId={selectedConv.id}
+            channelId={channelId}
+            contactName={selectedConv.contact_name}
           />
           
-          <Button onClick={onMarkAsResolved} size="sm" className="text-white bg-[#b5103c] py-0 my-0 text-center">
+          {/* Botão Marcar como Resolvido - FUNÇÃO CORRIGIDA */}
+          <Button 
+            onClick={handleMarkAsResolved} 
+            size="sm" 
+            className="text-white bg-[#b5103c] hover:bg-[#a00e35] h-9" // ALTURA FIXA
+          >
             Marcar como Resolvido
           </Button>
         </div>
@@ -265,7 +297,14 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           maxHeight: 96,
         }}
       >
-        <ChatInput isDarkMode={isDarkMode} onSendMessage={onSendMessage} onSendFile={onSendFile} onSendAudio={onSendAudio} selectedConv={selectedConv} channelId={channelId} />
+        <ChatInput 
+          isDarkMode={isDarkMode} 
+          onSendMessage={onSendMessage} 
+          onSendFile={onSendFile} 
+          onSendAudio={onSendAudio} 
+          selectedConv={selectedConv} 
+          channelId={channelId} 
+        />
       </div>
     </div>
   );

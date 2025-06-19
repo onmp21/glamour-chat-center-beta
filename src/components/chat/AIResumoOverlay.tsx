@@ -65,6 +65,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
 
   useEffect(() => {
     if (open && !summary && !isLoading && conversationId && channelId) {
+      console.log('🚀 [AI_RESUMO] Modal aberto, iniciando geração de resumo');
       loadProvidersAndGenerateSummary();
     }
   }, [open, conversationId, channelId]);
@@ -93,24 +94,21 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
 
       console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
       
-      // Verificar se há dados válidos
       if (!data || !Array.isArray(data) || data.length === 0) {
         setInternalError('Não há mensagens nesta conversa para resumir.');
         return [];
       }
 
-      // Verificar se há mensagens suficientes para resumir
       if (data.length < MINIMUM_MESSAGES_FOR_SUMMARY) {
         setInternalError(`Esta conversa tem apenas ${data.length} mensagem${data.length !== 1 ? 's' : ''}. É necessário pelo menos ${MINIMUM_MESSAGES_FOR_SUMMARY} mensagens para gerar um resumo útil.`);
         return [];
       }
 
-      // Filtrar mensagens muito curtas ou vazias para uma contagem mais precisa
       const meaningfulMessages = data.filter((msg: any) => 
         msg.message && 
         typeof msg.message === 'string' &&
-        msg.message.trim().length > 10 && // Mensagens com pelo menos 10 caracteres
-        !msg.message.trim().match(/^(ok|sim|não|oi|olá|tchau|obrigado|obrigada)$/i) // Evitar mensagens muito simples
+        msg.message.trim().length > 10 &&
+        !msg.message.trim().match(/^(ok|sim|não|oi|olá|tchau|obrigado|obrigada)$/i)
       );
 
       if (meaningfulMessages.length < 3) {
@@ -118,7 +116,6 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
         return [];
       }
 
-      // Mapear para o tipo MessageData
       const typedMessages: MessageData[] = data.map((item: any) => ({
         id: String(item.id),
         message: item.message || '',
@@ -179,9 +176,8 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     setInternalError('');
 
     try {
-      console.log('📝 [AI_RESUMO] Gerando resumo com prompt conversation_summary...');
+      console.log('📝 [AI_RESUMO] Gerando resumo com edge function...');
 
-      // Use mensagens carregadas ou as passadas como prop
       const messagesToUse = messagesData || conversationMessages || messages;
       
       if (messagesToUse.length === 0) {
@@ -190,7 +186,6 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
         return;
       }
 
-      // Preparar contexto das mensagens
       const contextMessages = messagesToUse.slice(-50).map(m => ({
         id: m.id,
         nome_do_contato: m.nome_do_contato,
@@ -219,18 +214,20 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
 
       if (error) {
         console.error('❌ [AI_RESUMO] Erro na edge function:', error);
-        setInternalError('Erro ao gerar resumo: ' + (error.message || 'Erro desconhecido'));
+        setInternalError('Erro ao gerar resumo: ' + (error.message || String(error)));
         return;
       }
 
       if (data && data.success) {
         const generatedSummary = data.report || data.content || 'Resumo não disponível';
+        console.log('✅ [AI_RESUMO] Resumo gerado com sucesso:', generatedSummary.substring(0, 100) + '...');
         setInternalSummary(generatedSummary);
         toast({
           title: "Resumo gerado",
           description: "Resumo da conversa gerado com sucesso",
         });
       } else {
+        console.error('❌ [AI_RESUMO] Resposta sem sucesso:', data);
         setInternalError(data?.error || 'Erro desconhecido na geração do resumo');
       }
 
