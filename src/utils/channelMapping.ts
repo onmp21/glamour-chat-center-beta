@@ -7,13 +7,19 @@ let displayNameCache: Record<string, string> = {};
 let lastCacheUpdate = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
-// Função para gerar nome da tabela baseado no nome do canal
-const generateTableName = (channelName: string): string => {
-  return channelName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '') + '_conversas';
+// Função para gerar nome da tabela baseado no channelId
+const getTableNameForChannelId = (channelId: string): string => {
+  const channelMapping: Record<string, string> = {
+    'chat': 'yelena_ai_conversas',
+    'canarana': 'canarana_conversas',
+    'souto-soares': 'souto_soares_conversas',
+    'joao-dourado': 'joao_dourado_conversas',
+    'america-dourada': 'america_dourada_conversas',
+    'gerente-lojas': 'gerente_lojas_conversas',
+    'gerente-externo': 'gerente_externo_conversas'
+  };
+  
+  return channelMapping[channelId] || 'yelena_ai_conversas';
 };
 
 // Função para carregar mapeamentos do banco
@@ -33,15 +39,8 @@ const loadChannelMappings = async (): Promise<void> => {
     channelMappingCache = {};
     displayNameCache = {};
 
-    // Preencher caches
-    channels?.forEach(channel => {
-      const tableName = generateTableName(channel.name);
-      channelMappingCache[channel.id] = tableName;
-      displayNameCache[channel.id] = channel.name;
-    });
-
-    // Mapeamentos legados para compatibilidade
-    const legacyMappings: Record<string, string> = {
+    // Preencher caches com mapeamento direto de channelId
+    const directMappings: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
       'souto-soares': 'souto_soares_conversas',
@@ -51,7 +50,12 @@ const loadChannelMappings = async (): Promise<void> => {
       'gerente-externo': 'gerente_externo_conversas'
     };
 
-    Object.assign(channelMappingCache, legacyMappings);
+    Object.assign(channelMappingCache, directMappings);
+
+    // Preencher display names baseado nos canais do banco
+    channels?.forEach(channel => {
+      displayNameCache[channel.id] = channel.name;
+    });
 
     lastCacheUpdate = Date.now();
     console.log('✅ Mapeamentos de canais carregados:', channelMappingCache);
@@ -71,7 +75,7 @@ export const getTableNameForChannel = async (channelId: string): Promise<string>
     await loadChannelMappings();
   }
 
-  return channelMappingCache[channelId] || 'yelena_ai_conversas'; // Fallback
+  return getTableNameForChannelId(channelId);
 };
 
 export const getChannelDisplayName = async (channelId: string): Promise<string> => {
@@ -83,9 +87,9 @@ export const getChannelDisplayName = async (channelId: string): Promise<string> 
   return displayNameCache[channelId] || channelId;
 };
 
-// Versões síncronas para compatibilidade (usam cache)
+// Versões síncronas para compatibilidade (usam mapeamento direto)
 export const getTableNameForChannelSync = (channelId: string): string => {
-  return channelMappingCache[channelId] || 'yelena_ai_conversas';
+  return getTableNameForChannelId(channelId);
 };
 
 export const getChannelDisplayNameSync = (channelId: string): string => {
