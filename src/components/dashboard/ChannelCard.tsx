@@ -39,8 +39,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Apenas mensagens pendentes (não lidas)
-  const pendingCount = counts.pending;
+  // Total de conversas no canal
+  const totalCount = counts.total;
   
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
@@ -99,6 +99,13 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
               isDarkMode ? "bg-[#27272a]" : "bg-gray-100"
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
+              
+              {/* Badge de contagem no canto inferior esquerdo do ícone */}
+              {totalCount > 0 && (
+                <div className="absolute -bottom-1 -left-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg">
+                  {totalCount > 99 ? '99+' : totalCount}
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className={cn(
@@ -118,7 +125,6 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Badge de mensagens pendentes no canto inferior direito */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -144,14 +150,15 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           )}>
             {loading ? 'Carregando...' : lastActivityText}
           </p>
+          
+          {/* Texto de contagem de conversas */}
+          <p className={cn(
+            "text-xs font-medium",
+            isDarkMode ? "text-gray-400" : "text-gray-600"
+          )}>
+            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
+          </p>
         </div>
-
-        {/* Badge de mensagens pendentes - posicionado no canto inferior direito */}
-        {pendingCount > 0 && (
-          <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium shadow-lg">
-            {pendingCount > 99 ? '99+' : pendingCount}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
