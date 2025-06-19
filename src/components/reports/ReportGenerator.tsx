@@ -9,6 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Zap, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AIProvider } from '@/types/ai-providers';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 interface ReportGeneratorProps {
   isDarkMode: boolean;
@@ -63,6 +65,127 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
       setFilters({
         ...filters,
         selected_sheets: currentSheets.filter((id: string) => id !== sheetId)
+      });
+    }
+  };
+
+  const handleGenerateReport = async () => {
+    console.log('🚀 [REPORT_GENERATOR] Iniciando geração de relatório...');
+    
+    // Validações
+    if (!selectedProvider) {
+      toast({
+        title: "Erro",
+        description: "Selecione um provedor de IA",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!filters.report_type) {
+      toast({
+        title: "Erro", 
+        description: "Selecione um tipo de relatório",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (filters.report_type !== 'custom' && (!filters.selected_sheets || filters.selected_sheets.length === 0)) {
+      toast({
+        title: "Erro",
+        description: "Selecione pelo menos uma planilha",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (filters.report_type === 'custom' && !filters.custom_prompt?.trim()) {
+      toast({
+        title: "Erro",
+        description: "Digite um prompt personalizado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Buscar dados das planilhas selecionadas
+      console.log('📊 [REPORT_GENERATOR] Buscando dados das planilhas:', filters.selected_sheets);
+      const reportData: any = {};
+
+      if (filters.selected_sheets && filters.selected_sheets.length > 0) {
+        for (const sheetId of filters.selected_sheets) {
+          try {
+            console.log(`🔍 [REPORT_GENERATOR] Buscando dados de: ${sheetId}`);
+            
+            let query;
+            if (sheetId === 'exams') {
+              query = supabase
+                .from('exams')
+                .select('*')
+                .limit(50)
+                .order('appointment_date', { ascending: false });
+            } else {
+              // Tabelas de conversas
+              query = supabase
+                .from(sheetId as any)
+                .select('session_id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
+                .limit(100)
+                .order('read_at', { ascending: false });
+            }
+            
+            const { data, error } = await query;
+            
+            if (error) {
+              console.error(`❌ [REPORT_GENERATOR] Erro ao buscar ${sheetId}:`, error);
+              continue;
+            }
+            
+            reportData[sheetId] = data || [];
+            console.log(`✅ [REPORT_GENERATOR] ${data?.length || 0} registros de ${sheetId}`);
+          } catch (err) {
+            console.error(`❌ [REPORT_GENERATOR] Erro ao processar ${sheetId}:`, err);
+          }
+        }
+      }
+
+      // Chamar função de geração via Supabase Edge Function
+      console.log('🤖 [REPORT_GENERATOR] Chamando edge function...');
+      const { data, error } = await supabase.functions.invoke('generate-report', {
+        body: {
+          provider_id: selectedProvider,
+          report_type: filters.report_type,
+          data: reportData,
+          custom_prompt: filters.custom_prompt,
+          filters: {
+            selected_sheets: filters.selected_sheets,
+            report_type: filters.report_type
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ [REPORT_GENERATOR] Erro na edge function:', error);
+        throw error;
+      }
+
+      console.log('✅ [REPORT_GENERATOR] Relatório gerado com sucesso');
+      
+      // Chamar callback para atualizar o estado no componente pai
+      onGenerateReport();
+      
+      toast({
+        title: "Sucesso",
+        description: "Relatório gerado com sucesso!",
+      });
+
+    } catch (error) {
+      console.error('❌ [REPORT_GENERATOR] Erro geral:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar relatório: " + (error instanceof Error ? error.message : 'Erro desconhecido'),
+        variant: "destructive"
       });
     }
   };
@@ -189,7 +312,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         {/* Botões de Ação */}
         <div className="flex gap-3 pt-4">
           <Button
-            onClick={onGenerateReport}
+            onClick={handleGenerateReport}
             disabled={isGenerating || !selectedProvider}
             className="flex-1 bg-primary hover:bg-primary/90"
           >
