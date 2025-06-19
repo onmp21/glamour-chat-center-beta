@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { EvolutionApiSettings } from '@/components/EvolutionApiSettings';
-import { ApiInstanceListEnhanced } from './ApiInstanceListEnhanced';
 
 interface EvolutionAPIFullSectionProps {
   isDarkMode: boolean;
@@ -16,7 +15,6 @@ export const EvolutionAPIFullSection: React.FC<EvolutionAPIFullSectionProps> = (
         isDarkMode={isDarkMode}
         channelId="default"
       />
-      <ApiInstanceListEnhanced isDarkMode={isDarkMode} />
     </div>
   );
 };
