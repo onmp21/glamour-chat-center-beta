@@ -8,183 +8,78 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🤖 [GENERATE_REPORT] Função iniciada');
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
+    // Get request body
+    const { provider_id, report_type, action_type, data } = await req.json()
 
-    // Verificar autenticação
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    console.log('📊 [GENERATE_REPORT] Request received:', { provider_id, report_type, action_type })
 
-    if (authError || !user) {
-      console.log('❌ [GENERATE_REPORT] Usuário não autenticado:', authError);
+    // Validate required parameters
+    if (!provider_id) {
       return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Unauthorized' 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ success: false, error: 'Provider ID é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('✅ [GENERATE_REPORT] Usuário autenticado:', user.id);
-
-    const requestBody = await req.json()
-    console.log('📝 [GENERATE_REPORT] Body recebido:', requestBody);
-
-    const { 
-      provider_id, 
-      report_type, 
-      custom_prompt, 
-      selected_sheets = [],
-      data: contextData = null,
-      action_type = null
-    } = requestBody
-
-    // Buscar o provedor de IA
-    const { data: provider, error: providerError } = await supabaseClient
+    // Get AI provider configuration
+    const { data: provider, error: providerError } = await supabase
       .from('ai_providers')
       .select('*')
       .eq('id', provider_id)
+      .eq('is_active', true)
       .single()
 
     if (providerError || !provider) {
-      console.log('❌ [GENERATE_REPORT] Erro ao buscar provider:', providerError);
+      console.error('❌ [GENERATE_REPORT] Provider not found:', providerError)
       return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Provedor de IA não encontrado' 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+        JSON.stringify({ success: false, error: 'Provedor de IA não encontrado ou inativo' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log('✅ [GENERATE_REPORT] Provider encontrado:', provider.name);
+    // Get appropriate prompt based on action type
+    let promptType = 'conversation_summary'
+    if (action_type === 'quick_response') {
+      promptType = 'quick_response'
+    }
 
-    // Buscar prompt apropriado da tabela ai_prompts baseado no tipo de ação
-    let systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios em português brasileiro.";
-    let userPrompt = custom_prompt || "";
+    const { data: promptData } = await supabase
+      .from('ai_prompts')
+      .select('prompt_content')
+      .eq('prompt_type', promptType)
+      .eq('is_active', true)
+      .single()
 
-    if (action_type) {
-      console.log('🔍 [GENERATE_REPORT] Buscando prompt para action_type:', action_type);
+    const systemPrompt = promptData?.prompt_content || 'Você é um assistente útil que gera relatórios baseados em dados de conversas.'
+
+    // Prepare messages for AI
+    let userMessage = ''
+    
+    if (action_type === 'quick_response') {
+      // For quick responses, format the conversation messages
+      const messages = data?.messages || []
+      const conversationText = messages.map((msg: any) => 
+        `[${msg.tipo_remetente === 'USUARIO_INTERNO' ? 'Agente' : 'Cliente'}]: ${msg.message}`
+      ).join('\n')
       
-      const { data: promptData, error: promptError } = await supabaseClient
-        .from('ai_prompts')
-        .select('*')
-        .eq('prompt_type', action_type)
-        .eq('is_active', true)
-        .single();
-
-      if (!promptError && promptData) {
-        console.log('✅ [GENERATE_REPORT] Prompt encontrado:', promptData.name);
-        userPrompt = promptData.prompt_content;
-        
-        // Se temos dados de contexto (mensagens da conversa), adicionar ao prompt
-        if (contextData && contextData.messages) {
-          userPrompt += `\n\nContexto da conversa:\n${JSON.stringify(contextData.messages, null, 2)}`;
-        }
-      } else {
-        console.log('⚠️ [GENERATE_REPORT] Prompt não encontrado, usando custom_prompt');
-      }
+      userMessage = `Baseado na seguinte conversa, sugira 3-5 respostas rápidas apropriadas:\n\n${conversationText}`
+    } else {
+      // For reports, use the existing format
+      userMessage = `Gere um relatório detalhado baseado nos dados fornecidos: ${JSON.stringify(data)}`
     }
 
-    // Se não temos prompt e é um relatório padrão, buscar dados das planilhas
-    if (!userPrompt && selected_sheets && selected_sheets.length > 0) {
-      const reportData: any = {};
-
-      for (const sheetId of selected_sheets) {
-        try {
-          console.log(`🔍 [GENERATE_REPORT] Buscando dados de: ${sheetId}`);
-          
-          let query;
-          if (sheetId === 'exams') {
-            query = supabaseClient
-              .from('exams')
-              .select('patient_name, phone, city, appointment_date, status, exam_type')
-              .limit(10);
-          } else {
-            const tableMapping: Record<string, string> = {
-              'yelena_ai_conversas': 'yelena_ai_conversas',
-              'canarana_conversas': 'canarana_conversas',
-              'souto_soares_conversas': 'souto_soares_conversas',
-              'joao_dourado_conversas': 'joao_dourado_conversas',
-              'america_dourada_conversas': 'america_dourada_conversas',
-              'gerente_lojas_conversas': 'gerente_lojas_conversas',
-              'gerente_externo_conversas': 'gerente_externo_conversas'
-            };
-
-            const tableName = tableMapping[sheetId] || sheetId;
-            
-            query = supabaseClient
-              .from(tableName as any)
-              .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
-              .limit(10);
-          }
-          
-          const { data, error } = await query;
-          
-          if (error) {
-            console.error(`❌ [GENERATE_REPORT] Erro ao buscar ${sheetId}:`, error);
-            continue;
-          }
-          
-          reportData[sheetId] = data || [];
-          console.log(`✅ [GENERATE_REPORT] ${data?.length || 0} registros de ${sheetId}`);
-        } catch (err) {
-          console.error(`❌ [GENERATE_REPORT] Erro ao processar ${sheetId}:`, err);
-        }
-      }
-
-      // Preparar prompt baseado no tipo de relatório
-      if (report_type === 'conversations') {
-        userPrompt = `Analise as seguintes conversas de WhatsApp e gere um relatório detalhado:
-
-Dados das conversas: ${JSON.stringify(reportData, null, 2)}
-
-Por favor, inclua:
-1. Estatísticas gerais
-2. Análise de padrões
-3. Principais temas
-4. Recomendações`
-
-      } else if (report_type === 'exams') {
-        userPrompt = `Analise os seguintes dados de exames médicos:
-
-Dados dos exames: ${JSON.stringify(reportData, null, 2)}
-
-Por favor, inclua:
-1. Estatísticas de agendamentos
-2. Distribuição por cidade
-3. Análise temporal
-4. Insights e recomendações`
-      }
-    }
-
-    if (!userPrompt) {
-      userPrompt = custom_prompt || 'Gere um relatório com base nos dados disponíveis.';
-    }
-
-    console.log('🔄 [GENERATE_REPORT] Enviando para IA...', provider.provider_type);
-
-    // Chamar a API da OpenAI
+    // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -192,13 +87,13 @@ Por favor, inclua:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: provider.default_model || 'gpt-4o-mini',
+        model: provider.default_model || 'gpt-3.5-turbo',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: userMessage }
         ],
-        max_tokens: 1500,
-        temperature: 0.7
+        max_tokens: 1000,
+        temperature: 0.7,
       }),
     })
 
@@ -206,76 +101,44 @@ Por favor, inclua:
       const errorText = await openaiResponse.text()
       console.error('❌ [GENERATE_REPORT] OpenAI API error:', errorText)
       return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: `Erro na API OpenAI: ${openaiResponse.statusText}` 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ success: false, error: 'Erro na API do OpenAI' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const response = await openaiResponse.json()
-    const reportContent = response.choices?.[0]?.message?.content || 'Erro na geração do relatório'
+    const aiResult = await openaiResponse.json()
+    const generatedContent = aiResult.choices[0]?.message?.content || 'Erro ao gerar conteúdo'
 
-    console.log('✅ [GENERATE_REPORT] Relatório gerado com sucesso');
-
-    // Salvar no histórico
-    const { data: savedReport, error: saveError } = await supabaseClient
-      .from('report_history')
-      .insert({
-        provider_id: provider.id,
-        report_type: report_type || 'custom',
-        prompt: userPrompt,
-        generated_report: reportContent,
-        model_used: provider.default_model || 'gpt-4o-mini',
-        tokens_used: response.usage?.total_tokens || 0,
-        generation_time: 0,
-        report_metadata: {
-          user_id: user.id,
-          action_type: action_type || null,
-          data_size: userPrompt.length
-        }
+    // Save to report history if it's a report (not quick response)
+    if (action_type !== 'quick_response') {
+      await supabase.from('report_history').insert({
+        report_type,
+        generated_report: generatedContent,
+        provider_id,
+        model_used: provider.default_model || 'gpt-3.5-turbo',
+        tokens_used: aiResult.usage?.total_tokens || 0,
+        prompt: userMessage,
+        report_metadata: data
       })
-      .select()
-      .single()
-
-    if (saveError) {
-      console.error('⚠️ [GENERATE_REPORT] Erro ao salvar relatório:', saveError)
     }
+
+    console.log('✅ [GENERATE_REPORT] Report generated successfully')
 
     return new Response(
       JSON.stringify({
         success: true,
-        report: reportContent,
-        content: reportContent, // Para compatibilidade
-        metadata: {
-          tokens_used: response.usage?.total_tokens || 0,
-          model_used: provider.default_model || 'gpt-4o-mini',
-          report_id: savedReport?.id,
-          provider_name: provider.name,
-          generation_time: 0
-        }
+        report: generatedContent,
+        content: generatedContent,
+        tokens_used: aiResult.usage?.total_tokens || 0
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('❌ [GENERATE_REPORT] Erro geral:', error)
+    console.error('❌ [GENERATE_REPORT] Unexpected error:', error)
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: 'Erro interno do servidor',
-        details: error.message || error.toString()
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ success: false, error: 'Erro interno do servidor' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

@@ -21,15 +21,6 @@ interface AIQuickResponseModalProps {
   onSelectResponse: (response: string) => void;
 }
 
-const PREDEFINED_RESPONSES = [
-  "Olá! Como posso ajudá-lo hoje?",
-  "Obrigado pelo contato. Vou verificar essa informação para você.",
-  "Perfeito! Vou agendar isso para você agora mesmo.",
-  "Entendi sua solicitação. Preciso de alguns dados adicionais.",
-  "Muito obrigado! Seu atendimento foi finalizado com sucesso.",
-  "Vou transferir você para o setor responsável."
-];
-
 export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
   isDarkMode,
   conversationId,
@@ -43,13 +34,21 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiResponses, setAiResponses] = useState<string[]>([]);
-  const [showPredefined, setShowPredefined] = useState(true);
+  const [initialGenerated, setInitialGenerated] = useState(false);
 
   const { messages, loading: loadingMessages } = useSimpleMessages(channelId || null, conversationId || null);
 
   useEffect(() => {
     loadProviders();
   }, []);
+
+  // Auto-generate responses when modal opens and data is ready
+  useEffect(() => {
+    if (providers.length > 0 && !loadingMessages && messages.length > 0 && !initialGenerated) {
+      generateAIResponses();
+      setInitialGenerated(true);
+    }
+  }, [providers, loadingMessages, messages, initialGenerated]);
 
   const loadProviders = async () => {
     try {
@@ -123,7 +122,6 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
 
         if (responses.length > 0) {
           setAiResponses(responses);
-          setShowPredefined(false);
           toast({
             title: "Sucesso",
             description: `${responses.length} respostas geradas com IA`,
@@ -131,7 +129,6 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
         } else {
           // Fallback para uma resposta única
           setAiResponses([generatedContent]);
-          setShowPredefined(false);
         }
       } else {
         toast({
@@ -153,8 +150,6 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
     }
   };
 
-  const responsesToShow = showPredefined ? PREDEFINED_RESPONSES : aiResponses;
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className={cn(
@@ -173,28 +168,11 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Badge 
-                variant={showPredefined ? "default" : "secondary"}
-                className={cn(
-                  showPredefined ? "bg-[#b5103c] text-white" : "",
-                  "cursor-pointer"
-                )}
-                onClick={() => setShowPredefined(true)}
+                variant="default"
+                className="bg-[#b5103c] text-white"
               >
-                Predefinidas
+                Geradas por IA ({aiResponses.length})
               </Badge>
-              
-              {aiResponses.length > 0 && (
-                <Badge 
-                  variant={!showPredefined ? "default" : "secondary"}
-                  className={cn(
-                    !showPredefined ? "bg-[#b5103c] text-white" : "",
-                    "cursor-pointer"
-                  )}
-                  onClick={() => setShowPredefined(false)}
-                >
-                  Geradas por IA ({aiResponses.length})
-                </Badge>
-              )}
             </div>
 
             {providers.length > 0 && (
@@ -216,7 +194,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
                 ) : (
                   <>
                     <RefreshCw size={14} />
-                    Gerar com IA
+                    Gerar Novas
                   </>
                 )}
               </Button>
@@ -225,7 +203,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
 
           {/* Lista de Respostas */}
           <div className="space-y-2">
-            {responsesToShow.map((response, index) => (
+            {aiResponses.map((response, index) => (
               <Card
                 key={index}
                 className={cn(
@@ -247,27 +225,24 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
               </Card>
             ))}
 
-            {responsesToShow.length === 0 && !isGenerating && (
+            {aiResponses.length === 0 && isGenerating && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c] mx-auto mb-4"></div>
+                <p className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
+                  Gerando respostas personalizadas com IA...
+                </p>
+              </div>
+            )}
+
+            {aiResponses.length === 0 && !isGenerating && providers.length === 0 && (
               <div className={cn(
                 "text-center py-8",
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               )}>
                 <Sparkles className="mx-auto h-12 w-12 opacity-30 mb-3" />
-                <p>Nenhuma resposta disponível</p>
+                <p>Nenhum provedor de IA configurado</p>
                 <p className="text-sm mt-1">
-                  {providers.length > 0 
-                    ? "Clique em 'Gerar com IA' para criar respostas personalizadas"
-                    : "Configure um provedor de IA para gerar respostas personalizadas"
-                  }
-                </p>
-              </div>
-            )}
-
-            {isGenerating && (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c] mx-auto mb-4"></div>
-                <p className={cn("text-sm", isDarkMode ? "text-muted-foreground" : "text-gray-600")}>
-                  Gerando respostas personalizadas com IA...
+                  Configure um provedor de IA para gerar respostas personalizadas
                 </p>
               </div>
             )}

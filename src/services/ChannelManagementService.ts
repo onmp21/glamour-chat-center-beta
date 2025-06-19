@@ -47,7 +47,7 @@ export class ChannelManagementService {
         .from('channels')
         .select('id')
         .eq('name', data.name.trim())
-        .single();
+        .maybeSingle();
 
       if (existingChannel) {
         return { success: false, error: 'Já existe um canal com este nome' };
@@ -73,9 +73,9 @@ export class ChannelManagementService {
         return { success: false, error: 'Erro ao criar canal no banco de dados' };
       }
 
-      // Criar tabela de conversas
+      // Criar tabela de conversas usando o nome correto do parâmetro
       const { error: tableError } = await supabase.rpc('create_conversation_table', {
-        table_name: tableName
+        p_table_name: tableName
       });
 
       if (tableError) {
