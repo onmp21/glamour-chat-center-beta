@@ -114,11 +114,11 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
   );
 
   const renderPromptCard = (def: any) => (
-    <Card key={def.type} className={isDarkMode ? "bg-card border-border" : "bg-gray-50 border-gray-200"}>
+    <Card key={def.type} className={isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <FileText size={18} className="text-primary" />
-          <CardTitle className={isDarkMode ? "text-foreground text-base" : "text-gray-900 text-base"}>
+          <FileText size={18} className="text-blue-500" />
+          <CardTitle className={isDarkMode ? "text-white text-base" : "text-gray-900 text-base"}>
             {def.label}
           </CardTitle>
         </div>
@@ -134,7 +134,7 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
         )}
       </CardHeader>
       <CardContent>
-        <p className={isDarkMode ? "text-muted-foreground text-xs mb-2" : "text-gray-600 text-xs mb-2"}>
+        <p className={isDarkMode ? "text-gray-400 text-xs mb-2" : "text-gray-600 text-xs mb-2"}>
           {def.description}
         </p>
         {editing === def.type ? (
@@ -147,7 +147,7 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
               rows={4}
             />
             <div className="flex gap-2 mt-2">
-              <Button size="sm" onClick={() => handleSave(def.type as AIPromptType)} className="bg-primary text-primary-foreground">
+              <Button size="sm" onClick={() => handleSave(def.type as AIPromptType)} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Salvar
               </Button>
               <Button size="sm" variant="outline" onClick={() => setEditing(null)}>
@@ -164,7 +164,7 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
             <div
               className={
                 "mt-1 rounded p-2 text-xs whitespace-pre-wrap font-mono " +
-                (isDarkMode ? "bg-card text-foreground" : "bg-white text-gray-800")
+                (isDarkMode ? "bg-gray-900 text-gray-300" : "bg-white text-gray-800")
               }
               style={{ minHeight: 56 }}
             >
@@ -178,10 +178,10 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
 
   return (
     <div>
-      <Card className={`border ${isDarkMode ? "bg-card border-border" : "bg-white border-gray-200 shadow"}`}>
+      <Card className={`border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200 shadow"}`}>
         <CardContent className="space-y-6 pt-6">
           {loading ? (
-            <div className="text-center text-muted-foreground">Carregando...</div>
+            <div className={`text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando...</div>
           ) : (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2">
