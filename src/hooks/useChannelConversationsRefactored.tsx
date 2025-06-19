@@ -1,16 +1,17 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
-import { MessageService } from '@/services/MessageService';
 import { ChannelConversation, ChannelMessage } from '@/types/messages';
 import { DetailedLogger } from '@/services/DetailedLogger';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
+import RealtimeSubscriptionManager from '@/services/RealtimeSubscriptionManager';
 
 export const useChannelConversationsRefactored = (channelId: string) => {
   const [conversations, setConversations] = useState<ChannelConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);
+  const subscriptionNameRef = useRef<string | null>(null);
   const isSubscribedRef = useRef<boolean>(false);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
@@ -55,49 +56,52 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   useEffect(() => {
     loadConversations();
 
-    let channelSuffix = '';
-
     // Only create realtime subscription if not already subscribed
     if (channelId && !isSubscribedRef.current) {
-      const messageService = new MessageService(channelId);
-      channelSuffix = `-conversations-refactored-${channelId}-${Date.now()}`;
+      const tableName = getTableNameForChannelSync(channelId);
+      const subscriptionName = `conversations-refactored-${channelId}-${Date.now()}`;
+      subscriptionNameRef.current = subscriptionName;
       
       try {
-        const channel = messageService.createRealtimeSubscription((payload) => {
-          DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-          // Recarregar conversas para refletir as novas mensagens
-          loadConversations();
-        }, channelSuffix);
+        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        
+        const channel = subscriptionManager.createSubscription(
+          subscriptionName,
+          (payload) => {
+            DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
+            // Recarregar conversas para refletir as novas mensagens
+            loadConversations();
+          },
+          tableName
+        );
 
-        channelRef.current = channel;
-
-        // Subscribe only once
-        channel.subscribe((status: string) => {
-          console.log(`🔌 [CONVERSATIONS_REFACTORED] Subscription status: ${status}`);
-          if (status === 'SUBSCRIBED') {
-            isSubscribedRef.current = true;
-          }
-        });
+        if (channel) {
+          // Subscribe only once
+          channel.subscribe((status: string) => {
+            console.log(`🔌 [CONVERSATIONS_REFACTORED] Subscription status: ${status} for ${channelId}`);
+            if (status === 'SUBSCRIBED') {
+              isSubscribedRef.current = true;
+            }
+          });
+        }
         
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
       } catch (error) {
-        DetailedLogger.error("useChannelConversationsRefactored", `Erro ao criar subscription:`, error);
+        DetailedLogger.error("useChannelConversationsRefactored", `Erro ao crear subscription:`, error);
       }
     }
 
     return () => {
-      if (channelRef.current && channelSuffix && isSubscribedRef.current) {
+      if (subscriptionNameRef.current && isSubscribedRef.current) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         try {
-          const messageService = new MessageService(channelId);
-          const repository = messageService['getRepository']();
-          const tableName = repository.getTableName();
-          MessageService.unsubscribeChannel(channelSuffix, tableName);
+          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+          subscriptionManager.removeSubscription(subscriptionNameRef.current);
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }
         isSubscribedRef.current = false;
-        channelRef.current = null;
+        subscriptionNameRef.current = null;
       }
     };
   }, [channelId, loadConversations]);

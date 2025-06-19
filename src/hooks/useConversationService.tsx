@@ -2,13 +2,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelConversation } from './useChannelConversations';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
+import RealtimeSubscriptionManager from '@/services/RealtimeSubscriptionManager';
 
 export const useConversationService = (channelId: string) => {
   const [conversations, setConversations] = useState<ChannelConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<any>(null);
+  const subscriptionNameRef = useRef<string | null>(null);
   const isSubscribedRef = useRef<boolean>(false);
 
   const loadConversations = async (isRefresh = false) => {
@@ -74,49 +76,52 @@ export const useConversationService = (channelId: string) => {
   useEffect(() => {
     loadConversations();
 
-    // Setup realtime subscription with proper cleanup - only if not already subscribed
-    let channelSuffix = '';
-
+    // Setup realtime subscription only if not already subscribed
     if (channelId && !isSubscribedRef.current) {
-      const messageService = new MessageService(channelId);
-      channelSuffix = `-service-${channelId}-${Date.now()}`;
+      const tableName = getTableNameForChannelSync(channelId);
+      const subscriptionName = `service-${channelId}-${Date.now()}`;
+      subscriptionNameRef.current = subscriptionName;
       
       try {
-        const channel = messageService.createRealtimeSubscription((payload) => {
-          console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-          // Refresh conversations when new message arrives
-          setTimeout(() => {
-            refreshConversations();
-          }, 1000);
-        }, channelSuffix);
+        const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        
+        const channel = subscriptionManager.createSubscription(
+          subscriptionName,
+          (payload) => {
+            console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
+            // Refresh conversations when new message arrives
+            setTimeout(() => {
+              refreshConversations();
+            }, 1000);
+          },
+          tableName
+        );
 
-        channelRef.current = channel;
-
-        // Subscribe only once
-        channel.subscribe((status: string) => {
-          console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status}`);
-          if (status === 'SUBSCRIBED') {
-            isSubscribedRef.current = true;
-          }
-        });
+        if (channel) {
+          // Subscribe only once
+          channel.subscribe((status: string) => {
+            console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status} for ${channelId}`);
+            if (status === 'SUBSCRIBED') {
+              isSubscribedRef.current = true;
+            }
+          });
+        }
       } catch (error) {
-        console.error('Error setting up realtime subscription:', error);
+        console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
       }
     }
 
     return () => {
-      if (channelRef.current && channelSuffix && isSubscribedRef.current) {
+      if (subscriptionNameRef.current && isSubscribedRef.current) {
         console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from channel ${channelId}`);
         try {
-          const messageService = new MessageService(channelId);
-          const repository = messageService['getRepository']();
-          const tableName = repository.getTableName();
-          MessageService.unsubscribeChannel(channelSuffix, tableName);
+          const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+          subscriptionManager.removeSubscription(subscriptionNameRef.current);
         } catch (error) {
-          console.error('Error cleaning up subscription:', error);
+          console.error('❌ [CONVERSATION_SERVICE_HOOK] Error cleaning up subscription:', error);
         }
         isSubscribedRef.current = false;
-        channelRef.current = null;
+        subscriptionNameRef.current = null;
       }
     };
   }, [channelId]);
