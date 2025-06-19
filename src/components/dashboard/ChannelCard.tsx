@@ -118,9 +118,10 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {counts.total > 0 && (
-              <Badge className="text-white text-xs bg-zinc-900 px-[2px] py-0">
-                {counts.total}
+            {/* Badge de mensagens não lidas - centralizado com o ícone de fixar */}
+            {unreadNotifications > 0 && (
+              <Badge className="bg-red-500 text-white text-xs px-2 py-1 font-medium">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
               </Badge>
             )}
             <button
@@ -149,13 +150,6 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
         </div>
-
-        {/* Badge de notificações não lidas - movido para canto inferior direito */}
-        {unreadNotifications > 0 && (
-          <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium shadow-lg">
-            {unreadNotifications > 99 ? '99+' : unreadNotifications}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
