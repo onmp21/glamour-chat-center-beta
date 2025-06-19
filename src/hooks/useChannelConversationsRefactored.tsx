@@ -11,10 +11,9 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const callbackRef = useRef<((payload: any) => void) | null>(null);
+  const callbackIdRef = useRef<string | null>(null);
   const tableNameRef = useRef<string | null>(null);
   const mountedRef = useRef(false);
-  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -61,13 +60,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations(true);
   }, [channelId, loadConversations]);
 
-  // Debounced realtime callback
+  // Callback debounced para realtime
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
     
-    // Debounce to avoid excessive refreshes
+    // Debounce para evitar atualizações excessivas
     setTimeout(() => {
       if (mountedRef.current) {
         loadConversations();
@@ -93,39 +92,33 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     tableNameRef.current = tableName;
-    callbackRef.current = realtimeCallback;
 
     const setupSubscription = async () => {
       if (!mountedRef.current) return;
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        const callbackId = await subscriptionManager.createSubscription(tableName, realtimeCallback);
         
-        // Store the promise to prevent duplicate calls
-        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, realtimeCallback);
-        await subscriptionPromiseRef.current;
-        
-        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
+        if (mountedRef.current) {
+          callbackIdRef.current = callbackId;
+          DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId} com callback ${callbackId}`);
+        }
       } catch (error) {
-        DetailedLogger.error("useChannelConversationsRefactored", `Erro ao crear subscription:`, error);
-      } finally {
-        subscriptionPromiseRef.current = null;
+        DetailedLogger.error("useChannelConversationsRefactored", `Erro ao criar subscription:`, error);
       }
     };
 
-    // Only setup if we're not already setting up
-    if (!subscriptionPromiseRef.current) {
-      setupSubscription();
-    }
+    setupSubscription();
 
     return () => {
       mountedRef.current = false;
       
-      if (tableNameRef.current && callbackRef.current) {
-        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
+      if (tableNameRef.current && callbackIdRef.current) {
+        DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}, callback ${callbackIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
+          subscriptionManager.removeSubscription(tableNameRef.current, callbackIdRef.current);
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }

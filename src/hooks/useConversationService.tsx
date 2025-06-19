@@ -10,10 +10,9 @@ export const useConversationService = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const callbackRef = useRef<((payload: any) => void) | null>(null);
+  const callbackIdRef = useRef<string | null>(null);
   const tableNameRef = useRef<string | null>(null);
   const mountedRef = useRef(false);
-  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -80,13 +79,13 @@ export const useConversationService = (channelId: string) => {
     }
   };
 
-  // Debounced realtime callback
+  // Callback debounced para realtime
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
     
-    // Debounce to avoid excessive refreshes
+    // Debounce para evitar atualizações excessivas
     setTimeout(() => {
       if (mountedRef.current) {
         refreshConversations();
@@ -112,39 +111,33 @@ export const useConversationService = (channelId: string) => {
     }
 
     tableNameRef.current = tableName;
-    callbackRef.current = realtimeCallback;
 
     const setupSubscription = async () => {
       if (!mountedRef.current) return;
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        const callbackId = await subscriptionManager.createSubscription(tableName, realtimeCallback);
         
-        // Store the promise to prevent duplicate calls
-        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, realtimeCallback);
-        await subscriptionPromiseRef.current;
-        
-        console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName}`);
+        if (mountedRef.current) {
+          callbackIdRef.current = callbackId;
+          console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName} with callback ${callbackId}`);
+        }
       } catch (error) {
         console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
-      } finally {
-        subscriptionPromiseRef.current = null;
       }
     };
 
-    // Only setup if we're not already setting up
-    if (!subscriptionPromiseRef.current) {
-      setupSubscription();
-    }
+    setupSubscription();
 
     return () => {
       mountedRef.current = false;
       
-      if (tableNameRef.current && callbackRef.current) {
-        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from table ${tableNameRef.current}`);
+      if (tableNameRef.current && callbackIdRef.current) {
+        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from table ${tableNameRef.current}, callback ${callbackIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
+          subscriptionManager.removeSubscription(tableNameRef.current, callbackIdRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_SERVICE_HOOK] Error cleaning up subscription:', error);
         }

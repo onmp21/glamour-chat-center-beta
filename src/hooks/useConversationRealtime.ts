@@ -6,12 +6,11 @@ import RealtimeSubscriptionManager from '@/services/RealtimeSubscriptionManager'
 
 export const useConversationRealtime = (channelId: string, onNewMessage?: (message: RawMessage) => void) => {
   const [isConnected, setIsConnected] = useState(false);
-  const callbackRef = useRef<((payload: any) => void) | null>(null);
+  const callbackIdRef = useRef<string | null>(null);
   const tableNameRef = useRef<string | null>(null);
   const mountedRef = useRef(false);
-  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
-  // Stable callback that won't change on every render
+  // Callback estável que não muda a cada render
   const stableCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
@@ -36,47 +35,38 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
       return;
     }
 
-    // Store refs for cleanup
     tableNameRef.current = tableName;
-    callbackRef.current = stableCallback;
 
     const setupSubscription = async () => {
       if (!mountedRef.current) return;
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
+        const callbackId = await subscriptionManager.createSubscription(tableName, stableCallback);
         
-        // Store the promise to prevent duplicate calls
-        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, stableCallback);
-        await subscriptionPromiseRef.current;
-
         if (mountedRef.current) {
+          callbackIdRef.current = callbackId;
           setIsConnected(true);
-          console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName}`);
+          console.log(`✅ [CONVERSATION_REALTIME] Connected to ${tableName} with callback ${callbackId}`);
         }
       } catch (error) {
         console.error('❌ [CONVERSATION_REALTIME] Error setting up subscription:', error);
         if (mountedRef.current) {
           setIsConnected(false);
         }
-      } finally {
-        subscriptionPromiseRef.current = null;
       }
     };
 
-    // Only setup if we're not already setting up
-    if (!subscriptionPromiseRef.current) {
-      setupSubscription();
-    }
+    setupSubscription();
 
     return () => {
       mountedRef.current = false;
       
-      if (tableNameRef.current && callbackRef.current) {
-        console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription for table ${tableNameRef.current}`);
+      if (tableNameRef.current && callbackIdRef.current) {
+        console.log(`🔌 [CONVERSATION_REALTIME] Cleaning up subscription for table ${tableNameRef.current}, callback ${callbackIdRef.current}`);
         try {
           const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-          subscriptionManager.removeSubscription(tableNameRef.current, callbackRef.current);
+          subscriptionManager.removeSubscription(tableNameRef.current, callbackIdRef.current);
         } catch (error) {
           console.error('❌ [CONVERSATION_REALTIME] Error cleaning up subscription:', error);
         }
