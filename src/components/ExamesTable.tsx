@@ -109,10 +109,7 @@ export const ExamesTable: React.FC<ExamesTableProps> = ({
               {showThisWeek ? 'Mostrar Todos' : 'Exames da Semana'}
             </Button>
             
-            <Button onClick={toggleMultiSelect} variant={isMultiSelectMode ? "default" : "outline"} className="flex items-center gap-2">
-              <CheckSquare size={16} />
-              {isMultiSelectMode ? 'Cancelar Seleção' : 'Seleção Múltipla'}
-            </Button>
+            
             
             {isMultiSelectMode && selectedExams.length > 0 && <Button onClick={deleteSelectedExams} variant="outline" className="flex items-center gap-2 text-destructive border-destructive hover:bg-destructive/10">
                 <Trash2 size={16} />
