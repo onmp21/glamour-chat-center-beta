@@ -454,7 +454,7 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
+          media_base64: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -465,7 +465,7 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
+          media_base64?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -476,7 +476,7 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
+          media_base64?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
