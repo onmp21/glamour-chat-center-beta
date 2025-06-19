@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from "@/integrations/supabase/client";
@@ -24,15 +25,30 @@ const NAME_TO_LEGACYID: Record<string, string> = {
   'Andressa Gerente Externo': 'gerente-externo'
 };
 
+// Função para gerar legacyId baseado no nome do canal
+const generateLegacyId = (channelName: string): string => {
+  // Primeiro, verificar se existe um mapeamento explícito
+  if (NAME_TO_LEGACYID[channelName]) {
+    return NAME_TO_LEGACYID[channelName];
+  }
+  
+  // Se não existe, gerar um legacyId baseado no nome
+  return channelName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
 export const useInternalChannels = () => {
   const [channels, setChannels] = useState<InternalChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Carregar canais diretamente do Supabase
-    const fetchChannels = async () => {
-      setLoading(true);
+  // Função para carregar canais do Supabase
+  const fetchChannels = async () => {
+    setLoading(true);
+    try {
       const { data, error } = await supabase
         .from('channels')
         .select('*')
@@ -54,42 +70,49 @@ export const useInternalChannels = () => {
           type: row.type as InternalChannel['type'],
           isActive: row.is_active,
           isDefault: row.is_default,
-          legacyId: NAME_TO_LEGACYID[row.name] || row.id // fallback para id se não houver mapeamento
+          legacyId: generateLegacyId(row.name) // Usar função dinâmica
         }));
+        
+        console.log('✅ [useInternalChannels] Canais carregados:', loadedChannels.map(c => ({ name: c.name, legacyId: c.legacyId })));
         setChannels(loadedChannels);
       }
+    } catch (error) {
+      console.error('[useInternalChannels] Erro inesperado:', error);
+      setChannels([]);
+    } finally {
       setLoading(false);
-    };
-
-    fetchChannels();
-    // Opcional: subscribe realtime aqui se precisar (outra etapa)
-  }, []);
-
-  // Ajuda "refetch" explícito (usa mesma lógica acima)
-  const refetch = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('channels')
-      .select('*')
-      .order('created_at', { ascending: true });
-
-    if (!error && data) {
-      const loadedChannels: InternalChannel[] = data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        type: row.type as InternalChannel['type'],
-        isActive: row.is_active,
-        isDefault: row.is_default,
-        legacyId: NAME_TO_LEGACYID[row.name] || row.id
-      }));
-      setChannels(loadedChannels);
     }
-    setLoading(false);
   };
 
-  // O resto (updateChannelStatus etc) igual
-  const saveChannels = (updatedChannels: InternalChannel[]) => {
-    setChannels(updatedChannels);
+  useEffect(() => {
+    fetchChannels();
+
+    // Configurar realtime para mudanças na tabela channels
+    const channel = supabase
+      .channel('channels-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'channels'
+        },
+        (payload) => {
+          console.log('🔄 [useInternalChannels] Mudança na tabela channels detectada:', payload);
+          // Recarregar canais quando houver mudanças
+          fetchChannels();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Função refetch explícita
+  const refetch = async () => {
+    await fetchChannels();
   };
 
   const updateChannelStatus = async (channelId: string, isActive: boolean) => {
@@ -108,8 +131,7 @@ export const useInternalChannels = () => {
         variant: "default"
       });
 
-      // Refaz loading após alteração (garante que a UI vai refletir o novo status)
-      await refetch();
+      // O realtime subscription já vai recarregar automaticamente
     } catch (error) {
       console.error('Erro ao atualizar canal:', error);
       toast({

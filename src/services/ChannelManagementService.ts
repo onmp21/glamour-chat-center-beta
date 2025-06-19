@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { invalidateChannelCache } from '@/utils/channelMapping';
 
 export interface CreateChannelData {
   name: string;
@@ -86,7 +88,11 @@ export class ChannelManagementService {
         return { success: false, error: 'Erro ao criar tabela de conversas' };
       }
 
+      // IMPORTANTE: Invalidar cache para que novos canais sejam reconhecidos
+      invalidateChannelCache();
+
       console.log('✅ [CHANNEL_MANAGEMENT] Channel created successfully:', newChannel.id);
+      console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
       
       toast({
         title: 'Sucesso',
@@ -122,7 +128,7 @@ export class ChannelManagementService {
           .select('id')
           .eq('name', data.name.trim())
           .neq('id', channelId)
-          .single();
+          .maybeSingle();
 
         if (existingChannel) {
           return { success: false, error: 'Já existe um canal com este nome' };
@@ -161,7 +167,11 @@ export class ChannelManagementService {
         return { success: false, error: 'Erro ao atualizar canal' };
       }
 
+      // Invalidar cache após atualização
+      invalidateChannelCache();
+
       console.log('✅ [CHANNEL_MANAGEMENT] Channel updated successfully');
+      console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
       
       toast({
         title: 'Sucesso',
@@ -230,7 +240,11 @@ export class ChannelManagementService {
         return { success: false, error: 'Erro ao excluir canal' };
       }
 
+      // Invalidar cache após exclusão
+      invalidateChannelCache();
+
       console.log('✅ [CHANNEL_MANAGEMENT] Channel deleted successfully');
+      console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
       
       toast({
         title: 'Sucesso',
@@ -252,7 +266,7 @@ export class ChannelManagementService {
         query = query.neq('id', excludeId);
       }
       
-      const { data } = await query.single();
+      const { data } = await query.maybeSingle();
       return !data; // Retorna true se não existe
     } catch {
       return true; // Se erro, assumir que não existe

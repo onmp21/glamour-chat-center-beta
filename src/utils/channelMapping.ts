@@ -16,6 +16,15 @@ const generateTableName = (channelName: string): string => {
     .replace(/^_|_$/g, '') + '_conversas';
 };
 
+// Função para gerar legacyId baseado no nome do canal
+const generateLegacyId = (channelName: string): string => {
+  return channelName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
+
 // Função para carregar mapeamentos do banco
 const loadChannelMappings = async (): Promise<void> => {
   try {
@@ -33,14 +42,27 @@ const loadChannelMappings = async (): Promise<void> => {
     channelMappingCache = {};
     displayNameCache = {};
 
-    // Preencher caches
+    // Preencher caches com canais do banco
     channels?.forEach(channel => {
       const tableName = generateTableName(channel.name);
+      const legacyId = generateLegacyId(channel.name);
+      
+      // Mapear tanto por UUID quanto por legacyId
       channelMappingCache[channel.id] = tableName;
+      channelMappingCache[legacyId] = tableName;
+      
       displayNameCache[channel.id] = channel.name;
+      displayNameCache[legacyId] = channel.name;
+      
+      console.log('📋 [CHANNEL_MAPPING] Mapeamento criado:', {
+        name: channel.name,
+        id: channel.id,
+        legacyId,
+        tableName
+      });
     });
 
-    // Mapeamentos legados para compatibilidade
+    // Mapeamentos legados para compatibilidade (sobrescrever se necessário)
     const legacyMappings: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
@@ -51,7 +73,12 @@ const loadChannelMappings = async (): Promise<void> => {
       'gerente-externo': 'gerente_externo_conversas'
     };
 
-    Object.assign(channelMappingCache, legacyMappings);
+    // Aplicar mapeamentos legados, mas não sobrescrever os novos
+    Object.entries(legacyMappings).forEach(([legacyId, tableName]) => {
+      if (!channelMappingCache[legacyId]) {
+        channelMappingCache[legacyId] = tableName;
+      }
+    });
 
     lastCacheUpdate = Date.now();
     console.log('✅ Mapeamentos de canais carregados:', channelMappingCache);
@@ -97,6 +124,7 @@ export const invalidateChannelCache = (): void => {
   channelMappingCache = {};
   displayNameCache = {};
   lastCacheUpdate = 0;
+  console.log('🔄 [CHANNEL_MAPPING] Cache invalidado - próxima consulta recarregará do banco');
 };
 
 // Inicializar cache na primeira importação
