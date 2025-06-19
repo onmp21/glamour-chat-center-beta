@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Users, History, Settings, Folder, Shield, Bell, Palette, Database, Sun, Moon, LogOut, Brain, MessageSquare } from 'lucide-react';
@@ -27,7 +28,7 @@ interface SettingsItem {
 interface ActionCardProps {
   title: string;
   description: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: React.ComponentType<{ size?: string | number; className?: string }>;
   onClick: () => void;
   isDarkMode: boolean;
 }
@@ -213,3 +214,4 @@ export const SettingsGrid: React.FC<SettingsGridProps> = ({
     </div>
   );
 };
+
