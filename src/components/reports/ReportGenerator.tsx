@@ -92,76 +92,49 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         return;
       }
 
-      // Validação específica para cada tipo de relatório
-      if (filters.report_type === 'custom' && !filters.custom_prompt?.trim()) {
-        toast({
-          title: "Erro",
-          description: "Digite um prompt personalizado",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (filters.report_type !== 'custom' && (!filters.selected_sheets || filters.selected_sheets.length === 0)) {
-        toast({
-          title: "Erro",
-          description: "Selecione pelo menos uma planilha",
-          variant: "destructive"
-        });
-        return;
-      }
-
       console.log('✅ [REPORT_GENERATOR] Validações passaram, chamando edge function...');
 
-      // Chamar a edge function diretamente com todos os parâmetros necessários
+      // Chamar a edge function
       const { data, error } = await supabase.functions.invoke('generate-report', {
         body: {
           provider_id: selectedProvider,
           report_type: filters.report_type,
           custom_prompt: filters.custom_prompt,
-          selected_sheets: filters.selected_sheets || [],
-          filters: {
-            selected_sheets: filters.selected_sheets || [],
-            report_type: filters.report_type
-          }
+          selected_sheets: filters.selected_sheets || []
         }
       });
 
+      console.log('📊 [REPORT_GENERATOR] Resposta da edge function:', { data, error });
+
       if (error) {
         console.error('❌ [REPORT_GENERATOR] Erro na edge function:', error);
-        throw error;
+        toast({
+          title: "Erro",
+          description: "Erro ao gerar relatório: " + (error.message || 'Erro desconhecido'),
+          variant: "destructive"
+        });
+        return;
       }
 
-      console.log('✅ [REPORT_GENERATOR] Resposta da edge function:', data);
-
       if (data && data.success) {
-        // Chamar callback para atualizar o estado no componente pai
         onGenerateReport();
-        
         toast({
           title: "Sucesso",
           description: "Relatório gerado com sucesso!",
         });
       } else {
-        throw new Error(data?.error || 'Erro desconhecido na geração do relatório');
+        toast({
+          title: "Erro",
+          description: data?.error || 'Erro desconhecido na geração do relatório',
+          variant: "destructive"
+        });
       }
 
     } catch (error) {
       console.error('❌ [REPORT_GENERATOR] Erro geral:', error);
-      
-      let errorMessage = 'Erro ao gerar relatório. Tente novamente.';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String(error.message);
-      }
-
       toast({
         title: "Erro",
-        description: errorMessage,
+        description: "Erro ao gerar relatório. Tente novamente.",
         variant: "destructive"
       });
     }
@@ -196,11 +169,6 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {providers.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Nenhum provedor de IA configurado. Configure um provedor primeiro.
-            </p>
-          )}
         </div>
 
         {/* Tipo de Relatório */}
@@ -227,7 +195,7 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
         {(filters.report_type === 'conversations' || filters.report_type === 'exams') && (
           <div className="space-y-3">
             <Label className={cn(isDarkMode ? "text-card-foreground" : "text-gray-700")}>
-              Selecionar Planilhas (múltipla seleção)
+              Selecionar Planilhas
             </Label>
             <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
               {availableSheets
@@ -262,9 +230,6 @@ export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Selecione uma ou mais planilhas para análise
-            </p>
           </div>
         )}
 

@@ -13,6 +13,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🤖 [GENERATE_REPORT] Função iniciada');
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -26,6 +28,7 @@ serve(async (req) => {
     const { data: { user } } = await supabaseClient.auth.getUser()
 
     if (!user) {
+      console.log('❌ [GENERATE_REPORT] Usuário não autenticado');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { 
@@ -35,19 +38,37 @@ serve(async (req) => {
       )
     }
 
-    const requestBody = await req.json()
-    const { provider_id, report_type, custom_prompt, selected_sheets = [], filters } = requestBody
+    console.log('✅ [GENERATE_REPORT] Usuário autenticado:', user.id);
 
-    console.log('🤖 [GENERATE_REPORT] Requisição recebida:', { 
-      provider_id, 
-      report_type, 
-      user_id: user.id,
-      selected_sheets_count: selected_sheets.length,
-      filters
-    });
+    const requestBody = await req.json()
+    console.log('📝 [GENERATE_REPORT] Body recebido:', requestBody);
+
+    const { provider_id, report_type, custom_prompt, selected_sheets = [] } = requestBody
+
+    // Buscar o provedor de IA
+    const { data: provider, error: providerError } = await supabaseClient
+      .from('ai_providers')
+      .select('*')
+      .eq('id', provider_id)
+      .single()
+
+    if (providerError || !provider) {
+      console.log('❌ [GENERATE_REPORT] Erro ao buscar provider:', providerError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Provedor de IA não encontrado' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('✅ [GENERATE_REPORT] Provider encontrado:', provider.name);
 
     // Buscar dados das planilhas selecionadas
-    console.log('📊 [GENERATE_REPORT] Buscando dados das planilhas:', selected_sheets);
     const reportData: any = {};
 
     if (selected_sheets && selected_sheets.length > 0) {
@@ -60,15 +81,25 @@ serve(async (req) => {
             query = supabaseClient
               .from('exams')
               .select('patient_name, phone, city, appointment_date, status, exam_type')
-              .limit(50)
-              .order('appointment_date', { ascending: false });
+              .limit(10);
           } else {
             // Tabelas de conversas
+            const tableMapping: Record<string, string> = {
+              'yelena_ai_conversas': 'yelena_ai_conversas',
+              'canarana_conversas': 'canarana_conversas',
+              'souto_soares_conversas': 'souto_soares_conversas',
+              'joao_dourado_conversas': 'joao_dourado_conversas',
+              'america_dourada_conversas': 'america_dourada_conversas',
+              'gerente_lojas_conversas': 'gerente_lojas_conversas',
+              'gerente_externo_conversas': 'gerente_externo_conversas'
+            };
+
+            const tableName = tableMapping[sheetId] || sheetId;
+            
             query = supabaseClient
-              .from(sheetId as any)
+              .from(tableName as any)
               .select('session_id, message, nome_do_contato, tipo_remetente, read_at')
-              .limit(100)
-              .order('read_at', { ascending: false });
+              .limit(10);
           }
           
           const { data, error } = await query;
@@ -86,58 +117,23 @@ serve(async (req) => {
       }
     }
 
-    // Buscar o provedor de IA
-    let { data: provider, error: providerError } = await supabaseClient
-      .from('ai_providers')
-      .select('*')
-      .eq('id', provider_id)
-      .single()
-
-    if (providerError || !provider) {
-      console.log(`⚠️ [GENERATE_REPORT] Provider not found: ${provider_id}, using default`);
-      
-      const defaultApiKey = Deno.env.get('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');
-      if (!defaultApiKey) {
-        return new Response(
-          JSON.stringify({ 
-            success: false,
-            error: 'Nenhum provedor de IA configurado e nenhuma chave padrão disponível' 
-          }),
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
-      
-      provider = {
-        id: 'default',
-        provider_type: 'openai',
-        api_key: defaultApiKey,
-        base_url: 'https://api.openai.com/v1/chat/completions',
-        default_model: 'gpt-3.5-turbo',
-        advanced_settings: {}
-      };
-    }
-
     // Preparar prompt baseado no tipo de relatório
     let systemPrompt = "Você é um assistente especializado em análise de dados e geração de relatórios em português brasileiro. Analise os dados fornecidos e gere um relatório detalhado, claro e útil."
     let userPrompt = ""
 
     if (report_type === 'conversations') {
-      userPrompt = `Analise as seguintes conversas de WhatsApp e gere um relatório detalhado com insights, estatísticas e recomendações sobre o atendimento ao cliente:
+      userPrompt = `Analise as seguintes conversas de WhatsApp e gere um relatório detalhado:
 
 Dados das conversas: ${JSON.stringify(reportData, null, 2)}
 
 Por favor, inclua:
-1. Estatísticas gerais (total de mensagens, conversas, etc.)
-2. Análise de padrões de comunicação
-3. Identificação de temas principais
-4. Qualidade do atendimento
-5. Recomendações de melhoria`
+1. Estatísticas gerais
+2. Análise de padrões
+3. Principais temas
+4. Recomendações`
 
     } else if (report_type === 'exams') {
-      userPrompt = `Analise os seguintes dados de exames médicos e gere um relatório detalhado:
+      userPrompt = `Analise os seguintes dados de exames médicos:
 
 Dados dos exames: ${JSON.stringify(reportData, null, 2)}
 
@@ -145,8 +141,7 @@ Por favor, inclua:
 1. Estatísticas de agendamentos
 2. Distribuição por cidade
 3. Análise temporal
-4. Status dos exames
-5. Insights e recomendações`
+4. Insights e recomendações`
 
     } else if (report_type === 'custom') {
       userPrompt = custom_prompt || 'Gere um relatório com base nos dados fornecidos.'
@@ -157,9 +152,7 @@ Por favor, inclua:
 
     console.log('🔄 [GENERATE_REPORT] Enviando para OpenAI...');
 
-    const startTime = Date.now()
-    
-    const openaiResponse = await fetch(provider.base_url || 'https://api.openai.com/v1/chat/completions', {
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${provider.api_key}`,
@@ -171,9 +164,8 @@ Por favor, inclua:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 2000,
-        temperature: 0.7,
-        ...provider.advanced_settings
+        max_tokens: 1500,
+        temperature: 0.7
       }),
     })
 
@@ -193,11 +185,9 @@ Por favor, inclua:
     }
 
     const response = await openaiResponse.json()
-    const generationTime = (Date.now() - startTime) / 1000
-    const tokensUsed = response.usage?.total_tokens || 0
     const reportContent = response.choices?.[0]?.message?.content || 'Erro na geração do relatório'
 
-    console.log('✅ [GENERATE_REPORT] Relatório gerado. Tokens:', tokensUsed, 'Tempo:', generationTime + 's');
+    console.log('✅ [GENERATE_REPORT] Relatório gerado com sucesso');
 
     // Salvar no histórico
     const { data: savedReport, error: saveError } = await supabaseClient
@@ -207,20 +197,19 @@ Por favor, inclua:
         report_type,
         prompt: userPrompt,
         generated_report: reportContent,
-        model_used: provider.default_model,
-        tokens_used: tokensUsed,
-        generation_time: generationTime,
+        model_used: provider.default_model || 'gpt-3.5-turbo',
+        tokens_used: response.usage?.total_tokens || 0,
+        generation_time: 0,
         report_metadata: {
-          filters,
-          data_size: JSON.stringify(reportData).length,
-          user_id: user.id
+          user_id: user.id,
+          data_size: JSON.stringify(reportData).length
         }
       })
       .select()
       .single()
 
     if (saveError) {
-      console.error('⚠️ [GENERATE_REPORT] Error saving report:', saveError)
+      console.error('⚠️ [GENERATE_REPORT] Erro ao salvar relatório:', saveError)
     }
 
     return new Response(
@@ -228,9 +217,8 @@ Por favor, inclua:
         success: true,
         report: reportContent,
         metadata: {
-          tokens_used: tokensUsed,
-          generation_time: generationTime,
-          model_used: provider.default_model,
+          tokens_used: response.usage?.total_tokens || 0,
+          model_used: provider.default_model || 'gpt-3.5-turbo',
           report_id: savedReport?.id
         }
       }),
@@ -240,7 +228,7 @@ Por favor, inclua:
     )
 
   } catch (error) {
-    console.error('❌ [GENERATE_REPORT] Error generating report:', error)
+    console.error('❌ [GENERATE_REPORT] Erro geral:', error)
     return new Response(
       JSON.stringify({ 
         success: false,
