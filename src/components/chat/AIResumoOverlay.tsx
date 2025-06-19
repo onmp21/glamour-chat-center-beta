@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,16 @@ interface AIResumoOverlayProps {
 
 const MINIMUM_MESSAGES_FOR_SUMMARY = 4; // Número mínimo de mensagens para permitir resumo
 
+// Type for message data from database
+interface MessageData {
+  id: string;
+  message: string;
+  nome_do_contato?: string;
+  tipo_remetente?: string;
+  read_at?: string;
+  mensagemtype?: string;
+}
+
 export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   open,
   onClose,
@@ -46,7 +57,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   const [internalLoading, setInternalLoading] = useState(false);
   const [internalError, setInternalError] = useState<string>('');
   const [providers, setProviders] = useState<AIProvider[]>([]);
-  const [conversationMessages, setConversationMessages] = useState<any[]>([]);
+  const [conversationMessages, setConversationMessages] = useState<MessageData[]>([]);
 
   // Use external props or internal state
   const summary = externalSummary || internalSummary;
@@ -59,7 +70,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     }
   }, [open, conversationId, channelId]);
 
-  const loadConversationMessages = async () => {
+  const loadConversationMessages = async (): Promise<MessageData[]> => {
     if (!channelId || !conversationId) {
       console.log('❌ [AI_RESUMO] Missing channelId or conversationId');
       return [];
@@ -83,7 +94,8 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
 
       console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
       
-      if (!data || data.length === 0) {
+      // Type guard to ensure data is an array of MessageData
+      if (!data || !Array.isArray(data)) {
         setInternalError('Não há mensagens nesta conversa para resumir.');
         return [];
       }
@@ -95,8 +107,9 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
       }
 
       // Filtrar mensagens muito curtas ou vazias para uma contagem mais precisa
-      const meaningfulMessages = data.filter(msg => 
+      const meaningfulMessages = data.filter((msg: MessageData) => 
         msg.message && 
+        typeof msg.message === 'string' &&
         msg.message.trim().length > 10 && // Mensagens com pelo menos 10 caracteres
         !msg.message.trim().match(/^(ok|sim|não|oi|olá|tchau|obrigado|obrigada)$/i) // Evitar mensagens muito simples
       );
@@ -106,7 +119,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
         return [];
       }
 
-      return data || [];
+      return data as MessageData[];
 
     } catch (error) {
       console.error('❌ [AI_RESUMO] Error loading conversation messages:', error);
@@ -140,7 +153,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     }
   };
 
-  const generateSummary = async (providerId?: string, messagesData?: any[]) => {
+  const generateSummary = async (providerId?: string, messagesData?: MessageData[]) => {
     if (!conversationId || !channelId) {
       setInternalError('Dados da conversa não disponíveis');
       return;
@@ -334,3 +347,4 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
     </Dialog>
   );
 };
+
