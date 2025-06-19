@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -601,7 +602,154 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           </CardContent>
         </Card>
 
-        {/* SEÇÃO 2: Gerenciar Instâncias */}
+        {/* SEÇÃO 2: Instâncias da API Evolution */}
+        {apiConnection.isValidated && (
+          <Card className={cn(
+            "border-2",
+            isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+          )}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Instâncias da API Evolution
+              </CardTitle>
+              <CardDescription>
+                Instâncias encontradas na API Evolution
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label>Instâncias Disponíveis ({apiConnection.instances.length}):</Label>
+                {apiConnection.instances.length === 0 ? (
+                  <p className={cn(
+                    "text-sm p-4 rounded-lg border border-dashed text-center",
+                    isDarkMode ? "text-gray-400 border-gray-600" : "text-gray-500 border-gray-300"
+                  )}>
+                    Nenhuma instância encontrada na API
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {apiConnection.instances.map((instance) => (
+                      <div
+                        key={instance.instanceName}
+                        className={cn(
+                          "flex items-center justify-between p-4 border rounded-lg",
+                          isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          {getStatusBadge(instance.status)}
+                          <div>
+                            <span className={cn(
+                              "font-semibold text-base",
+                              isDarkMode ? "text-white" : "text-gray-900"
+                            )}>
+                              {instance.instanceName}
+                            </span>
+                            {instance.profileName && (
+                              <p className={cn(
+                                "text-sm",
+                                isDarkMode ? "text-gray-400" : "text-gray-600"
+                              )}>
+                                Perfil: {instance.profileName}
+                              </p>
+                            )}
+                            {instance.number && (
+                              <p className={cn(
+                                "text-sm",
+                                isDarkMode ? "text-gray-400" : "text-gray-600"
+                              )}>
+                                Número: {instance.number}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(instance.status === 'connecting' || instance.status === 'close' || instance.status === 'unknown') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                setQrCodeModal({
+                                  isOpen: true,
+                                  qrCode: '',
+                                  instanceName: instance.instanceName,
+                                  loading: true
+                                });
+                                
+                                try {
+                                  const service = new EvolutionApiService({
+                                    baseUrl: apiConnection.baseUrl,
+                                    apiKey: apiConnection.apiKey,
+                                    instanceName: instance.instanceName
+                                  });
+                                  
+                                  const qrResult = await service.getQRCodeForInstance(instance.instanceName);
+                                  if (qrResult.success && qrResult.qrCode) {
+                                    const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
+                                      ? qrResult.qrCode 
+                                      : `data:image/png;base64,${qrResult.qrCode}`;
+                                    
+                                    setQrCodeModal(prev => ({
+                                      ...prev,
+                                      qrCode: qrCodeSrc,
+                                      loading: false
+                                    }));
+                                  } else {
+                                    setQrCodeModal(prev => ({ ...prev, loading: false }));
+                                    toast({
+                                      title: "Erro",
+                                      description: qrResult.error || "Erro ao obter QR Code",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                } catch (error) {
+                                  setQrCodeModal(prev => ({ ...prev, loading: false }));
+                                  toast({
+                                    title: "Erro",
+                                    description: `Erro ao obter QR Code: ${error}`,
+                                    variant: "destructive"
+                                  });
+                                }
+                              }}
+                              className={cn(
+                                isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
+                              )}
+                            >
+                              <QrCode className="mr-2 h-4 w-4" />
+                              QR Code
+                            </Button>
+                          )}
+                          {instance.status === 'open' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => logoutInstance(instance.instanceName)}
+                              disabled={loggingOutInstance === instance.instanceName}
+                              className={cn(
+                                "border-orange-500 text-orange-600 hover:bg-orange-50",
+                                isDarkMode ? "border-orange-400 text-orange-400 hover:bg-orange-900/20" : ""
+                              )}
+                            >
+                              {loggingOutInstance === instance.instanceName ? (
+                                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <LogOut className="mr-2 h-4 w-4" />
+                              )}
+                              Desconectar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* SEÇÃO 3: Gerenciar Instâncias */}
         {apiConnection.isValidated && (
           <Card className={cn(
             "border-2",
@@ -613,7 +761,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 Gerenciar Instâncias
               </CardTitle>
               <CardDescription>
-                Crie novas instâncias ou visualize as existentes.
+                Crie novas instâncias ou gerencie as existentes.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -649,134 +797,11 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                   )}
                 </Button>
               </div>
-
-              <div className="space-y-2">
-                <Label>Instâncias Existentes:</Label>
-                {apiConnection.instances.length === 0 ? (
-                  <p className="text-gray-500">Nenhuma instância encontrada.</p>
-                ) : (
-                  apiConnection.instances.map((instance) => {
-                    console.log('🔍 [EVOLUTION_API_SETTINGS] Renderizando instância:', instance);
-                    return (
-                      <div
-                        key={instance.instanceName}
-                        className={cn(
-                          "flex items-center justify-between p-3 border rounded-md",
-                          isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(instance.status)}
-                          <span className="font-semibold">{instance.instanceName}</span>
-                          {instance.profileName && (
-                            <span className="text-xs text-gray-400 ml-2">
-                              ({instance.profileName})
-                            </span>
-                          )}
-                          {instance.number && (
-                            <span className="text-sm text-gray-500">({instance.number})</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(instance.status === 'connecting' || instance.status === 'close' || instance.status === 'unknown') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                setQrCodeModal({
-                                  isOpen: true,
-                                  qrCode: '',
-                                  instanceName: instance.instanceName,
-                                  loading: true
-                                });
-                                
-                                try {
-                                  const service = new EvolutionApiService({
-                                    baseUrl: apiConnection.baseUrl,
-                                    apiKey: apiConnection.apiKey,
-                                    instanceName: instance.instanceName
-                                  });
-                                  
-                                  const qrResult = await service.getQRCodeForInstance(instance.instanceName);
-                                  if (qrResult.success && qrResult.qrCode) {
-                                    // Verificar se o QR Code já tem o prefixo data:image
-                                    const qrCodeSrc = qrResult.qrCode.startsWith('data:image') 
-                                      ? qrResult.qrCode 
-                                      : `data:image/png;base64,${qrResult.qrCode}`;
-                                    
-                                    setQrCodeModal(prev => ({
-                                      ...prev,
-                                      qrCode: qrCodeSrc,
-                                      loading: false
-                                    }));
-                                  } else {
-                                    setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                    toast({
-                                      title: "Erro",
-                                      description: qrResult.error || "Erro ao obter QR Code",
-                                      variant: "destructive"
-                                    });
-                                  }
-                                } catch (error) {
-                                  setQrCodeModal(prev => ({ ...prev, loading: false }));
-                                  toast({
-                                    title: "Erro",
-                                    description: `Erro ao obter QR Code: ${error}`,
-                                    variant: "destructive"
-                                  });
-                                }
-                              }}
-                              className={cn(
-                                isDarkMode ? "border-[#3f3f46] text-white" : "border-gray-300 text-gray-700"
-                              )}
-                            >
-                              <QrCode className="mr-2 h-4 w-4" />
-                              Ver QR Code
-                            </Button>
-                          )}
-                          {instance.status === 'open' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => logoutInstance(instance.instanceName)}
-                              disabled={loggingOutInstance === instance.instanceName}
-                              className={cn(
-                                "border-orange-500 text-orange-600 hover:bg-orange-50",
-                                isDarkMode ? "border-orange-400 text-orange-400 hover:bg-orange-900/20" : ""
-                              )}
-                            >
-                              {loggingOutInstance === instance.instanceName ? (
-                                <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <LogOut className="mr-2 h-4 w-4" />
-                              )}
-                              Desconectar
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteInstance(instance.instanceName)}
-                            disabled={deletingInstance === instance.instanceName}
-                          >
-                            {deletingInstance === instance.instanceName ? (
-                              <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="mr-2 h-4 w-4" />
-                            )}
-                            Excluir
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* SEÇÃO 3: Vincular Canal à Instância */}
+        {/* SEÇÃO 4: Vincular Canal à Instância */}
         {apiConnection.isValidated && (
           <Card className={cn(
             "border-2",
