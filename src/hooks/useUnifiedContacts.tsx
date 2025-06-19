@@ -41,77 +41,70 @@ export const useUnifiedContacts = () => {
 
       setLoadingProgress(50);
 
-      // STEP 2: Para cada contato, buscar última mensagem e status
-      const enrichedContacts: OptimizedContact[] = [];
+      // STEP 2: Para cada contato E cada canal, criar uma conversa separada
+      const separateContacts: OptimizedContact[] = [];
 
       for (const contact of unifiedContacts || []) {
-        try {
-          // Buscar última mensagem de qualquer canal do contato
-          let lastMessage = '';
-          let lastMessageTime = contact.updated_at;
-          let unreadCount = 0;
-
-          // Verificar cada canal do contato
-          for (const channel of contact.channels || []) {
+        // Para cada canal do contato, criar uma entrada separada
+        for (const channel of contact.channels || []) {
+          try {
             const tableName = getTableNameForChannel(channel);
             if (!tableName) continue;
 
-            try {
-              // Buscar mensagens mais recentes
-              const messagesResult = await supabase
-                .from(tableName as any)
-                .select('message, read_at, is_read, mensagemtype')
-                .ilike('session_id', `%${contact.phone_number}%`)
-                .order('read_at', { ascending: false })
-                .limit(1);
+            // Buscar mensagens deste contato neste canal específico
+            const messagesResult = await supabase
+              .from(tableName as any)
+              .select('message, read_at, is_read, mensagemtype')
+              .ilike('session_id', `%${contact.phone_number}%`)
+              .order('read_at', { ascending: false })
+              .limit(1);
 
-              if (messagesResult.data && messagesResult.data.length > 0) {
-                const msg = messagesResult.data[0] as unknown as DatabaseMessage;
-                const msgTime = new Date(msg.read_at || '').toISOString();
-                
-                // Se esta mensagem é mais recente
-                if (msgTime > lastMessageTime) {
-                  lastMessageTime = msgTime;
-                  lastMessage = formatLastMessage(msg.message, msg.mensagemtype);
-                }
-              }
+            let lastMessage = '';
+            let lastMessageTime = contact.updated_at;
+            let unreadCount = 0;
 
-              // Contar mensagens não lidas
-              const { count } = await supabase
-                .from(tableName as any)
-                .select('*', { count: 'exact', head: true })
-                .ilike('session_id', `%${contact.phone_number}%`)
-                .eq('is_read', false);
-
-              if (count) {
-                unreadCount += count;
-              }
-            } catch (channelError) {
-              console.warn(`⚠️ [UNIFIED_CONTACTS] Erro no canal ${channel}:`, channelError);
+            if (messagesResult.data && messagesResult.data.length > 0) {
+              const msg = messagesResult.data[0] as unknown as DatabaseMessage;
+              lastMessageTime = msg.read_at || contact.updated_at;
+              lastMessage = formatLastMessage(msg.message, msg.mensagemtype);
             }
+
+            // Contar mensagens não lidas neste canal específico
+            const { count } = await supabase
+              .from(tableName as any)
+              .select('*', { count: 'exact', head: true })
+              .ilike('session_id', `%${contact.phone_number}%`)
+              .eq('is_read', false);
+
+            if (count) {
+              unreadCount = count;
+            }
+
+            // Determinar status baseado em mensagens não lidas
+            const status = unreadCount > 0 ? 'pendente' : 'resolvida';
+
+            // Criar uma entrada separada para cada canal
+            separateContacts.push({
+              id: `${channel}-${contact.phone_number}`, // ID único por canal + telefone
+              nome: contact.contact_name,
+              telefone: contact.phone_number,
+              ultimaMensagem: lastMessage || 'Sem mensagens',
+              tempo: formatTimeAgo(lastMessageTime),
+              status: status as 'pendente' | 'em_andamento' | 'resolvida',
+              canais: [channel], // Apenas o canal atual
+              channelId: channel // Identificação específica do canal
+            });
+
+          } catch (channelError) {
+            console.warn(`⚠️ [UNIFIED_CONTACTS] Erro no canal ${channel}:`, channelError);
           }
-
-          // Determinar status baseado em mensagens não lidas
-          const status = unreadCount > 0 ? 'pendente' : 'resolvida';
-
-          enrichedContacts.push({
-            id: `unified-${contact.phone_number}`,
-            nome: contact.contact_name,
-            telefone: contact.phone_number,
-            ultimaMensagem: lastMessage || 'Sem mensagens',
-            tempo: formatTimeAgo(lastMessageTime),
-            status: status as 'pendente' | 'em_andamento' | 'resolvida',
-            canais: contact.channels || []
-          });
-        } catch (contactError) {
-          console.error(`❌ [UNIFIED_CONTACTS] Erro processando contato ${contact.phone_number}:`, contactError);
         }
       }
 
       setLoadingProgress(90);
 
       // STEP 3: Ordenar contatos (pendentes primeiro, depois por tempo)
-      enrichedContacts.sort((a, b) => {
+      separateContacts.sort((a, b) => {
         if (a.status === 'pendente' && b.status !== 'pendente') return -1;
         if (b.status === 'pendente' && a.status !== 'pendente') return 1;
         
@@ -121,10 +114,10 @@ export const useUnifiedContacts = () => {
         return timeB.getTime() - timeA.getTime();
       });
 
-      setContacts(enrichedContacts);
+      setContacts(separateContacts);
       setLoadingProgress(100);
 
-      console.log(`✅ [UNIFIED_CONTACTS] Carregados ${enrichedContacts.length} contatos unificados`);
+      console.log(`✅ [UNIFIED_CONTACTS] Carregadas ${separateContacts.length} conversas separadas por canal`);
 
     } catch (err) {
       console.error('❌ [UNIFIED_CONTACTS] Erro ao carregar contatos:', err);

@@ -16,7 +16,7 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
   onContactClick,
   isDarkMode
 }) => {
-  // Usar hook unificado para carregar contatos de todos os canais
+  // Usar hook unificado para carregar contatos de todos os canais (separados por canal)
   const { contacts: hookContacts, loading, error, loadingProgress } = useUnifiedContacts();
   
   // Usar contatos do hook se não foram passados como prop
@@ -144,23 +144,19 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
                 {contact.ultimaMensagem}
               </p>
               
-              {contact.canais && contact.canais.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {contact.canais.map((canal, index) => (
-                    <span
-                      key={index}
-                      className={cn(
-                        "px-2 py-1 rounded-full text-xs",
-                        isDarkMode
-                          ? "bg-[#27272a] text-gray-300"
-                          : "bg-gray-100 text-gray-600"
-                      )}
-                    >
-                      {getChannelDisplayNameSync(canal)}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Mostrar canal específico para cada conversa */}
+              <div className="flex flex-wrap gap-1 mb-2">
+                <span
+                  className={cn(
+                    "px-2 py-1 rounded-full text-xs font-medium",
+                    isDarkMode
+                      ? "bg-[#27272a] text-gray-300"
+                      : "bg-gray-100 text-gray-600"
+                  )}
+                >
+                  {getChannelDisplayNameSync(contact.channelId || contact.canais[0])}
+                </span>
+              </div>
             </div>
             
             <div className="flex flex-col items-end gap-1">

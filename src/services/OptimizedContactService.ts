@@ -10,6 +10,7 @@ export interface OptimizedContact {
   status: 'pendente' | 'em_andamento' | 'resolvida';
   canais: string[];
   isGroup?: boolean;
+  channelId: string; // Adicionar identificação específica do canal
 }
 
 interface RawContactData {
@@ -77,7 +78,7 @@ export class OptimizedContactService {
   private static groupContactsByPhone(rawContacts: RawContactData[], channelId: string): OptimizedContact[] {
     const contactGroups = new Map<string, RawContactData[]>();
     
-    // Agrupar por telefone
+    // Agrupar por telefone APENAS dentro do mesmo canal
     rawContacts.forEach(contact => {
       const phone = this.extractPhoneFromSessionId(contact.session_id);
       if (!contactGroups.has(phone)) {
@@ -146,13 +147,14 @@ export class OptimizedContactService {
       }
 
       const contact: OptimizedContact = {
-        id: `${channelId}-${phone}`,
+        id: `${channelId}-${phone}`, // ID único por canal + telefone
         nome: displayName,
         telefone: phone,
         ultimaMensagem: latestMessage.message || '',
         tempo: this.formatTimeAgo(latestMessage.read_at || ''),
         status: unreadCount > 0 ? 'pendente' : 'resolvida',
-        canais: [channelId],
+        canais: [channelId], // Apenas o canal atual
+        channelId: channelId, // Identificação específica do canal
         isGroup
       };
 
@@ -181,7 +183,7 @@ export class OptimizedContactService {
   }
 
   static async getContactsForChannels(channelIds: string[]): Promise<OptimizedContact[]> {
-    console.log('🔍 [OPTIMIZED_CONTACT_SERVICE] Loading contacts for channels:', channelIds);
+    console.log('🔍 [OPTIMIZED_CONTACT_SERVICE] Loading contacts for channels (separate conversations):', channelIds);
     
     const cacheKey = channelIds.sort().join(',');
     const now = Date.now();
@@ -196,8 +198,7 @@ export class OptimizedContactService {
     }
 
     const tableMapping = this.getChannelTableMapping();
-    const allContacts: OptimizedContact[] = [];
-    const phoneToContactMap = new Map<string, OptimizedContact>();
+    const allContacts: OptimizedContact[] = []; // Não agrupar por telefone
 
     for (const channelId of channelIds) {
       const tableName = tableMapping[channelId];
@@ -247,32 +248,16 @@ export class OptimizedContactService {
         const channelContacts = this.groupContactsByPhone(validData, channelId);
         console.log(`✅ [OPTIMIZED_CONTACT_SERVICE] Found ${channelContacts.length} contacts in ${tableName}`);
 
-        // Agrupar contatos por telefone entre canais
-        channelContacts.forEach(contact => {
-          if (phoneToContactMap.has(contact.telefone)) {
-            const existingContact = phoneToContactMap.get(contact.telefone)!;
-            existingContact.canais.push(...contact.canais);
-            
-            // Usar a mensagem mais recente
-            const contactTime = new Date(contact.tempo.includes('h') || contact.tempo.includes('min') ? Date.now() : contact.tempo);
-            const existingTime = new Date(existingContact.tempo.includes('h') || existingContact.tempo.includes('min') ? Date.now() : existingContact.tempo);
-            
-            if (contactTime > existingTime) {
-              existingContact.ultimaMensagem = contact.ultimaMensagem;
-              existingContact.tempo = contact.tempo;
-            }
-          } else {
-            phoneToContactMap.set(contact.telefone, { ...contact });
-          }
-        });
+        // Adicionar todos os contatos do canal (sem agrupamento entre canais)
+        allContacts.push(...channelContacts);
 
       } catch (err) {
         console.error(`❌ [OPTIMIZED_CONTACT_SERVICE] Unexpected error for ${tableName}:`, err);
       }
     }
 
-    // Converter map para array e ordenar
-    const finalContacts = Array.from(phoneToContactMap.values())
+    // Ordenar contatos (sem agrupar por telefone)
+    const finalContacts = allContacts
       .sort((a, b) => {
         // Priorizar conversas pendentes
         if (a.status === 'pendente' && b.status !== 'pendente') return -1;
@@ -288,7 +273,7 @@ export class OptimizedContactService {
     this.cache.set(cacheKey, finalContacts);
     this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
 
-    console.log(`🎯 [OPTIMIZED_CONTACT_SERVICE] Total unique contacts found: ${finalContacts.length}`);
+    console.log(`🎯 [OPTIMIZED_CONTACT_SERVICE] Total separate conversations found: ${finalContacts.length}`);
     return finalContacts;
   }
 
