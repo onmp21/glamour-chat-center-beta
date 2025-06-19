@@ -78,9 +78,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         let base64: string;
         let mimeType = filePreview.file.type;
         base64 = await FileService.convertToBase64(filePreview.file);
-        const fullBase64 = ensureDataUrl(base64, mimeType);
+        
+        // Garantir que o base64 seja puro (sem prefixo data:)
+        const pureBase64 = base64.startsWith("data:") ? base64.split(",")[1] : base64;
+        
         fileData = {
-          base64: fullBase64,
+          base64: pureBase64, // Enviar base64 puro
           fileName: filePreview.file.name,
           mimeType: mimeType,
           size: filePreview.file.size
@@ -98,7 +101,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     const getMessageTypeFromFileType = (type: FilePreview['type'] | undefined): 'text' | 'file' | 'audio' | 'image' | 'video' | 'document' => {
       if (!type) return 'text';
-      if (type === 'file') return 'file';
+      if (type === 'file') return 'document';
       if (type === 'audio') return 'audio';
       if (type === 'image') return 'image';
       if (type === 'video') return 'video';
@@ -109,15 +112,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       ? getMessageTypeFromFileType(fileType)
       : 'text';
 
+    // Usar a legenda personalizada se fornecida, senão usar a mensagem normal
+    const finalContent = customCaption !== undefined ? customCaption : message.trim() || (filePreview ? filePreview.file.name : "");
+
     const messageData = {
       conversationId,
       channelId,
-      content: customCaption !== undefined ? customCaption : message.trim() || (filePreview ? filePreview.file.name : ""),
+      content: finalContent,
       sender: 'agent' as const,
       agentName: user.name,
       messageType,
       fileData: fileData || undefined
     };
+
+    console.log('📤 [CHAT_INPUT] Enviando mensagem:', {
+      hasText: !!finalContent,
+      hasFile: !!fileData,
+      messageType,
+      fileName: fileData?.fileName
+    });
 
     const success = await sendMessage(messageData, onSendMessage as ((message: any) => void) | undefined);
 
@@ -226,33 +239,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         let convertedBase64 = '';
         try {
           convertedBase64 = await FileService.convertToBase64(audioFile);
+          // Garantir que seja base64 puro
+          const pureBase64 = convertedBase64.startsWith("data:") ? convertedBase64.split(",")[1] : convertedBase64;
+          
+          await sendMessage({
+            conversationId: selectedConv?.contact_phone || selectedConv?.id,
+            channelId,
+            content: '[Áudio]',
+            sender: 'agent' as const,
+            agentName: user?.name,
+            messageType: 'audio',
+            fileData: {
+              base64: pureBase64, // Base64 puro
+              fileName: audioFile.name,
+              mimeType: audioFile.type,
+              size: audioFile.size
+            }
+          }, onSendMessage as ((message: any) => void) | undefined);
         } catch {
           alert('Erro ao codificar áudio');
-          setSendingLocal(false);
-          setSendingAudio(false);
-          return;
         }
-        await sendMessage({
-          conversationId: selectedConv?.contact_phone || selectedConv?.id,
-          channelId,
-          content: '[Áudio]',
-          sender: 'agent' as const,
-          agentName: user?.name,
-          messageType: 'audio',
-          fileData: {
-            base64: convertedBase64.startsWith("data:") ? convertedBase64.split(",")[1] : convertedBase64,
-            fileName: audioFile.name,
-            mimeType: audioFile.type,
-            size: audioFile.size
-          }
-        }, onSendMessage as ((message: any) => void) | undefined);
+        
         setSendingLocal(false);
         setSendingAudio(false);
         setIsRecording(false);
         setRecordingTime(0);
         if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
       };
-      mediaRecorderRef.current.stop();
+      mediaRecorder.stop();
     }
   };
 
