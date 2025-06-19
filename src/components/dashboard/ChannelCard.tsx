@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,8 +38,9 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Mostrar apenas conversas não lidas (pendentes)
+  // Mostrar conversas não lidas no badge, total no texto
   const unreadCount = counts.pending;
+  const totalCount = counts.total;
   
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
@@ -154,16 +154,12 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
           
-          {/* Texto de contagem de conversas não lidas */}
+          {/* Texto de contagem total de conversas */}
           <p className={cn(
             "text-xs font-medium",
             isDarkMode ? "text-gray-400" : "text-gray-600"
           )}>
-            {unreadCount > 0 ? (
-              `${unreadCount} ${unreadCount === 1 ? 'não vista' : 'não vistas'}`
-            ) : (
-              'Todas vistas'
-            )}
+            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
           </p>
         </div>
       </CardContent>
