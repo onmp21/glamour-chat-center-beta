@@ -710,16 +710,8 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
-      count_unique_sessions: {
-        Args: { table_name: string }
-        Returns: number
-      }
       count_unread_messages: {
         Args: { table_name: string; p_session_id: string }
-        Returns: number
-      }
-      count_unread_messages_total: {
-        Args: { table_name: string }
         Returns: number
       }
       create_audit_log: {
