@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -100,9 +99,12 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
               
-              {/* Badge de contagem no canto inferior esquerdo do ícone */}
+              {/* Badge de contagem no canto superior esquerdo do ícone */}
               {totalCount > 0 && (
-                <div className="absolute -bottom-1 -left-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg">
+                <div className={cn(
+                  "absolute -top-1 -left-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg",
+                  isDarkMode ? "bg-[#b5103c]" : "bg-[#b5103c]"
+                )}>
                   {totalCount > 99 ? '99+' : totalCount}
                 </div>
               )}
