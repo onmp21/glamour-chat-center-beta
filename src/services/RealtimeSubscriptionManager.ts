@@ -4,15 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 interface SubscriptionInfo {
   channel: any;
   subscriptionCount: number;
-  channelName: string;
+  tableName: string;
   isSubscribed: boolean;
+  callbacks: Set<(payload: any) => void>;
 }
 
 class RealtimeSubscriptionManager {
   private static instance: RealtimeSubscriptionManager;
   private subscriptions: Map<string, SubscriptionInfo> = new Map();
   private isShuttingDown = false;
-  private pendingSubscriptions: Map<string, Promise<any>> = new Map();
 
   public static getInstance(): RealtimeSubscriptionManager {
     if (!RealtimeSubscriptionManager.instance) {
@@ -22,50 +22,35 @@ class RealtimeSubscriptionManager {
   }
 
   public async createSubscription(
-    channelName: string,
-    callback: (payload: any) => void,
-    tableName: string
+    tableName: string,
+    callback: (payload: any) => void
   ): Promise<any> {
     if (this.isShuttingDown) {
-      console.warn(`[REALTIME_MANAGER] Cannot create subscription during shutdown: ${channelName}`);
+      console.warn(`[REALTIME_MANAGER] Cannot create subscription during shutdown: ${tableName}`);
       return null;
     }
 
-    // Se já existe uma subscription ativa para este canal, retorna ela
-    const existing = this.subscriptions.get(channelName);
+    // Use table name as the key to prevent duplicates
+    const existing = this.subscriptions.get(tableName);
+    
     if (existing && existing.isSubscribed) {
-      console.log(`[REALTIME_MANAGER] Reusing existing active subscription: ${channelName}`);
+      console.log(`[REALTIME_MANAGER] Reusing existing subscription for table: ${tableName}`);
+      existing.subscriptionCount++;
+      existing.callbacks.add(callback);
+      return existing.channel;
+    }
+
+    if (existing && !existing.isSubscribed) {
+      console.log(`[REALTIME_MANAGER] Adding callback to pending subscription: ${tableName}`);
+      existing.callbacks.add(callback);
       existing.subscriptionCount++;
       return existing.channel;
     }
 
-    // Se há uma subscription pendente, aguarda ela
-    if (this.pendingSubscriptions.has(channelName)) {
-      console.log(`[REALTIME_MANAGER] Waiting for pending subscription: ${channelName}`);
-      return await this.pendingSubscriptions.get(channelName);
-    }
-
-    // Cria nova subscription
-    console.log(`[REALTIME_MANAGER] Creating new subscription: ${channelName} for table: ${tableName}`);
+    // Create new subscription
+    console.log(`[REALTIME_MANAGER] Creating new subscription for table: ${tableName}`);
     
-    const subscriptionPromise = this.createNewSubscription(channelName, callback, tableName);
-    this.pendingSubscriptions.set(channelName, subscriptionPromise);
-    
-    try {
-      const result = await subscriptionPromise;
-      this.pendingSubscriptions.delete(channelName);
-      return result;
-    } catch (error) {
-      this.pendingSubscriptions.delete(channelName);
-      throw error;
-    }
-  }
-
-  private async createNewSubscription(
-    channelName: string, 
-    callback: (payload: any) => void, 
-    tableName: string
-  ): Promise<any> {
+    const channelName = `realtime-${tableName}-${Date.now()}`;
     const channel = supabase
       .channel(channelName)
       .on(
@@ -75,56 +60,76 @@ class RealtimeSubscriptionManager {
           schema: 'public',
           table: tableName
         },
-        callback
+        (payload) => {
+          const info = this.subscriptions.get(tableName);
+          if (info) {
+            // Call all registered callbacks
+            info.callbacks.forEach(cb => {
+              try {
+                cb(payload);
+              } catch (error) {
+                console.error(`[REALTIME_MANAGER] Error in callback for ${tableName}:`, error);
+              }
+            });
+          }
+        }
       );
 
-    // Armazenar informações antes do subscribe
-    this.subscriptions.set(channelName, {
+    // Initialize subscription info
+    const callbacks = new Set<(payload: any) => void>();
+    callbacks.add(callback);
+    
+    this.subscriptions.set(tableName, {
       channel,
       subscriptionCount: 1,
-      channelName,
-      isSubscribed: false
+      tableName,
+      isSubscribed: false,
+      callbacks
     });
 
-    // Fazer subscribe apenas uma vez
+    // Subscribe and wait for confirmation
     return new Promise((resolve, reject) => {
       channel.subscribe((status: string) => {
-        console.log(`[REALTIME_MANAGER] Subscription status: ${status} for ${channelName}`);
+        console.log(`[REALTIME_MANAGER] Subscription status: ${status} for table: ${tableName}`);
         
-        const info = this.subscriptions.get(channelName);
+        const info = this.subscriptions.get(tableName);
         if (info) {
           if (status === 'SUBSCRIBED') {
             info.isSubscribed = true;
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR') {
-            this.subscriptions.delete(channelName);
-            reject(new Error(`Failed to subscribe to channel: ${channelName}`));
+            this.subscriptions.delete(tableName);
+            reject(new Error(`Failed to subscribe to table: ${tableName}`));
           }
         }
       });
     });
   }
 
-  public removeSubscription(channelName: string): void {
-    const existing = this.subscriptions.get(channelName);
+  public removeSubscription(tableName: string, callback?: (payload: any) => void): void {
+    const existing = this.subscriptions.get(tableName);
     if (!existing) {
-      console.warn(`[REALTIME_MANAGER] Subscription not found: ${channelName}`);
+      console.warn(`[REALTIME_MANAGER] Subscription not found for table: ${tableName}`);
       return;
     }
 
-    existing.subscriptionCount--;
-    console.log(`[REALTIME_MANAGER] Decremented subscription count for ${channelName}: ${existing.subscriptionCount}`);
+    if (callback) {
+      existing.callbacks.delete(callback);
+    }
 
-    if (existing.subscriptionCount <= 0) {
-      console.log(`[REALTIME_MANAGER] Removing subscription: ${channelName}`);
+    existing.subscriptionCount--;
+    console.log(`[REALTIME_MANAGER] Decremented subscription count for ${tableName}: ${existing.subscriptionCount}`);
+
+    if (existing.subscriptionCount <= 0 || existing.callbacks.size === 0) {
+      console.log(`[REALTIME_MANAGER] Removing subscription for table: ${tableName}`);
       try {
         if (existing.isSubscribed) {
           supabase.removeChannel(existing.channel);
         }
       } catch (error) {
-        console.warn(`[REALTIME_MANAGER] Error removing channel: ${channelName}`, error);
+        console.warn(`[REALTIME_MANAGER] Error removing channel for table: ${tableName}`, error);
       }
-      this.subscriptions.delete(channelName);
+      this.subscriptions.delete(tableName);
     }
   }
 
@@ -132,18 +137,17 @@ class RealtimeSubscriptionManager {
     console.log(`[REALTIME_MANAGER] Cleaning up all subscriptions`);
     this.isShuttingDown = true;
     
-    for (const [channelName, info] of this.subscriptions.entries()) {
+    for (const [tableName, info] of this.subscriptions.entries()) {
       try {
         if (info.isSubscribed) {
           supabase.removeChannel(info.channel);
         }
       } catch (error) {
-        console.warn(`[REALTIME_MANAGER] Error during cleanup: ${channelName}`, error);
+        console.warn(`[REALTIME_MANAGER] Error during cleanup for table: ${tableName}`, error);
       }
     }
     
     this.subscriptions.clear();
-    this.pendingSubscriptions.clear();
     this.isShuttingDown = false;
   }
 
