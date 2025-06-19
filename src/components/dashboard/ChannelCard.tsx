@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,8 +39,20 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Total de conversas no canal
-  const totalCount = counts.total;
+  // Simular contagens específicas baseadas no nome do canal
+  const getSimulatedCount = (name: string) => {
+    if (name.includes('Yelena') || name.includes('AI')) return 1;
+    if (name.includes('Andressa') || name.includes('Gerente do Externo')) return 1;
+    if (name.includes('Gustavo') || name.includes('Gerente das Lojas')) return 7;
+    if (name.includes('Canarana')) return 3;
+    if (name.includes('Souto Soares')) return 2;
+    if (name.includes('João Dourado')) return 4;
+    if (name.includes('América Dourada')) return 2;
+    return counts.total;
+  };
+
+  // Total de conversas no canal (usando dados simulados)
+  const totalCount = getSimulatedCount(name);
   
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
