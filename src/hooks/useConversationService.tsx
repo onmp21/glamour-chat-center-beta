@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelConversation } from './useChannelConversations';
 import { getTableNameForChannelSync } from '@/utils/channelMapping';
@@ -12,7 +12,7 @@ export const useConversationService = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const isSetupRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -32,54 +32,74 @@ export const useConversationService = (channelId: string) => {
       const messageService = new MessageService(channelId);
       const loadedConversations = await messageService.getConversations();
       
-      setConversations(loadedConversations);
+      if (mountedRef.current) {
+        setConversations(loadedConversations);
+      }
     } catch (err) {
       console.error(`❌ [CONVERSATION_SERVICE_HOOK] Error loading conversations:`, err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      setConversations([]);
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setConversations([]);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
-  const refreshConversations = () => {
+  const refreshConversations = useCallback(() => {
     loadConversations(true);
-  };
+  }, [channelId]);
 
   const updateConversationStatus = async (
     conversationId: string, 
     status: 'unread' | 'in_progress' | 'resolved'
   ) => {
     try {
-      // Salvar status no localStorage
       const statusKey = `conversation_status_${channelId}_${conversationId}`;
       localStorage.setItem(statusKey, status);
 
-      // Marcar como lido se necessário
       if (status === 'in_progress' || status === 'resolved') {
         const messageService = new MessageService(channelId);
         await messageService.markConversationAsRead(conversationId);
       }
 
-      // Atualizar estado local
-      setConversations(prev => prev.map(conv => 
-        conv.id === conversationId 
-          ? { ...conv, status }
-          : conv
-      ));
+      if (mountedRef.current) {
+        setConversations(prev => prev.map(conv => 
+          conv.id === conversationId 
+            ? { ...conv, status }
+            : conv
+        ));
+      }
     } catch (error) {
       console.error('❌ [CONVERSATION_SERVICE_HOOK] Error updating status:', error);
       throw error;
     }
   };
 
+  // Memoizar o callback do realtime
+  const realtimeCallback = useCallback((payload: any) => {
+    if (!mountedRef.current) return;
+    
+    console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
+    // Aguardar um pouco antes de atualizar para evitar muitas requisições
+    setTimeout(() => {
+      if (mountedRef.current) {
+        refreshConversations();
+      }
+    }, 1000);
+  }, [refreshConversations]);
+
   useEffect(() => {
     loadConversations();
   }, [channelId]);
 
   useEffect(() => {
-    if (!channelId || isSetupRef.current) {
+    mountedRef.current = true;
+    
+    if (!channelId) {
       return;
     }
 
@@ -90,22 +110,14 @@ export const useConversationService = (channelId: string) => {
     }
 
     tableNameRef.current = tableName;
-    isSetupRef.current = true;
-    
-    const callback = (payload: any) => {
-      console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-      // Refresh conversations when new message arrives
-      setTimeout(() => {
-        refreshConversations();
-      }, 1000);
-    };
-
-    callbackRef.current = callback;
+    callbackRef.current = realtimeCallback;
 
     const setupSubscription = async () => {
+      if (!mountedRef.current) return;
+      
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        await subscriptionManager.createSubscription(tableName, callback);
+        await subscriptionManager.createSubscription(tableName, realtimeCallback);
         console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName}`);
       } catch (error) {
         console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
@@ -115,6 +127,8 @@ export const useConversationService = (channelId: string) => {
     setupSubscription();
 
     return () => {
+      mountedRef.current = false;
+      
       if (tableNameRef.current && callbackRef.current) {
         console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from table ${tableNameRef.current}`);
         try {
@@ -124,9 +138,8 @@ export const useConversationService = (channelId: string) => {
           console.error('❌ [CONVERSATION_SERVICE_HOOK] Error cleaning up subscription:', error);
         }
       }
-      isSetupRef.current = false;
     };
-  }, [channelId]);
+  }, [channelId, realtimeCallback]);
 
   return {
     conversations,

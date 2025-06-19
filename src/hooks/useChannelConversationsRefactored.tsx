@@ -13,7 +13,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const isSetupRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -37,15 +37,21 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       const channelService = new ChannelService(channelId);
       const conversations = await channelService.getConversations();
 
-      DetailedLogger.info('useChannelConversationsRefactored', `Conversas carregadas com sucesso`, { count: conversations.length });
-      setConversations(conversations);
+      if (mountedRef.current) {
+        DetailedLogger.info('useChannelConversationsRefactored', `Conversas carregadas com sucesso`, { count: conversations.length });
+        setConversations(conversations);
+      }
     } catch (err) {
       DetailedLogger.error('useChannelConversationsRefactored', `Erro ao carregar conversas para o canal ${channelId}`, { error: err });
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
-      setConversations([]);
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido');
+        setConversations([]);
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mountedRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [channelId]);
 
@@ -54,12 +60,23 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations(true);
   }, [channelId, loadConversations]);
 
+  // Memoizar o callback do realtime
+  const realtimeCallback = useCallback((payload: any) => {
+    if (!mountedRef.current) return;
+    
+    DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
+    // Recarregar conversas para refletir as novas mensagens
+    loadConversations();
+  }, [loadConversations]);
+
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
   useEffect(() => {
-    if (!channelId || isSetupRef.current) {
+    mountedRef.current = true;
+    
+    if (!channelId) {
       return;
     }
 
@@ -70,20 +87,14 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     tableNameRef.current = tableName;
-    isSetupRef.current = true;
-    
-    const callback = (payload: any) => {
-      DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
-      // Recarregar conversas para refletir as novas mensagens
-      loadConversations();
-    };
-
-    callbackRef.current = callback;
+    callbackRef.current = realtimeCallback;
 
     const setupSubscription = async () => {
+      if (!mountedRef.current) return;
+      
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        await subscriptionManager.createSubscription(tableName, callback);
+        await subscriptionManager.createSubscription(tableName, realtimeCallback);
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
       } catch (error) {
         DetailedLogger.error("useChannelConversationsRefactored", `Erro ao crear subscription:`, error);
@@ -93,6 +104,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     setupSubscription();
 
     return () => {
+      mountedRef.current = false;
+      
       if (tableNameRef.current && callbackRef.current) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         try {
@@ -102,9 +115,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }
       }
-      isSetupRef.current = false;
     };
-  }, [channelId, loadConversations]);
+  }, [channelId, realtimeCallback]);
 
   return {
     conversations,
