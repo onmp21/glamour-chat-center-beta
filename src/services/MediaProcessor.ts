@@ -1,181 +1,123 @@
 
-import { MediaDetector } from './media/MediaDetector';
-import { MediaStorageService } from './MediaStorageService';
-
-interface ProcessResult {
-  isProcessed: boolean;
-  url?: string;
-  type?: string;
-  mimeType?: string;
-  size?: string;
-  error?: string;
-}
-
 export class MediaProcessor {
-  static async processAsync(content: string, messageType?: string): Promise<ProcessResult> {
+  // Processar mídia de forma assíncrona (método principal)
+  static async processAsync(content: string, messageType: string = 'text'): Promise<string> {
+    if (!content) return '';
+
     try {
-      if (!content || content.length < 5) {
-        return { isProcessed: false, error: 'Conteúdo muito pequeno' };
+      // Se já é uma URL completa, retornar como está
+      if (content.startsWith('http')) {
+        console.log(`🔗 [MEDIA_PROCESSOR] URL completa detectada:`, content.substring(0, 50));
+        return content;
       }
 
-      // Se já é uma URL pública válida do storage
-      if (content.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/')) {
-        return {
-          isProcessed: true,
-          url: content,
-          type: this.detectMediaType(content, messageType),
-          mimeType: this.getMimeTypeFromUrl(content)
-        };
-      }
-
-      // Se é um data URL base64
+      // Se é data URL (base64), processar
       if (content.startsWith('data:')) {
-        const uploadResult = await MediaStorageService.uploadBase64ToStorage(content);
-        if (uploadResult.success && uploadResult.url) {
-          return {
-            isProcessed: true,
-            url: uploadResult.url,
-            type: this.detectMediaType(content, messageType),
-            mimeType: this.getMimeTypeFromUrl(uploadResult.url)
-          }
-        } else {
-          return { isProcessed: false, error: uploadResult.error || 'Erro ao enviar mídia ao storage' };
-        }
+        console.log(`📄 [MEDIA_PROCESSOR] Data URL detectada:`, content.substring(0, 50));
+        return content;
       }
 
-      // Se é um base64 puro
-      if (MediaDetector.looksLikeBase64(content)) {
-        const dataUrl = `data:${this.getMimeTypeFromType(messageType ?? 'image')};base64,${content}`;
-        const uploadResult = await MediaStorageService.uploadBase64ToStorage(dataUrl);
-        if (uploadResult.success && uploadResult.url) {
-          return {
-            isProcessed: true,
-            url: uploadResult.url,
-            type: messageType ?? 'image',
-            mimeType: this.getMimeTypeFromUrl(uploadResult.url)
-          }
-        } else {
-          return { isProcessed: false, error: 'Erro ao enviar base64 ao storage' };
-        }
+      // Se parece ser base64 puro, formar data URL
+      if (this.looksLikeBase64(content)) {
+        const mimeType = this.detectMimeType(content, messageType);
+        const dataUrl = `data:${mimeType};base64,${content}`;
+        console.log(`🔄 [MEDIA_PROCESSOR] Base64 convertido para data URL:`, mimeType);
+        return dataUrl;
       }
 
-      return { isProcessed: false, error: 'Não é conteúdo de mídia válido' };
+      // Caso contrário, retornar como texto
+      return content;
     } catch (error) {
-      console.error('❌ [MEDIA_PROCESSOR] Error:', error);
-      return { isProcessed: false, error: 'Erro ao processar mídia' };
+      console.error('❌ [MEDIA_PROCESSOR] Erro no processamento assíncrono:', error);
+      return content;
     }
   }
 
-  static process(content: string, messageType?: string): ProcessResult {
-    // Por compatibilidade, apenas retorna erro dizendo que só processa de forma assíncrona agora.
-    return {
-      isProcessed: false,
-      error: 'Use processAsync para processar mídia corretamente!'
-    };
-  }
-
-  static processImage(content: string): ProcessResult {
-    return this.process(content, 'image');
-  }
-  static processAudio(content: string): ProcessResult {
-    return this.process(content, 'audio');
-  }
-  static processVideo(content: string): ProcessResult {
-    return this.process(content, 'video');
-  }
-
-  static detectMediaType(content: string, messageType?: string): string {
-    if (messageType && messageType !== 'text') {
-      return messageType;
-    }
+  // Detectar se conteúdo parece base64
+  private static looksLikeBase64(content: string): boolean {
+    if (!content || content.length < 50) return false;
     
-    // Para URLs (completas ou relativas), detectar pelo nome do arquivo
-    if (content.startsWith('https://')) {
-      const extension = content.split('.').pop()?.toLowerCase();
-      switch (extension) {
-        case 'jpg':
-        case 'jpeg':
-        case 'png':
-        case 'gif':
-        case 'webp':
-          return 'image';
-        case 'mp3':
-        case 'ogg':
-        case 'wav':
-        case 'm4a':
-          return 'audio';
-        case 'mp4':
-        case 'avi':
-        case 'mov':
-        case 'webm':
-          return 'video';
-        case 'pdf':
-        case 'doc':
-        case 'docx':
-        case 'txt':
-          return 'document';
-        default:
-          // Se não tem extensão, tentar detectar pelo nome do arquivo
-          if (content.includes('audio') || content.includes('Audio')) return 'audio';
-          if (content.includes('video') || content.includes('Video')) return 'video';
-          if (content.includes('image') || content.includes('Image')) return 'image';
-          return 'document';
-      }
-    }
+    // Verificar se contém apenas caracteres base64 válidos
+    const base64Pattern = /^[A-Za-z0-9+/]*={0,2}$/;
+    const cleanContent = content.replace(/\s/g, '');
     
-    if (content.startsWith('data:')) {
-      const mimeMatch = content.match(/data:([^;]+)/);
-      if (mimeMatch) {
-        return this.getTypeFromMimeType(mimeMatch[1]);
-      }
-    }
-    if (MediaDetector.looksLikeBase64(content)) {
-      return MediaDetector.detectMediaTypeFromBase64(content);
-    }
-    return 'unknown';
+    return base64Pattern.test(cleanContent);
   }
 
-  private static getTypeFromMimeType(mimeType: string): string {
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType === 'application/pdf') return 'document';
-    return 'document';
-  }
-
-  private static getMimeTypeFromType(type: string): string {
-    switch (type) {
-      case 'image': return 'image/jpeg';
-      case 'audio': return 'audio/mpeg';
-      case 'video': return 'video/mp4';
-      case 'document': return 'application/pdf';
-      default: return 'application/octet-stream';
-    }
-  }
-
-  private static getMimeTypeFromUrl(url: string): string {
-    const extension = url.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg': return 'image/jpeg';
-      case 'png': return 'image/png';
-      case 'gif': return 'image/gif';
-      case 'webp': return 'image/webp';
-      case 'mp3': return 'audio/mpeg';
-      case 'ogg': return 'audio/ogg';
-      case 'mp4': return 'video/mp4';
-      case 'pdf': return 'application/pdf';
-      default: return 'application/octet-stream';
+  // Detectar tipo MIME baseado no conteúdo e tipo da mensagem
+  private static detectMimeType(content: string, messageType: string): string {
+    // Baseado no tipo da mensagem primeiro
+    switch (messageType) {
+      case 'image':
+      case 'imageMessage':
+        return this.detectImageMime(content) || 'image/jpeg';
+      case 'audio':
+      case 'audioMessage':
+      case 'ptt':
+        return this.detectAudioMime(content) || 'audio/mpeg';
+      case 'video':
+      case 'videoMessage':
+        return this.detectVideoMime(content) || 'video/mp4';
+      case 'document':
+      case 'documentMessage':
+        return this.detectDocumentMime(content) || 'application/pdf';
+      default:
+        // Tentar detectar automaticamente
+        return this.detectImageMime(content) || 
+               this.detectAudioMime(content) || 
+               this.detectVideoMime(content) || 
+               this.detectDocumentMime(content) || 
+               'application/octet-stream';
     }
   }
 
-  static getMediaIcon(type: string): string {
-    switch (type) {
-      case 'image': return '🖼️';
-      case 'audio': return '🎵';
-      case 'video': return '🎥';
-      case 'document': return '📄';
-      default: return '📎';
+  // Detectores específicos por tipo
+  private static detectImageMime(content: string): string | null {
+    if (content.startsWith('/9j/')) return 'image/jpeg';
+    if (content.startsWith('iVBORw')) return 'image/png';
+    if (content.startsWith('R0lGO')) return 'image/gif';
+    if (content.startsWith('UklGR')) return 'image/webp';
+    return null;
+  }
+
+  private static detectAudioMime(content: string): string | null {
+    if (content.startsWith('SUQz') || content.startsWith('//uQ') || content.startsWith('//sw')) {
+      return 'audio/mpeg';
     }
+    if (content.startsWith('T2dn')) return 'audio/ogg';
+    return null;
+  }
+
+  private static detectVideoMime(content: string): string | null {
+    if (content.startsWith('AAAAGG') || content.startsWith('AAAAFG') || content.startsWith('AAAAHG')) {
+      return 'video/mp4';
+    }
+    return null;
+  }
+
+  private static detectDocumentMime(content: string): string | null {
+    if (content.startsWith('JVBERi')) return 'application/pdf';
+    return null;
+  }
+
+  // Métodos síncronos mantidos para compatibilidade mas deprecados
+  static processAudio(content: string): string {
+    console.warn('⚠️ [MEDIA_PROCESSOR] processAudio() é deprecado, use processAsync()');
+    return content;
+  }
+
+  static processImage(content: string): string {
+    console.warn('⚠️ [MEDIA_PROCESSOR] processImage() é deprecado, use processAsync()');
+    return content;
+  }
+
+  static processVideo(content: string): string {
+    console.warn('⚠️ [MEDIA_PROCESSOR] processVideo() é deprecado, use processAsync()');
+    return content;
+  }
+
+  static processDocument(content: string): string {
+    console.warn('⚠️ [MEDIA_PROCESSOR] processDocument() é deprecado, use processAsync()');
+    return content;
   }
 }

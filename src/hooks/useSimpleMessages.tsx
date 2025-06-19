@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
+import { ContactNameResolver } from '@/services/ContactNameResolver';
 
 interface SimpleMessage {
   id: string;
@@ -23,7 +24,6 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
   const getTableName = (channelId: string): string => {
     console.log(`🔍 [SIMPLE_MESSAGES] Mapeando canal: ${channelId}`);
     
-    // CORRIGIDO: Mapeamento padronizado usando apenas UUIDs com fallbacks melhorados
     const mapping: Record<string, string> = {
       // UUIDs principais
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
@@ -50,35 +50,29 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     return tableName;
   };
 
-  // NOVA: Função para completar URLs de mídia
   const completeMediaUrl = (media_url?: string): string | undefined => {
     if (!media_url) return undefined;
     
-    // Se já é uma URL completa, retorna como está
     if (media_url.startsWith('http')) {
       return media_url;
     }
     
-    // Se é um link curto, completa com o base URL do Supabase Storage
     const baseUrl = 'https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/';
     const fullUrl = baseUrl + media_url;
     console.log(`🔗 [MEDIA_URL] Completando URL: ${media_url} -> ${fullUrl}`);
     return fullUrl;
   };
 
-  // CORRIGIDA: Função para mapear nomenclaturas de mídia com suporte completo
   const mapMessageType = (mensagemtype?: string): string => {
     if (!mensagemtype) return 'text';
     
     const typeMapping: Record<string, string> = {
-      // Nomenclaturas do WhatsApp/Evolution
       'audioMessage': 'audio',
       'imageMessage': 'image', 
       'videoMessage': 'video',
       'documentMessage': 'document',
       'stickerMessage': 'sticker',
       'conversation': 'text',
-      // Nomenclaturas diretas
       'audio': 'audio',
       'image': 'image',
       'video': 'video',
@@ -91,6 +85,11 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
     const mapped = typeMapping[mensagemtype] || mensagemtype;
     console.log(`🔄 [MESSAGE_TYPE] ${mensagemtype} -> ${mapped}`);
     return mapped;
+  };
+
+  const extractPhoneFromSession = (sessionId: string): string => {
+    const match = sessionId.match(/(\d+)/);
+    return match ? match[1] : sessionId;
   };
 
   const loadMessages = async () => {
@@ -114,7 +113,6 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       const tableName = getTableName(channelId);
       console.log(`📋 [SIMPLE_MESSAGES] Iniciando query na tabela: ${tableName}, sessão: ${sessionId}, usuário: ${user?.name}`);
 
-      // CORRIGIDO: Query atualizada sem media_base64
       const { data: rawData, error: queryError } = await supabase
         .from(tableName as any)
         .select("id, session_id, message, read_at, tipo_remetente, nome_do_contato, mensagemtype, media_url")
@@ -133,18 +131,31 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
         console.log(`📋 [SIMPLE_MESSAGES] Primeira mensagem exemplo:`, rawData[0]);
       }
 
-      const processedMessages: SimpleMessage[] = (rawData || []).map((row: any) => ({
-        id: row.id?.toString() || "",
-        session_id: row.session_id || "",
-        message: row.message || "",
-        read_at: row.read_at || new Date().toISOString(),
-        tipo_remetente: row.tipo_remetente,
-        nome_do_contato: row.nome_do_contato,
-        mensagemtype: mapMessageType(row.mensagemtype),
-        media_url: completeMediaUrl(row.media_url) // APLICAR COMPLETAR URL
-      }));
+      // Processar mensagens e resolver nomes usando ContactNameResolver
+      const processedMessages: SimpleMessage[] = [];
+      
+      for (const row of rawData || []) {
+        const phoneNumber = extractPhoneFromSession(row.session_id);
+        
+        // Resolver nome do contato usando tabela unificada
+        const resolvedName = await ContactNameResolver.resolveName(
+          phoneNumber, 
+          row.nome_do_contato
+        );
 
-      console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas para exibição`);
+        processedMessages.push({
+          id: row.id?.toString() || "",
+          session_id: row.session_id || "",
+          message: row.message || "",
+          read_at: row.read_at || new Date().toISOString(),
+          tipo_remetente: row.tipo_remetente,
+          nome_do_contato: resolvedName, // USAR NOME RESOLVIDO
+          mensagemtype: mapMessageType(row.mensagemtype),
+          media_url: completeMediaUrl(row.media_url)
+        });
+      }
+
+      console.log(`✅ [SIMPLE_MESSAGES] ${processedMessages.length} mensagens processadas com nomes resolvidos`);
       setMessages(processedMessages);
 
     } catch (err) {
@@ -163,7 +174,6 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       loadMessages();
       const tableName = getTableName(channelId);
 
-      // CORRIGIDO: Melhor configuração de realtime com fallback
       try {
         realtimeChannel = supabase
           .channel(`public:${tableName}:${sessionId}`)
@@ -175,10 +185,18 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
               table: tableName, 
               filter: `session_id=eq.${sessionId}` 
             },
-            (payload) => {
+            async (payload) => {
               console.log(`📨 [SIMPLE_MESSAGES] Nova mensagem recebida via realtime:`, payload);
               if (payload && payload.new) {
                 const novo = payload.new;
+                
+                // Resolver nome da nova mensagem
+                const phoneNumber = extractPhoneFromSession(novo.session_id);
+                const resolvedName = await ContactNameResolver.resolveName(
+                  phoneNumber, 
+                  novo.nome_do_contato
+                );
+                
                 setMessages((prev) => {
                   const exists = prev.some((m) => m.id === novo.id?.toString());
                   if (exists) {
@@ -192,12 +210,12 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
                     message: novo.message || '',
                     read_at: novo.read_at || new Date().toISOString(),
                     tipo_remetente: novo.tipo_remetente,
-                    nome_do_contato: novo.nome_do_contato,
+                    nome_do_contato: resolvedName, // USAR NOME RESOLVIDO
                     mensagemtype: mapMessageType(novo.mensagemtype), 
-                    media_url: completeMediaUrl(novo.media_url) // APLICAR COMPLETAR URL
+                    media_url: completeMediaUrl(novo.media_url)
                   };
                   
-                  console.log(`✅ [SIMPLE_MESSAGES] Adicionando nova mensagem:`, newMessage.id);
+                  console.log(`✅ [SIMPLE_MESSAGES] Adicionando nova mensagem com nome resolvido:`, newMessage.id);
                   return [...prev, newMessage];
                 });
               }

@@ -293,6 +293,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          channels: string[] | null
           contact_name: string
           created_at: string
           id: string
@@ -300,6 +301,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          channels?: string[] | null
           contact_name: string
           created_at?: string
           id?: string
@@ -307,6 +309,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          channels?: string[] | null
           contact_name?: string
           created_at?: string
           id?: string

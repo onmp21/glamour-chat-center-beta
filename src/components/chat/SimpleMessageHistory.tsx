@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSimpleMessages } from '@/hooks/useSimpleMessages';
@@ -30,34 +31,62 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     }
   }, [messages.length]);
 
-  // CORRIGIDO: Função melhorada para detectar agentes vs clientes
+  // CORRIGIDO: Função expandida para detectar agentes vs clientes
   const isAgentMessage = (message: any): boolean => {
+    // Lista expandida de tipos de agente (interno)
     const agentTypes = [
       'USUARIO_INTERNO',
       'Yelena-ai',
+      'Yelena AI',
       'Andressa-ai',
+      'Andressa AI',
       'AGENTE',
       'AGENT',
       'INTERNAL_USER',
-      'AI_ASSISTANT'
+      'AI_ASSISTANT',
+      'Canarana',
+      'Souto Soares',
+      'João Dourado',
+      'America Dourada',
+      'Gerente Lojas',
+      'Gerente Externo',
+      'GerenteLojas',
+      'GerenteExterno'
     ];
     
-    // Verificar tipo_remetente
+    // PRIORIDADE 1: Verificar tipo_remetente
     if (message.tipo_remetente && agentTypes.includes(message.tipo_remetente)) {
       console.log(`🤖 [AGENT_CHECK] Mensagem de agente detectada via tipo_remetente:`, message.tipo_remetente);
       return true;
     }
     
-    // Verificar se é uma mensagem enviada pela interface (sem nome de contato)
-    if (!message.nome_do_contato && message.tipo_remetente === 'USUARIO_INTERNO') {
-      console.log(`✏️ [AGENT_CHECK] Mensagem de agente detectada via interface interna`);
+    // PRIORIDADE 2: Verificar se é uma mensagem enviada pela interface (sem nome de contato válido)
+    if (!message.nome_do_contato || message.nome_do_contato ===  'Cliente' || message.nome_do_contato.trim() === '') {
+      console.log(`✏️ [AGENT_CHECK] Mensagem de agente detectada via interface interna (sem nome contato)`);
       return true;
+    }
+    
+    // PRIORIDADE 3: Verificar por nomes específicos de agente no nome do contato
+    if (message.nome_do_contato) {
+      const agentNames = [
+        'Yelena', 'yelena', 'YELENA',
+        'Andressa', 'andressa', 'ANDRESSA', 
+        'Gerente', 'gerente', 'GERENTE',
+        'Admin', 'admin', 'ADMIN',
+        'Sistema', 'sistema', 'SISTEMA'
+      ];
+      
+      for (const agentName of agentNames) {
+        if (message.nome_do_contato.includes(agentName)) {
+          console.log(`👤 [AGENT_CHECK] Mensagem de agente detectada via nome:`, message.nome_do_contato);
+          return true;
+        }
+      }
     }
     
     return false;
   };
 
-  // CORRIGIDO: Função melhorada para detectar mídia
   const isMediaMessage = (message: any): boolean => {
     // PRIORIDADE 1: Verificar se mensagem contém "media("
     if (message.message && message.message.includes('media(')) {
@@ -81,7 +110,6 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
     return false;
   };
 
-  // CORRIGIDO: Função para obter conteúdo da mídia
   const getMediaContent = (message: any): string => {
     // PRIORIDADE: media_url (mais confiável e já completada)
     if (message.media_url && message.media_url.trim() !== '') {
@@ -160,7 +188,7 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
               key={`${message.id}-${index}`}
               className={cn(
                 "flex mb-3",
-                isAgent ? "justify-end" : "justify-start" // APLICAR CORREÇÃO
+                isAgent ? "justify-end" : "justify-start" // APLICAR CORREÇÃO CORRETA
               )}
             >
               <div className={cn(
@@ -170,10 +198,10 @@ export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = ({
                 <div className={cn(
                   "px-3 py-2 text-sm shadow-sm rounded-lg",
                   isAgent
-                    ? "bg-[#b5103c] text-white"
+                    ? "bg-[#b5103c] text-white" // AGENTE = DIREITA = VERMELHO
                     : isDarkMode
-                      ? "bg-[#18181b] text-white border border-zinc-800"
-                      : "bg-white text-gray-900 border border-gray-200"
+                      ? "bg-[#18181b] text-white border border-zinc-800" // CLIENTE = ESQUERDA = ESCURO
+                      : "bg-white text-gray-900 border border-gray-200" // CLIENTE = ESQUERDA = CLARO
                 )}>
                   {isMedia ? (
                     <MediaRendererFixed 

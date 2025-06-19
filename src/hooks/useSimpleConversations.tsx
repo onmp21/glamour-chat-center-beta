@@ -1,6 +1,8 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
+import { ContactNameResolver } from '@/services/ContactNameResolver';
 
 interface SimpleConversation {
   id: string;
@@ -80,21 +82,23 @@ export const useSimpleConversations = (channelId: string | null) => {
 
       const conversationsMap = new Map<string, SimpleConversation>();
       
-      (rawData || []).forEach((message: any) => {
+      // Processar mensagens e resolver nomes usando ContactNameResolver
+      for (const message of rawData || []) {
         const sessionId = message.session_id;
         
         if (!conversationsMap.has(sessionId)) {
-          let contactName = 'Cliente';
-          if (message.nome_do_contato) {
-            contactName = message.nome_do_contato;
-          } else {
-            contactName = extractPhoneFromSession(sessionId);
-          }
+          const phoneNumber = extractPhoneFromSession(sessionId);
+          
+          // USAR ContactNameResolver para obter nome correto da tabela de contatos
+          const contactName = await ContactNameResolver.resolveName(
+            phoneNumber, 
+            message.nome_do_contato
+          );
 
           conversationsMap.set(sessionId, {
             id: sessionId,
-            contact_name: contactName,
-            contact_phone: extractPhoneFromSession(sessionId),
+            contact_name: contactName, // NOME RESOLVIDO DA TABELA UNIFICADA
+            contact_phone: phoneNumber,
             last_message: message.message || '',
             last_message_time: message.read_at || new Date().toISOString(),
             status: 'unread', // Default status, can be enhanced later
@@ -102,12 +106,12 @@ export const useSimpleConversations = (channelId: string | null) => {
             updated_at: message.read_at || new Date().toISOString()
           });
         }
-      });
+      }
 
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
-      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas`);
+      console.log(`✅ [SIMPLE_CONVERSATIONS] ${conversations.length} conversas únicas processadas com nomes resolvidos`);
       
       if (conversations.length > 0) {
         console.log(`📋 [SIMPLE_CONVERSATIONS] Primeira conversa:`, conversations[0]);
