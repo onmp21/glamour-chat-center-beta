@@ -11,5 +11,6 @@ interface ConversationsListOptimizedProps {
 
 export const ConversationsListOptimized: React.FC<ConversationsListOptimizedProps> = (props) => {
   console.log('📋 [CONVERSATIONS_LIST_OPTIMIZED] Rendering with:', props);
-  return <SimpleConversationsListWithRealtime {...props} enableRealtime={true} />;
+  // Usar apenas polling, sem realtime subscriptions
+  return <SimpleConversationsListWithRealtime {...props} enableRealtime={false} />;
 };

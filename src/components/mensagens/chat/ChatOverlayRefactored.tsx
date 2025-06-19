@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatMainArea } from './ChatMainArea';
-import { useSimpleConversations } from '@/hooks/useSimpleConversations';
-import { useSimpleMessages } from '@/hooks/useSimpleMessages';
+import { useNonRealtimeConversations } from '@/hooks/useNonRealtimeConversations';
+import { useNonRealtimeMessages } from '@/hooks/useNonRealtimeMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChannelConversation } from '@/types/messages';
 import { useConversationStatus } from '@/hooks/useConversationStatus';
@@ -16,8 +17,6 @@ interface ChatOverlayRefactoredProps {
   onSendAudio?: (audioBlob: Blob, duration: number) => Promise<void>;
 }
 
-// Placeholder type definition for SimpleConversation as it's not exported from the hook
-// and the hook file is not in the allowed list to modify.
 export interface SimpleConversation {
   id: string;
   contact_name: string;
@@ -29,7 +28,6 @@ export interface SimpleConversation {
   updated_at: string;
 }
 
-// Placeholder type definition for SimpleMessage
 export interface SimpleMessage {
   id: string;
   message: string;
@@ -37,12 +35,11 @@ export interface SimpleMessage {
   created_at?: string; 
   read_at?: string; 
   mensagemtype?: string; 
-  media_url?: string; // REMOVIDO media_base64
+  media_url?: string;
   is_read?: boolean;
   nome_do_contato?: string;
 }
 
-// Unified type for compatibility, if still needed
 interface UnifiedConversation {
   id: string;
   contact_name: string;
@@ -54,7 +51,6 @@ interface UnifiedConversation {
   updated_at: string;
 }
 
-// Type for messages displayed in ChatMainArea
 interface DisplayMessage {
   id: string;
   content: string;
@@ -85,17 +81,18 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isAuthenticated, user } = useAuth();
 
+  // Usar hooks sem realtime para evitar subscriptions
   const {
     conversations: simpleConversations, 
     loading: conversationsLoading,
     refreshConversations
-  } = useSimpleConversations(channelId);
+  } = useNonRealtimeConversations(channelId);
   
   const {
     messages: simpleMessagesFromHook, 
     loading: messagesLoading,
     refreshMessages 
-  } = useSimpleMessages(channelId, selectedConversation);
+  } = useNonRealtimeMessages(channelId, selectedConversation);
 
   console.log('🎯 [CHAT_OVERLAY] Estado atual:', {
     channelId,
@@ -108,7 +105,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     user: user?.name
   });
 
-  // Cast simpleConversations to UnifiedConversation[] if structure matches.
   const conversations: UnifiedConversation[] = simpleConversations.map((conv: SimpleConversation) => ({
     id: conv.id,
     contact_name: conv.contact_name,
@@ -133,9 +129,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     setSelectedConversation(conversationId);
   };
 
-  // Message sending is typically handled by ChatInput via useMessageActions or passed directly to ChatMainArea.
-  // These handlers here are illustrative if ChatOverlayRefactored itself were to send messages,
-  // but based on the setup, ChatMainArea / ChatInput handle sends.
   const handleSendMessage = async (message: string) => {
     console.log('💬 [CHAT_OVERLAY] Attempting to send message:', message);
     if (selectedConversation) {
@@ -168,7 +161,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
   const selectedConvData: SimpleConversation | undefined = simpleConversations.find(c => c.id === selectedConversation);
   
-  // Map SimpleConversation to ChannelConversation for ChatMainArea
   const selectedConvForMainArea: ChannelConversation | undefined = selectedConvData ? {
     id: selectedConvData.id,
     contact_name: selectedConvData.contact_name,
@@ -190,7 +182,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     }
   };
 
-  // Convert SimpleMessage from hook to DisplayMessage for ChatMainArea
   const displayMessages: DisplayMessage[] = simpleMessagesFromHook.map((msg: SimpleMessage) => {
     const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
     
@@ -204,7 +195,7 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
             msg.mensagemtype === 'audio' ? 'audio' :
             msg.mensagemtype === 'video' ? 'video' :
             msg.mensagemtype === 'document' || msg.mensagemtype === 'file' ? 'file' : 'text', 
-      fileUrl: msg.media_url || undefined, // CORRIGIDO: Usando apenas media_url
+      fileUrl: msg.media_url || undefined,
       fileName: msg.message || undefined,
       read: typeof msg.is_read === 'boolean' ? msg.is_read : true,
       nome_do_contato: msg.nome_do_contato,
