@@ -57,44 +57,64 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   }, [open, conversationId, channelId]);
 
   const loadConversationMessages = async () => {
-    if (!channelId || !conversationId) return [];
+    if (!channelId || !conversationId) {
+      console.log('❌ [AI_RESUMO] Missing channelId or conversationId');
+      return [];
+    }
 
     try {
       const tableName = getTableNameForChannelSync(channelId);
+      console.log(`📊 [AI_RESUMO] Loading messages from table: ${tableName} for session: ${conversationId}`);
       
       const { data, error: queryError } = await supabase
         .from(tableName as any)
         .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
         .eq('session_id', conversationId)
         .order('read_at', { ascending: true })
-        .limit(50);
+        .limit(100);
 
       if (queryError) {
         console.error('❌ [AI_RESUMO] Error loading messages:', queryError);
-        return [];
+        throw new Error(`Erro ao carregar mensagens: ${queryError.message}`);
       }
 
       console.log(`📊 [AI_RESUMO] Loaded ${data?.length || 0} messages from ${tableName}`);
+      
+      if (!data || data.length === 0) {
+        setInternalError('Não há mensagens nesta conversa para resumir.');
+        return [];
+      }
+
       return data || [];
 
     } catch (error) {
       console.error('❌ [AI_RESUMO] Error loading conversation messages:', error);
+      setInternalError(error instanceof Error ? error.message : 'Erro ao carregar mensagens');
       return [];
     }
   };
 
   const loadProvidersAndGenerateSummary = async () => {
     try {
+      console.log('🔄 [AI_RESUMO] Loading providers...');
       const activeProviders = await AIProviderService.getActiveProviders();
       setProviders(activeProviders);
       
-      if (activeProviders.length > 0) {
-        const messages = await loadConversationMessages();
-        setConversationMessages(messages);
+      if (activeProviders.length === 0) {
+        setInternalError('Nenhum provedor de IA configurado');
+        return;
+      }
+      
+      console.log(`✅ [AI_RESUMO] Found ${activeProviders.length} active providers`);
+      
+      const messages = await loadConversationMessages();
+      setConversationMessages(messages);
+      
+      if (messages.length > 0) {
         await generateSummary(activeProviders[0].id, messages);
       }
     } catch (error) {
-      console.error('Erro ao carregar provedores:', error);
+      console.error('❌ [AI_RESUMO] Error loading providers:', error);
       setInternalError('Erro ao carregar configurações de IA');
     }
   };
@@ -122,7 +142,7 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
       
       if (messagesToUse.length === 0) {
         console.warn('⚠️ [AI_RESUMO] Nenhuma mensagem encontrada para resumir');
-        setInternalError('Nenhuma mensagem encontrada para resumir');
+        setInternalError('Não há mensagens nesta conversa para resumir.');
         return;
       }
 

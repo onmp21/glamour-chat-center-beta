@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -50,52 +51,68 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
 
   const loadProviders = async () => {
     try {
+      console.log('🔄 [AI_QUICK_RESPONSE] Loading providers...');
       const activeProviders = await AIProviderService.getActiveProviders();
       setProviders(activeProviders);
       if (activeProviders.length > 0) {
         setSelectedProvider(activeProviders[0].id);
+        console.log(`✅ [AI_QUICK_RESPONSE] Found ${activeProviders.length} active providers`);
+      } else {
+        console.warn('⚠️ [AI_QUICK_RESPONSE] No active providers found');
       }
     } catch (error) {
-      console.error('Erro ao carregar provedores:', error);
+      console.error('❌ [AI_QUICK_RESPONSE] Error loading providers:', error);
     }
   };
 
   const loadConversationMessages = async () => {
-    if (!channelId || !conversationId) return [];
+    if (!channelId || !conversationId) {
+      console.log('❌ [AI_QUICK_RESPONSE] Missing channelId or conversationId');
+      return [];
+    }
 
     try {
       const tableName = getTableNameForChannelSync(channelId);
+      console.log(`📊 [AI_QUICK_RESPONSE] Loading messages from table: ${tableName} for session: ${conversationId}`);
       
       const { data, error: queryError } = await supabase
         .from(tableName as any)
         .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype')
         .eq('session_id', conversationId)
         .order('read_at', { ascending: true })
-        .limit(20);
+        .limit(50);
 
       if (queryError) {
         console.error('❌ [AI_QUICK_RESPONSE] Error loading messages:', queryError);
-        return [];
+        throw new Error(`Erro ao carregar mensagens: ${queryError.message}`);
       }
 
       console.log(`📊 [AI_QUICK_RESPONSE] Loaded ${data?.length || 0} messages from ${tableName}`);
+      
+      if (!data || data.length === 0) {
+        throw new Error('Não há mensagens nesta conversa para gerar respostas.');
+      }
+
       return data || [];
 
     } catch (error) {
       console.error('❌ [AI_QUICK_RESPONSE] Error loading conversation messages:', error);
-      return [];
+      throw error;
     }
   };
 
   const loadMessagesAndGenerate = async () => {
-    const messages = await loadConversationMessages();
-    setConversationMessages(messages);
-    if (messages.length > 0) {
-      generateAIResponses(messages);
-    } else {
+    try {
+      const messages = await loadConversationMessages();
+      setConversationMessages(messages);
+      if (messages.length > 0) {
+        generateAIResponses(messages);
+      }
+    } catch (error) {
+      console.error('❌ [AI_QUICK_RESPONSE] Error in loadMessagesAndGenerate:', error);
       toast({
         title: "Aviso",
-        description: "Nenhuma mensagem encontrada nesta conversa",
+        description: error instanceof Error ? error.message : "Erro ao carregar mensagens",
         variant: "destructive"
       });
     }
@@ -123,7 +140,7 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
         console.warn('⚠️ [AI_QUICK_RESPONSE] Nenhuma mensagem encontrada para gerar respostas');
         toast({
           title: "Aviso",
-          description: "Nenhuma mensagem encontrada para gerar respostas",
+          description: "Não há mensagens nesta conversa para gerar respostas.",
           variant: "destructive"
         });
         return;
@@ -312,9 +329,9 @@ export const AIQuickResponseModal: React.FC<AIQuickResponseModalProps> = ({
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               )}>
                 <Sparkles className="mx-auto h-12 w-12 opacity-30 mb-3" />
-                <p>Nenhuma mensagem encontrada</p>
+                <p>Não há mensagens nesta conversa para gerar respostas</p>
                 <p className="text-sm mt-1">
-                  Esta conversa não possui mensagens para analisar
+                  Selecione uma conversa com mensagens para usar esta funcionalidade
                 </p>
               </div>
             )}
