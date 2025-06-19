@@ -51,11 +51,11 @@ export const ApiConnectionSection: React.FC<ApiConnectionSectionProps> = ({
               id="baseUrl"
               placeholder="https://evolution.estudioonmp.com"
               value={apiConnection.baseUrl}
-              onChange={(e) => setApiConnection(prev => ({
-                ...prev,
+              onChange={(e) => setApiConnection({
+                ...apiConnection,
                 baseUrl: e.target.value,
                 isValidated: false
-              }))}
+              })}
               disabled={validatingApi}
               className={cn(
                 isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
@@ -70,11 +70,11 @@ export const ApiConnectionSection: React.FC<ApiConnectionSectionProps> = ({
               type="password"
               placeholder="Sua API Key"
               value={apiConnection.apiKey}
-              onChange={(e) => setApiConnection(prev => ({
-                ...prev,
+              onChange={(e) => setApiConnection({
+                ...apiConnection,
                 apiKey: e.target.value,
                 isValidated: false
-              }))}
+              })}
               disabled={validatingApi}
               className={cn(
                 isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
