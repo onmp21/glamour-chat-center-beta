@@ -13,7 +13,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
+  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -60,13 +61,13 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     loadConversations(true);
   }, [channelId, loadConversations]);
 
-  // Callback memoizado do realtime com debounce
+  // Debounced realtime callback
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
     
-    // Debounce para evitar muitas atualizações
+    // Debounce to avoid excessive refreshes
     setTimeout(() => {
       if (mountedRef.current) {
         loadConversations();
@@ -99,14 +100,23 @@ export const useChannelConversationsRefactored = (channelId: string) => {
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        await subscriptionManager.createSubscription(tableName, realtimeCallback);
+        
+        // Store the promise to prevent duplicate calls
+        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, realtimeCallback);
+        await subscriptionPromiseRef.current;
+        
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
       } catch (error) {
         DetailedLogger.error("useChannelConversationsRefactored", `Erro ao crear subscription:`, error);
+      } finally {
+        subscriptionPromiseRef.current = null;
       }
     };
 
-    setupSubscription();
+    // Only setup if we're not already setting up
+    if (!subscriptionPromiseRef.current) {
+      setupSubscription();
+    }
 
     return () => {
       mountedRef.current = false;

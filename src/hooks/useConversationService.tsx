@@ -12,7 +12,8 @@ export const useConversationService = (channelId: string) => {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
+  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -79,13 +80,13 @@ export const useConversationService = (channelId: string) => {
     }
   };
 
-  // Callback memoizado do realtime com debounce
+  // Debounced realtime callback
   const realtimeCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
     console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
     
-    // Debounce para evitar muitas requisições
+    // Debounce to avoid excessive refreshes
     setTimeout(() => {
       if (mountedRef.current) {
         refreshConversations();
@@ -118,14 +119,23 @@ export const useConversationService = (channelId: string) => {
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        await subscriptionManager.createSubscription(tableName, realtimeCallback);
+        
+        // Store the promise to prevent duplicate calls
+        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, realtimeCallback);
+        await subscriptionPromiseRef.current;
+        
         console.log(`✅ [CONVERSATION_SERVICE_HOOK] Connected to ${tableName}`);
       } catch (error) {
         console.error('❌ [CONVERSATION_SERVICE_HOOK] Error setting up subscription:', error);
+      } finally {
+        subscriptionPromiseRef.current = null;
       }
     };
 
-    setupSubscription();
+    // Only setup if we're not already setting up
+    if (!subscriptionPromiseRef.current) {
+      setupSubscription();
+    }
 
     return () => {
       mountedRef.current = false;

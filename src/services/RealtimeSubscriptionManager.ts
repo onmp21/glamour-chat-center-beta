@@ -5,13 +5,12 @@ interface SubscriptionInfo {
   channel: any;
   callbacks: Set<(payload: any) => void>;
   isSubscribed: boolean;
-  subscriptionPromise: Promise<any> | null;
 }
 
 class RealtimeSubscriptionManager {
   private static instance: RealtimeSubscriptionManager;
   private subscriptions: Map<string, SubscriptionInfo> = new Map();
-  private pendingSubscriptions: Map<string, Promise<any>> = new Map();
+  private subscriptionLocks: Map<string, boolean> = new Map();
 
   public static getInstance(): RealtimeSubscriptionManager {
     if (!RealtimeSubscriptionManager.instance) {
@@ -26,50 +25,78 @@ class RealtimeSubscriptionManager {
   ): Promise<any> {
     console.log(`[REALTIME_MANAGER] Creating subscription for table: ${tableName}`);
 
-    // Se já existe uma subscrição pendente, aguardar ela
-    if (this.pendingSubscriptions.has(tableName)) {
-      console.log(`[REALTIME_MANAGER] Waiting for pending subscription: ${tableName}`);
-      const existingPromise = this.pendingSubscriptions.get(tableName)!;
-      await existingPromise;
+    // Check if we're already in the process of creating a subscription
+    if (this.subscriptionLocks.get(tableName)) {
+      console.log(`[REALTIME_MANAGER] Subscription creation in progress for: ${tableName}, waiting...`);
+      // Wait for the existing subscription to be ready
+      return this.waitForSubscription(tableName, callback);
     }
 
-    // Obter ou criar subscription info
+    // Check if subscription already exists
     let subscriptionInfo = this.subscriptions.get(tableName);
     
-    if (!subscriptionInfo) {
-      // Criar nova subscription com promise para evitar condições de corrida
-      const subscriptionPromise = this.setupNewSubscription(tableName);
-      this.pendingSubscriptions.set(tableName, subscriptionPromise);
-      
-      try {
-        subscriptionInfo = await subscriptionPromise;
-        this.subscriptions.set(tableName, subscriptionInfo);
-        console.log(`[REALTIME_MANAGER] New subscription created for: ${tableName}`);
-      } finally {
-        this.pendingSubscriptions.delete(tableName);
-      }
+    if (subscriptionInfo) {
+      console.log(`[REALTIME_MANAGER] Using existing subscription for: ${tableName}`);
+      subscriptionInfo.callbacks.add(callback);
+      console.log(`[REALTIME_MANAGER] Added callback, total for ${tableName}: ${subscriptionInfo.callbacks.size}`);
+      return subscriptionInfo.channel;
     }
 
-    // Adicionar callback
-    subscriptionInfo.callbacks.add(callback);
-    console.log(`[REALTIME_MANAGER] Added callback, total for ${tableName}: ${subscriptionInfo.callbacks.size}`);
+    // Lock to prevent concurrent subscription creation
+    this.subscriptionLocks.set(tableName, true);
 
-    return subscriptionInfo.channel;
+    try {
+      // Create new subscription
+      subscriptionInfo = await this.setupNewSubscription(tableName);
+      this.subscriptions.set(tableName, subscriptionInfo);
+      
+      // Add the callback
+      subscriptionInfo.callbacks.add(callback);
+      console.log(`[REALTIME_MANAGER] New subscription created and callback added for: ${tableName}`);
+      
+      return subscriptionInfo.channel;
+    } finally {
+      // Always release the lock
+      this.subscriptionLocks.delete(tableName);
+    }
+  }
+
+  private async waitForSubscription(tableName: string, callback: (payload: any) => void): Promise<any> {
+    // Wait for the subscription to be ready (max 5 seconds)
+    const maxWait = 5000;
+    const checkInterval = 100;
+    let waited = 0;
+
+    while (waited < maxWait) {
+      const subscriptionInfo = this.subscriptions.get(tableName);
+      if (subscriptionInfo && subscriptionInfo.isSubscribed) {
+        subscriptionInfo.callbacks.add(callback);
+        console.log(`[REALTIME_MANAGER] Added callback to existing subscription for: ${tableName}`);
+        return subscriptionInfo.channel;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      waited += checkInterval;
+    }
+
+    throw new Error(`Timeout waiting for subscription to be ready for table: ${tableName}`);
   }
 
   private async setupNewSubscription(tableName: string): Promise<SubscriptionInfo> {
     return new Promise((resolve, reject) => {
+      // Create a unique channel name to avoid conflicts
       const channelName = `realtime-${tableName}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`[REALTIME_MANAGER] Creating channel: ${channelName}`);
+      
       const channel = supabase.channel(channelName);
       
       const subscriptionInfo: SubscriptionInfo = {
         channel,
         callbacks: new Set(),
-        isSubscribed: false,
-        subscriptionPromise: null
+        isSubscribed: false
       };
 
-      // Configurar o listener ANTES de se inscrever
+      // Set up the postgres_changes listener BEFORE subscribing
       channel.on(
         'postgres_changes',
         {
@@ -79,7 +106,7 @@ class RealtimeSubscriptionManager {
         },
         (payload: any) => {
           console.log(`[REALTIME_MANAGER] Received update for ${tableName}:`, payload);
-          // Chamar todos os callbacks registrados
+          // Call all registered callbacks
           subscriptionInfo.callbacks.forEach(callback => {
             try {
               callback(payload);
@@ -90,7 +117,7 @@ class RealtimeSubscriptionManager {
         }
       );
 
-      // Se inscrever apenas uma vez
+      // Subscribe to the channel
       channel.subscribe((status: string) => {
         console.log(`[REALTIME_MANAGER] Subscription status for ${tableName}: ${status}`);
         
@@ -113,13 +140,13 @@ class RealtimeSubscriptionManager {
       return;
     }
 
-    // Remover callback específico se fornecido
+    // Remove specific callback if provided
     if (callback) {
       subscriptionInfo.callbacks.delete(callback);
       console.log(`[REALTIME_MANAGER] Removed callback, remaining for ${tableName}: ${subscriptionInfo.callbacks.size}`);
     }
 
-    // Se não há mais callbacks, remover a subscrição inteira
+    // If no more callbacks, remove the entire subscription
     if (subscriptionInfo.callbacks.size === 0) {
       console.log(`[REALTIME_MANAGER] No more callbacks, removing subscription for: ${tableName}`);
       try {
@@ -147,7 +174,7 @@ class RealtimeSubscriptionManager {
     }
     
     this.subscriptions.clear();
-    this.pendingSubscriptions.clear();
+    this.subscriptionLocks.clear();
   }
 
   public getActiveSubscriptions(): string[] {

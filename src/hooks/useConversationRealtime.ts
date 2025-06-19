@@ -8,9 +8,10 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
   const [isConnected, setIsConnected] = useState(false);
   const callbackRef = useRef<((payload: any) => void) | null>(null);
   const tableNameRef = useRef<string | null>(null);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
+  const subscriptionPromiseRef = useRef<Promise<any> | null>(null);
 
-  // Callback memoizado para evitar recriações desnecessárias
+  // Stable callback that won't change on every render
   const stableCallback = useCallback((payload: any) => {
     if (!mountedRef.current) return;
     
@@ -35,6 +36,7 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
       return;
     }
 
+    // Store refs for cleanup
     tableNameRef.current = tableName;
     callbackRef.current = stableCallback;
 
@@ -43,7 +45,10 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
       
       try {
         const subscriptionManager = RealtimeSubscriptionManager.getInstance();
-        await subscriptionManager.createSubscription(tableName, stableCallback);
+        
+        // Store the promise to prevent duplicate calls
+        subscriptionPromiseRef.current = subscriptionManager.createSubscription(tableName, stableCallback);
+        await subscriptionPromiseRef.current;
 
         if (mountedRef.current) {
           setIsConnected(true);
@@ -54,10 +59,15 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
         if (mountedRef.current) {
           setIsConnected(false);
         }
+      } finally {
+        subscriptionPromiseRef.current = null;
       }
     };
 
-    setupSubscription();
+    // Only setup if we're not already setting up
+    if (!subscriptionPromiseRef.current) {
+      setupSubscription();
+    }
 
     return () => {
       mountedRef.current = false;
@@ -70,8 +80,8 @@ export const useConversationRealtime = (channelId: string, onNewMessage?: (messa
         } catch (error) {
           console.error('❌ [CONVERSATION_REALTIME] Error cleaning up subscription:', error);
         }
-        setIsConnected(false);
       }
+      setIsConnected(false);
     };
   }, [channelId, stableCallback]);
 
