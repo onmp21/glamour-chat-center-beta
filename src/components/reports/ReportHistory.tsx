@@ -1,10 +1,37 @@
 
 import React, { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownloadReport }) => {
+export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownloadReport, onRemoveReport }) => {
   const [selectedReport, setSelectedReport] = useState(null);
+
+  const handleDownloadTxt = (content, reportType, reportId) => {
+    // Create a blob with the content
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `relatorio_${reportType}_${reportId}.txt`;
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleRemove = (reportId) => {
+    if (confirm('Tem certeza que deseja remover este relatório?')) {
+      if (typeof onRemoveReport === "function") {
+        onRemoveReport(reportId);
+      }
+    }
+  };
 
   return (
     <div>
@@ -17,13 +44,13 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
       <ul className="grid gap-3">
         {recentReports.map(report => (
           <li key={report.id} className={cn(
-            "flex items-center justify-between p-2 rounded transition-colors",
+            "flex items-center justify-between p-3 rounded transition-colors",
             isDarkMode 
               ? "bg-[#27272a] border border-[#3f3f46]" 
               : "bg-gray-100 border border-gray-200"
           )}>
             <span className={cn(
-              "font-medium text-sm",
+              "font-medium text-sm flex-1",
               isDarkMode ? "text-white" : "text-gray-900"
             )}>
               {report.title}
@@ -35,7 +62,7 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
                   if (typeof onViewReport === "function") onViewReport(report.result);
                 }}
                 className={cn(
-                  "text-primary px-2 py-1 border rounded hover:bg-primary/10 transition",
+                  "text-primary px-3 py-1 border rounded hover:bg-primary/10 transition text-sm",
                   isDarkMode 
                     ? "bg-[#18181b] border-[#3f3f46] hover:bg-primary/20" 
                     : "bg-white border-gray-300"
@@ -44,13 +71,29 @@ export const ReportHistory = ({ isDarkMode, recentReports, onViewReport, onDownl
                 Ver
               </button>
               <button
-                onClick={() => onDownloadReport(report.generated_report, report.report_type, report.id)}
+                onClick={() => handleDownloadTxt(report.generated_report, report.report_type, report.id)}
                 className={cn(
-                  "text-xs hover:underline",
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                  "flex items-center gap-1 px-3 py-1 border rounded hover:bg-blue-50 transition text-sm",
+                  isDarkMode 
+                    ? "bg-[#18181b] border-[#3f3f46] text-blue-400 hover:bg-blue-900/20" 
+                    : "bg-white border-gray-300 text-blue-600"
                 )}
+                title="Baixar como TXT"
               >
-                Download
+                <Download size={14} />
+                TXT
+              </button>
+              <button
+                onClick={() => handleRemove(report.id)}
+                className={cn(
+                  "flex items-center gap-1 px-3 py-1 border rounded hover:bg-red-50 transition text-sm",
+                  isDarkMode 
+                    ? "bg-[#18181b] border-[#3f3f46] text-red-400 hover:bg-red-900/20" 
+                    : "bg-white border-gray-300 text-red-600"
+                )}
+                title="Remover relatório"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
           </li>
