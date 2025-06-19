@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ interface AIResumoOverlayProps {
   contactName?: string;
   messages?: any[];
 }
+
+const MINIMUM_MESSAGES_FOR_SUMMARY = 4; // Número mínimo de mensagens para permitir resumo
 
 export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
   open,
@@ -82,6 +85,24 @@ export const AIResumoOverlay: React.FC<AIResumoOverlayProps> = ({
       
       if (!data || data.length === 0) {
         setInternalError('Não há mensagens nesta conversa para resumir.');
+        return [];
+      }
+
+      // Verificar se há mensagens suficientes para resumir
+      if (data.length < MINIMUM_MESSAGES_FOR_SUMMARY) {
+        setInternalError(`Esta conversa tem apenas ${data.length} mensagem${data.length !== 1 ? 's' : ''}. É necessário pelo menos ${MINIMUM_MESSAGES_FOR_SUMMARY} mensagens para gerar um resumo útil.`);
+        return [];
+      }
+
+      // Filtrar mensagens muito curtas ou vazias para uma contagem mais precisa
+      const meaningfulMessages = data.filter(msg => 
+        msg.message && 
+        msg.message.trim().length > 10 && // Mensagens com pelo menos 10 caracteres
+        !msg.message.trim().match(/^(ok|sim|não|oi|olá|tchau|obrigado|obrigada)$/i) // Evitar mensagens muito simples
+      );
+
+      if (meaningfulMessages.length < 3) {
+        setInternalError(`Esta conversa tem apenas ${meaningfulMessages.length} mensagem${meaningfulMessages.length !== 1 ? 's' : ''} significativas. É necessário mais conteúdo para gerar um resumo útil.`);
         return [];
       }
 
