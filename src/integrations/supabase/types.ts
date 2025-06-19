@@ -590,6 +590,42 @@ export type Database = {
         }
         Relationships: []
       }
+      teste_conversas: {
+        Row: {
+          id: number
+          is_read: boolean | null
+          media_url: string | null
+          mensagemtype: string | null
+          message: string
+          nome_do_contato: string | null
+          read_at: string | null
+          session_id: string
+          tipo_remetente: string | null
+        }
+        Insert: {
+          id?: number
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id: string
+          tipo_remetente?: string | null
+        }
+        Update: {
+          id?: number
+          is_read?: boolean | null
+          media_url?: string | null
+          mensagemtype?: string | null
+          message?: string
+          nome_do_contato?: string | null
+          read_at?: string | null
+          session_id?: string
+          tipo_remetente?: string | null
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null

@@ -191,7 +191,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
             <span>Resumo IA</span>
           </Button>
 
-          {/* Modal de Resumo */}
+          {/* Modal de Resumo - ADICIONANDO isLoading prop */}
           <AIResumoOverlay
             open={isResumoOpen}
             onClose={() => setIsResumoOpen(false)}
@@ -199,6 +199,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
             conversationId={selectedConv.id}
             channelId={channelId}
             contactName={selectedConv.contact_name}
+            isLoading={false}
           />
           
           {/* Botão Marcar como Resolvido - FUNÇÃO CORRIGIDA */}
