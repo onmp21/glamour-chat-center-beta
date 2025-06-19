@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { OptimizedContact } from '@/services/OptimizedContactService';
 import { useUnifiedContacts } from '@/hooks/useUnifiedContacts';
-import { getChannelDisplayName } from '@/utils/channelMapping';
+import { getChannelDisplayNameSync } from '@/utils/channelMapping';
 
 interface ContactsListOptimizedProps {
   contacts?: OptimizedContact[];
@@ -156,7 +156,7 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
                           : "bg-gray-100 text-gray-600"
                       )}
                     >
-                      {getChannelDisplayName(canal)}
+                      {getChannelDisplayNameSync(canal)}
                     </span>
                   ))}
                 </div>
