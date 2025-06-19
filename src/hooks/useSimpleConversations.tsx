@@ -15,6 +15,14 @@ interface SimpleConversation {
   updated_at: string;
 }
 
+interface ConversationMessage {
+  session_id: string;
+  nome_do_contato: string;
+  message: string;
+  read_at: string;
+  tipo_remetente?: string;
+}
+
 export const useSimpleConversations = (channelId: string | null) => {
   const [conversations, setConversations] = useState<SimpleConversation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,7 +91,7 @@ export const useSimpleConversations = (channelId: string | null) => {
       const conversationsMap = new Map<string, SimpleConversation>();
       
       // Processar mensagens e resolver nomes usando ContactNameResolver
-      for (const message of rawData || []) {
+      for (const message of (rawData as ConversationMessage[]) || []) {
         const sessionId = message.session_id;
         
         if (!conversationsMap.has(sessionId)) {
@@ -97,12 +105,13 @@ export const useSimpleConversations = (channelId: string | null) => {
 
           conversationsMap.set(sessionId, {
             id: sessionId,
-            contact_name: contactName, // NOME RESOLVIDO DA TABELA UNIFICADA
+            contact_name: contactName,
             contact_phone: phoneNumber,
             last_message: message.message || '',
             last_message_time: message.read_at || new Date().toISOString(),
-            status: 'unread', // Default status, can be enhanced later
-            unread_count: 0, // Default unread count
+            status: '
+' as const,
+            unread_count: 0,
             updated_at: message.read_at || new Date().toISOString()
           });
         }

@@ -34,10 +34,14 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
         console.log(`🎵 [AUDIO_PLAYER] Processando áudio:`, audioSrc.substring(0, 50));
         
         // USAR MÉTODO ASSÍNCRONO CORRETO
-        const processedSrc = await MediaProcessor.processAsync(audioSrc, 'audio');
-        setProcessedAudioSrc(processedSrc);
-        
-        console.log(`✅ [AUDIO_PLAYER] Áudio processado com sucesso`);
+        const result = await MediaProcessor.processAsync(audioSrc, 'audio');
+        if (result.isProcessed && result.url) {
+          setProcessedAudioSrc(result.url);
+          console.log(`✅ [AUDIO_PLAYER] Áudio processado com sucesso`);
+        } else {
+          console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', result.error);
+          setProcessedAudioSrc(audioSrc); // Fallback para src original
+        }
       } catch (error) {
         console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', error);
         setProcessedAudioSrc(audioSrc); // Fallback para src original

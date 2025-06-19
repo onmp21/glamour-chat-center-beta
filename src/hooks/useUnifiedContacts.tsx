@@ -4,6 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { OptimizedContact } from '@/services/OptimizedContactService';
 import { useAuth } from '@/contexts/AuthContext';
 
+interface DatabaseMessage {
+  message: string;
+  read_at: string;
+  mensagemtype?: string;
+  is_read?: boolean;
+}
+
 export const useUnifiedContacts = () => {
   const [contacts, setContacts] = useState<OptimizedContact[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +66,7 @@ export const useUnifiedContacts = () => {
                 .limit(1);
 
               if (messages && messages.length > 0) {
-                const msg = messages[0];
+                const msg = messages[0] as DatabaseMessage;
                 const msgTime = new Date(msg.read_at || '').toISOString();
                 
                 // Se esta mensagem é mais recente

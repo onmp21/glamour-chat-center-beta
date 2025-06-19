@@ -15,6 +15,17 @@ interface SimpleMessage {
   media_url?: string;
 }
 
+interface DatabaseMessage {
+  id: number;
+  session_id: string;
+  message: string;
+  read_at: string;
+  tipo_remetente?: string;
+  nome_do_contato?: string;
+  mensagemtype?: string;
+  media_url?: string;
+}
+
 export const useSimpleMessages = (channelId: string | null, sessionId: string | null) => {
   const [messages, setMessages] = useState<SimpleMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,7 +145,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
       // Processar mensagens e resolver nomes usando ContactNameResolver
       const processedMessages: SimpleMessage[] = [];
       
-      for (const row of rawData || []) {
+      for (const row of (rawData as DatabaseMessage[]) || []) {
         const phoneNumber = extractPhoneFromSession(row.session_id);
         
         // Resolver nome do contato usando tabela unificada
@@ -149,7 +160,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
           message: row.message || "",
           read_at: row.read_at || new Date().toISOString(),
           tipo_remetente: row.tipo_remetente,
-          nome_do_contato: resolvedName, // USAR NOME RESOLVIDO
+          nome_do_contato: resolvedName,
           mensagemtype: mapMessageType(row.mensagemtype),
           media_url: completeMediaUrl(row.media_url)
         });
@@ -188,7 +199,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
             async (payload) => {
               console.log(`📨 [SIMPLE_MESSAGES] Nova mensagem recebida via realtime:`, payload);
               if (payload && payload.new) {
-                const novo = payload.new;
+                const novo = payload.new as DatabaseMessage;
                 
                 // Resolver nome da nova mensagem
                 const phoneNumber = extractPhoneFromSession(novo.session_id);
@@ -210,7 +221,7 @@ export const useSimpleMessages = (channelId: string | null, sessionId: string | 
                     message: novo.message || '',
                     read_at: novo.read_at || new Date().toISOString(),
                     tipo_remetente: novo.tipo_remetente,
-                    nome_do_contato: resolvedName, // USAR NOME RESOLVIDO
+                    nome_do_contato: resolvedName,
                     mensagemtype: mapMessageType(novo.mensagemtype), 
                     media_url: completeMediaUrl(novo.media_url)
                   };

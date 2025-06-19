@@ -1,20 +1,42 @@
 
+export interface MediaResult {
+  isProcessed: boolean;
+  url?: string;
+  type?: string;
+  mimeType?: string;
+  size?: string;
+  error?: string;
+}
+
 export class MediaProcessor {
   // Processar mídia de forma assíncrona (método principal)
-  static async processAsync(content: string, messageType: string = 'text'): Promise<string> {
-    if (!content) return '';
+  static async processAsync(content: string, messageType: string = 'text'): Promise<MediaResult> {
+    if (!content) {
+      return { isProcessed: false, error: 'Conteúdo vazio' };
+    }
 
     try {
       // Se já é uma URL completa, retornar como está
       if (content.startsWith('http')) {
         console.log(`🔗 [MEDIA_PROCESSOR] URL completa detectada:`, content.substring(0, 50));
-        return content;
+        return {
+          isProcessed: true,
+          url: content,
+          type: this.getTypeFromMessageType(messageType),
+          mimeType: this.getMimeTypeFromUrl(content)
+        };
       }
 
       // Se é data URL (base64), processar
       if (content.startsWith('data:')) {
         console.log(`📄 [MEDIA_PROCESSOR] Data URL detectada:`, content.substring(0, 50));
-        return content;
+        const mimeType = this.extractMimeFromDataUrl(content);
+        return {
+          isProcessed: true,
+          url: content,
+          type: this.getTypeFromMimeType(mimeType),
+          mimeType
+        };
       }
 
       // Se parece ser base64 puro, formar data URL
@@ -22,14 +44,19 @@ export class MediaProcessor {
         const mimeType = this.detectMimeType(content, messageType);
         const dataUrl = `data:${mimeType};base64,${content}`;
         console.log(`🔄 [MEDIA_PROCESSOR] Base64 convertido para data URL:`, mimeType);
-        return dataUrl;
+        return {
+          isProcessed: true,
+          url: dataUrl,
+          type: this.getTypeFromMimeType(mimeType),
+          mimeType
+        };
       }
 
-      // Caso contrário, retornar como texto
-      return content;
+      // Caso contrário, retornar como não processado
+      return { isProcessed: false, error: 'Formato não reconhecido' };
     } catch (error) {
       console.error('❌ [MEDIA_PROCESSOR] Erro no processamento assíncrono:', error);
-      return content;
+      return { isProcessed: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
     }
   }
 
@@ -100,24 +127,107 @@ export class MediaProcessor {
     return null;
   }
 
+  // Extrair MIME type de data URL
+  private static extractMimeFromDataUrl(dataUrl: string): string {
+    const match = dataUrl.match(/^data:([^;]+)/);
+    return match ? match[1] : 'application/octet-stream';
+  }
+
+  // Obter tipo da mensagem baseado no MIME type
+  private static getTypeFromMimeType(mimeType: string): string {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType === 'application/pdf') return 'document';
+    return 'document';
+  }
+
+  // Obter tipo baseado no tipo da mensagem
+  private static getTypeFromMessageType(messageType: string): string {
+    switch (messageType) {
+      case 'imageMessage':
+      case 'image':
+        return 'image';
+      case 'audioMessage':
+      case 'audio':
+      case 'ptt':
+        return 'audio';
+      case 'videoMessage':
+      case 'video':
+        return 'video';
+      case 'documentMessage':
+      case 'document':
+        return 'document';
+      case 'stickerMessage':
+      case 'sticker':
+        return 'sticker';
+      default:
+        return 'document';
+    }
+  }
+
+  // Obter MIME type de URL
+  private static getMimeTypeFromUrl(url: string): string {
+    const extension = url.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp3':
+        return 'audio/mpeg';
+      case 'ogg':
+        return 'audio/ogg';
+      case 'mp4':
+        return 'video/mp4';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // Obter ícone para tipo de mídia
+  static getMediaIcon(type: string): string {
+    switch (type) {
+      case 'image':
+        return '🖼️';
+      case 'audio':
+        return '🎵';
+      case 'video':
+        return '🎥';
+      case 'document':
+        return '📄';
+      case 'sticker':
+        return '🏷️';
+      default:
+        return '📎';
+    }
+  }
+
   // Métodos síncronos mantidos para compatibilidade mas deprecados
-  static processAudio(content: string): string {
+  static processAudio(content: string): MediaResult {
     console.warn('⚠️ [MEDIA_PROCESSOR] processAudio() é deprecado, use processAsync()');
-    return content;
+    return { isProcessed: false, error: 'Método deprecado' };
   }
 
-  static processImage(content: string): string {
+  static processImage(content: string): MediaResult {
     console.warn('⚠️ [MEDIA_PROCESSOR] processImage() é deprecado, use processAsync()');
-    return content;
+    return { isProcessed: false, error: 'Método deprecado' };
   }
 
-  static processVideo(content: string): string {
+  static processVideo(content: string): MediaResult {
     console.warn('⚠️ [MEDIA_PROCESSOR] processVideo() é deprecado, use processAsync()');
-    return content;
+    return { isProcessed: false, error: 'Método deprecado' };
   }
 
-  static processDocument(content: string): string {
+  static processDocument(content: string): MediaResult {
     console.warn('⚠️ [MEDIA_PROCESSOR] processDocument() é deprecado, use processAsync()');
-    return content;
+    return { isProcessed: false, error: 'Método deprecado' };
   }
 }
