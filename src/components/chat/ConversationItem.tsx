@@ -68,7 +68,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     }
   };
 
-  const showUnreadBadge = currentStatus === 'unread';
+  // Só mostrar badge se for unread (pendente) E se unread_count > 0
+  const showUnreadBadge = currentStatus === 'unread' && (conversation.unread_count || 0) > 0;
 
   const handleClick = async () => {
     
@@ -106,7 +107,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={cn("text-xs flex-shrink-0", isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")}>
               {formatTime(conversation.last_message_time)}
             </span>
-            {/* Só mostrar badge se for unread (pendente) */}
+            {/* Só mostrar badge se for unread (pendente) E se unread_count > 0 */}
             {showUnreadBadge && (
               <Badge variant="default" className="bg-[#b5103c] hover:bg-[#9d0e34] text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center">
                 •

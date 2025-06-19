@@ -66,37 +66,23 @@ export const useConversationStatusEnhanced = () => {
     localStorage.setItem(globalKey, JSON.stringify(globalStats));
   }, []);
 
-  // Função para detectar nova mensagem e reativar conversa resolvida
+  // Função para detectar nova mensagem e SEMPRE reativar conversa para pendente
   const handleNewMessage = useCallback((channelId: string, conversationId: string, messageTime: string) => {
-    console.log(`📩 [STATUS] Nova mensagem detectada em ${channelId}/${conversationId}`);
+    console.log(`📩 [STATUS] Nova mensagem detectada em ${channelId}/${conversationId} - mudando para pendente`);
     
     const currentData = getConversationStatusData(channelId, conversationId);
     
-    // Se estava resolvida, voltar para pendente
-    if (currentData.status === 'resolved') {
-      console.log(`🔄 [STATUS] Reativando conversa resolvida para pendente`);
-      const updatedData: ConversationStatusData = {
-        ...currentData,
-        status: 'unread',
-        lastActivity: messageTime,
-        lastMessageTime: messageTime,
-        autoResolvedAt: undefined // Remove marcação de auto-resolução
-      };
-      saveConversationStatusData(channelId, conversationId, updatedData);
-      return true; // Indica que houve mudança
-    }
-    
-    // Atualizar timestamp da última mensagem para conversas ativas
-    if (currentData.status === 'unread' || currentData.status === 'in_progress') {
-      const updatedData: ConversationStatusData = {
-        ...currentData,
-        lastActivity: messageTime,
-        lastMessageTime: messageTime
-      };
-      saveConversationStatusData(channelId, conversationId, updatedData);
-    }
-    
-    return false;
+    // SEMPRE mudar para pendente quando chegar nova mensagem, independente do status atual
+    console.log(`🔄 [STATUS] Mudando conversa para pendente devido a nova mensagem`);
+    const updatedData: ConversationStatusData = {
+      ...currentData,
+      status: 'unread', // SEMPRE pendente para nova mensagem
+      lastActivity: messageTime,
+      lastMessageTime: messageTime,
+      autoResolvedAt: undefined // Remove marcação de auto-resolução
+    };
+    saveConversationStatusData(channelId, conversationId, updatedData);
+    return true; // Indica que houve mudança
   }, [getConversationStatusData, saveConversationStatusData]);
 
   // Auto-resolver conversas antigas (24 horas sem interação)
