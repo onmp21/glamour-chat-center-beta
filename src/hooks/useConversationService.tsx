@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MessageService } from '@/services/MessageService';
 import { ChannelConversation } from './useChannelConversations';
 
@@ -8,6 +8,8 @@ export const useConversationService = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef<boolean>(false);
 
   const loadConversations = async (isRefresh = false) => {
     if (!channelId) {
@@ -72,30 +74,38 @@ export const useConversationService = (channelId: string) => {
   useEffect(() => {
     loadConversations();
 
-    // Setup realtime subscription with proper cleanup
-    let channel: any = null;
+    // Setup realtime subscription with proper cleanup - only if not already subscribed
     let channelSuffix = '';
 
-    if (channelId) {
+    if (channelId && !isSubscribedRef.current) {
       const messageService = new MessageService(channelId);
       channelSuffix = `-service-${channelId}-${Date.now()}`;
       
-      channel = messageService.createRealtimeSubscription((payload) => {
-        console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
-        // Refresh conversations when new message arrives
-        setTimeout(() => {
-          refreshConversations();
-        }, 1000);
-      }, channelSuffix);
+      try {
+        const channel = messageService.createRealtimeSubscription((payload) => {
+          console.log(`🔴 [CONVERSATION_SERVICE_HOOK] New message via realtime:`, payload);
+          // Refresh conversations when new message arrives
+          setTimeout(() => {
+            refreshConversations();
+          }, 1000);
+        }, channelSuffix);
 
-      // Subscribe only once
-      channel.subscribe((status: string) => {
-        console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status}`);
-      });
+        channelRef.current = channel;
+
+        // Subscribe only once
+        channel.subscribe((status: string) => {
+          console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Subscription status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            isSubscribedRef.current = true;
+          }
+        });
+      } catch (error) {
+        console.error('Error setting up realtime subscription:', error);
+      }
     }
 
     return () => {
-      if (channel && channelSuffix) {
+      if (channelRef.current && channelSuffix && isSubscribedRef.current) {
         console.log(`🔌 [CONVERSATION_SERVICE_HOOK] Unsubscribing from channel ${channelId}`);
         try {
           const messageService = new MessageService(channelId);
@@ -105,6 +115,8 @@ export const useConversationService = (channelId: string) => {
         } catch (error) {
           console.error('Error cleaning up subscription:', error);
         }
+        isSubscribedRef.current = false;
+        channelRef.current = null;
       }
     };
   }, [channelId]);

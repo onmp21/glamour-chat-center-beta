@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelService } from '@/services/ChannelService';
 import { MessageService } from '@/services/MessageService';
 import { ChannelConversation, ChannelMessage } from '@/types/messages';
@@ -10,6 +10,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef<boolean>(false);
 
   const loadConversations = useCallback(async (isRefresh = false) => {
     if (!channelId) {
@@ -53,23 +55,28 @@ export const useChannelConversationsRefactored = (channelId: string) => {
   useEffect(() => {
     loadConversations();
 
-    let channel: any = null;
     let channelSuffix = '';
 
-    if (channelId) {
+    // Only create realtime subscription if not already subscribed
+    if (channelId && !isSubscribedRef.current) {
       const messageService = new MessageService(channelId);
-      channelSuffix = `-conversations-${channelId}-${Date.now()}`;
+      channelSuffix = `-conversations-refactored-${channelId}-${Date.now()}`;
       
       try {
-        channel = messageService.createRealtimeSubscription((payload) => {
+        const channel = messageService.createRealtimeSubscription((payload) => {
           DetailedLogger.info("useChannelConversationsRefactored", `Nova mensagem via realtime:`, payload);
           // Recarregar conversas para refletir as novas mensagens
           loadConversations();
         }, channelSuffix);
 
+        channelRef.current = channel;
+
         // Subscribe only once
         channel.subscribe((status: string) => {
           console.log(`🔌 [CONVERSATIONS_REFACTORED] Subscription status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            isSubscribedRef.current = true;
+          }
         });
         
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription iniciado para o canal ${channelId}`);
@@ -79,7 +86,7 @@ export const useChannelConversationsRefactored = (channelId: string) => {
     }
 
     return () => {
-      if (channel && channelSuffix) {
+      if (channelRef.current && channelSuffix && isSubscribedRef.current) {
         DetailedLogger.info("useChannelConversationsRefactored", `Realtime subscription interrompido para o canal ${channelId}`);
         try {
           const messageService = new MessageService(channelId);
@@ -89,6 +96,8 @@ export const useChannelConversationsRefactored = (channelId: string) => {
         } catch (error) {
           DetailedLogger.error("useChannelConversationsRefactored", `Erro ao fazer cleanup do realtime subscription:`, error);
         }
+        isSubscribedRef.current = false;
+        channelRef.current = null;
       }
     };
   }, [channelId, loadConversations]);
