@@ -28,7 +28,7 @@ export const useLazyChannelMessages = (channelId: string | null, conversationId:
       setError(null);
       console.log(`📋 [LAZY_MESSAGES] Loading messages for authenticated user: ${user?.name}, channel: ${channelId}, conversation: ${conversationId}`);
       
-      const messageService = new OptimizedMessageService(channelId);
+      const messageService = OptimizedMessageService.getInstance(channelId);
       const result = await messageService.getMessagesByConversation(conversationId, 50);
       
       setMessages(result.data || []);

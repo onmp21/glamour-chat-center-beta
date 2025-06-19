@@ -5,9 +5,11 @@ import { MediaStorageService } from './MediaStorageService';
 
 export class MessageServiceV2 {
   private optimizedService: OptimizedMessageService;
+  private channelId: string;
 
-  constructor(channelId?: string) {
-    this.optimizedService = new OptimizedMessageService(channelId);
+  constructor(channelId: string) {
+    this.channelId = channelId;
+    this.optimizedService = OptimizedMessageService.getInstance(channelId);
   }
 
   async getMessagesByConversation(sessionId: string, limit = 50): Promise<{ data: RawMessage[] }> {
