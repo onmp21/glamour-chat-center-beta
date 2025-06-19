@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { useConversationStatus } from '@/hooks/useConversationStatus';
 
 interface ConversationCounts {
@@ -11,7 +11,7 @@ interface ConversationCounts {
 }
 
 export const useChannelConversationCounts = (channelId: string) => {
-  const { conversations, loading } = useChannelConversationsRefactored(channelId);
+  const { conversations, loading } = useSimpleConversationsWithRealtime(channelId);
   const { getConversationStatus } = useConversationStatus();
   const [counts, setCounts] = useState<ConversationCounts>({
     total: 0,

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useChannels } from '@/contexts/ChannelContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { useExams } from '@/hooks/useExams';
 
 interface ConversationStats {
@@ -111,7 +111,7 @@ export const useDashboardStats = () => {
     const channelHooks = availableChannels.map(channel => {
       // Usar o ID real do banco para buscar conversas
       const realChannelId = channels.find(c => getChannelLegacyId(c) === channel.id)?.id;
-      return useChannelConversationsRefactored(realChannelId || channel.id);
+      return useSimpleConversationsWithRealtime(realChannelId || channel.id);
     });
 
     useEffect(() => {

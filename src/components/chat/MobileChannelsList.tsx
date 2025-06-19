@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useChannels } from '@/contexts/ChannelContext';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { Badge } from '@/components/ui/badge';
 import { Hash, Users, Store, ExternalLink, UserCheck } from 'lucide-react';
 
@@ -74,7 +74,7 @@ export const MobileChannelsList: React.FC<MobileChannelsListProps> = ({
   };
 
   const ChannelWithStats: React.FC<{ channel: any }> = ({ channel }) => {
-    const { conversations, loading } = useChannelConversationsRefactored(channel.realId);
+    const { conversations, loading } = useSimpleConversationsWithRealtime(channel.realId);
     
     const unreadCount = conversations.reduce((total, conv) => {
       return total + (conv.unread_count || 0);

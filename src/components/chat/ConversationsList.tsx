@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { ConversationsListHeader } from './ConversationsListHeader';
 import { ConversationsListEmpty } from './ConversationsListEmpty';
 import { ConversationItem } from './ConversationItem';
@@ -23,9 +23,9 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
   const {
     conversations,
     loading,
-    refreshing,
+    error,
     refreshConversations
-  } = useChannelConversationsRefactored(channelId);
+  } = useSimpleConversationsWithRealtime(channelId);
   
   console.log(`📋 [CONVERSATIONS_LIST] Rendering for channel ${channelId} with ${conversations.length} conversations`);
   
@@ -54,7 +54,7 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
       <div className="flex-shrink-0">
         <ConversationsListHeader
           isDarkMode={isDarkMode}
-          refreshing={refreshing}
+          refreshing={loading}
           onRefresh={refreshConversations}
         />
       </div>

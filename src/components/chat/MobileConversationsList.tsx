@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useChannelConversationsRefactored } from '@/hooks/useChannelConversationsRefactored';
+import { useSimpleConversationsWithRealtime } from '@/hooks/useSimpleConversationsWithRealtime';
 import { useConversationStatus } from '@/hooks/useConversationStatus';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,9 +25,9 @@ export const MobileConversationsList: React.FC<MobileConversationsListProps> = (
   const { 
     conversations, 
     loading, 
-    refreshing, 
+    error,
     refreshConversations
-  } = useChannelConversationsRefactored(mobileChannelId || '');
+  } = useSimpleConversationsWithRealtime(mobileChannelId || '');
 
   const { updateConversationStatus } = useConversationStatus();
 
@@ -49,7 +49,8 @@ export const MobileConversationsList: React.FC<MobileConversationsListProps> = (
     onConversationSelect(conversationId);
     // Auto-marcar como lido quando abrir a conversa
     const conversation = conversations.find(c => c.id === conversationId);
-    if (conversation && conversation.status === 'unread') {      await updateConversationStatus(mobileChannelId || '', conversationId, 'in_progress', false); // Passar false para não mostrar toast
+    if (conversation && conversation.status === 'unread') {
+      await updateConversationStatus(mobileChannelId || '', conversationId, 'in_progress', false); // Passar false para não mostrar toast
     }
   };
 
@@ -103,13 +104,13 @@ export const MobileConversationsList: React.FC<MobileConversationsListProps> = (
           variant="ghost"
           size="sm"
           onClick={refreshConversations}
-          disabled={refreshing}
+          disabled={loading}
           className={cn(
             "h-8 w-8 p-0",
             isDarkMode ? "hover:bg-zinc-800" : "hover:bg-gray-100"
           )}
         >
-          <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
+          <RefreshCw size={16} className={cn(loading && "animate-spin")} />
         </Button>
       </div>
 
@@ -186,7 +187,6 @@ export const MobileConversationsList: React.FC<MobileConversationsListProps> = (
                     )}>
                       {conversation.contact_phone}
                     </span>
-
                   </div>
                 </div>
               </div>
