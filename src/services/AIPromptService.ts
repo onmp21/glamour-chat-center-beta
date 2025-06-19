@@ -32,50 +32,50 @@ export function getPromptTypes(): AIPromptTypeDefinition[] {
   return [
     {
       type: 'conversation_summary',
-      label: 'Resumo de Conversas',
-      description: 'Prompt para gerar resumos automáticos de conversas',
+      label: 'Resumo Automático de Conversas',
+      description: 'Prompt para gerar resumos automáticos de conversas individuais',
       defaultPrompt: 'Analise a conversa e forneça um resumo conciso dos pontos principais discutidos.'
     },
     {
       type: 'quick_response',
-      label: 'Resposta Rápida',
-      description: 'Prompt para gerar respostas rápidas baseadas no contexto',
+      label: 'Resposta Rápida IA',
+      description: 'Prompt para gerar respostas rápidas baseadas no contexto da conversa',
       defaultPrompt: 'Com base no contexto da conversa, sugira uma resposta apropriada e profissional.'
     },
     {
       type: 'summary',
-      label: 'Resumir Conversa',
-      description: 'Prompt para resumir conversas específicas',
+      label: 'Resumo Detalhado Individual',
+      description: 'Prompt para resumir conversas específicas com mais detalhes',
       defaultPrompt: 'Faça um resumo detalhado desta conversa, destacando os pontos principais, problemas identificados e soluções propostas.'
     },
     {
       type: 'report',
-      label: 'Relatório da Conversa',
-      description: 'Prompt para relatórios estruturados de conversas',
+      label: 'Relatório Estruturado da Conversa',
+      description: 'Prompt para relatórios estruturados e formais de conversas',
       defaultPrompt: 'Crie um relatório estruturado desta conversa incluindo: resumo, problemas identificados, ações tomadas e próximos passos.'
     },
     {
       type: 'report_conversations',
-      label: 'Relatório de Conversas',
-      description: 'Prompt para análise detalhada de conversas',
+      label: 'Análise Completa de Conversas',
+      description: 'Prompt para análise detalhada de múltiplas conversas',
       defaultPrompt: 'Analise as conversas fornecidas e gere um relatório detalhado com insights sobre padrões de comunicação, volume de mensagens e tendências.'
     },
     {
       type: 'report_channels',
-      label: 'Relatório de Canais',
-      description: 'Prompt para análise de performance de canais',
+      label: 'Performance de Canais',
+      description: 'Prompt para análise de performance e engajamento dos canais',
       defaultPrompt: 'Analise os dados dos canais e forneça insights sobre performance, engajamento e oportunidades de melhoria.'
     },
     {
       type: 'report_custom',
       label: 'Relatório Personalizado',
-      description: 'Prompt base para relatórios personalizados',
+      description: 'Prompt base para relatórios personalizados e análises específicas',
       defaultPrompt: 'Analise os dados fornecidos e gere um relatório personalizado conforme solicitado.'
     },
     {
       type: 'report_exams',
-      label: 'Relatório de Exames',
-      description: 'Prompt para análise de dados de exames',
+      label: 'Análise de Dados de Exames',
+      description: 'Prompt para análise estatística de dados de exames médicos',
       defaultPrompt: 'Analise os dados de exames fornecidos e gere um relatório com estatísticas de agendamentos, distribuição por cidade e insights.'
     }
   ];
