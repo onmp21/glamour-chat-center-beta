@@ -3,11 +3,21 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebarHeader } from './ChatSidebarHeader';
 import { ConversationsList } from './ConversationsList';
-import { ChannelConversation } from '@/hooks/useChannelConversations';
+
+interface Conversation {
+  id: string;
+  contact_name: string;
+  contact_phone: string;
+  last_message: string;
+  last_message_time: string;
+  status: 'unread' | 'in_progress' | 'resolved';
+  unread_count: number;
+  updated_at: string;
+}
 
 interface ChatSidebarProps {
   channelId: string;
-  conversations: ChannelConversation[];
+  conversations: Conversation[];
   selectedConversation: string | null;
   isSidebarOpen: boolean;
   isDarkMode: boolean;
@@ -19,7 +29,7 @@ interface ChatSidebarProps {
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   channelId,
-  conversations = [], // Default empty array
+  conversations = [],
   selectedConversation,
   isSidebarOpen,
   isDarkMode,
