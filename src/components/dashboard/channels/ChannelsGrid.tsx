@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Bot, Store, Users, Pin } from 'lucide-react';
@@ -158,8 +159,8 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channel.id);
   
-  // Calcular notificações não lidas
-  const unreadNotifications = counts.pending + counts.inProgress;
+  // Apenas mensagens pendentes (não lidas)
+  const pendingCount = counts.pending;
 
   const handleCardClick = () => {
     console.log(`🎯 [DASHBOARD_CHANNEL_CARD] Clicking channel ${displayName} with legacyId: ${legacyId}`);
@@ -197,12 +198,6 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Badge de mensagens não lidas - centralizado com o ícone de fixar */}
-            {unreadNotifications > 0 && (
-              <Badge className="bg-red-500 text-white text-xs px-2 py-1 font-medium">
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
-              </Badge>
-            )}
             {/* Pin Button - Só aparece no hover */}
             <button
               onClick={(e) => {
@@ -230,6 +225,13 @@ const ChannelCardWithStats: React.FC<ChannelCardWithStatsProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
         </div>
+
+        {/* Badge de mensagens pendentes - posicionado no canto inferior direito */}
+        {pendingCount > 0 && (
+          <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium shadow-lg">
+            {pendingCount > 99 ? '99+' : pendingCount}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -39,8 +39,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Calcular notificações não lidas
-  const unreadNotifications = counts.pending + counts.inProgress;
+  // Apenas mensagens pendentes (não lidas)
+  const pendingCount = counts.pending;
   
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
@@ -118,12 +118,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Badge de mensagens não lidas - centralizado com o ícone de fixar */}
-            {unreadNotifications > 0 && (
-              <Badge className="bg-red-500 text-white text-xs px-2 py-1 font-medium">
-                {unreadNotifications > 99 ? '99+' : unreadNotifications}
-              </Badge>
-            )}
+            {/* Badge de mensagens pendentes no canto inferior direito */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -150,6 +145,13 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             {loading ? 'Carregando...' : lastActivityText}
           </p>
         </div>
+
+        {/* Badge de mensagens pendentes - posicionado no canto inferior direito */}
+        {pendingCount > 0 && (
+          <div className="absolute bottom-2 right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-medium shadow-lg">
+            {pendingCount > 99 ? '99+' : pendingCount}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

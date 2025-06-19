@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client.ts';
@@ -8,13 +9,14 @@ interface ConversationStatusData {
   status: ConversationStatus;
   lastActivity: string;
   lastViewed: string;
+  lastMessageTime?: string;
+  autoResolvedAt?: string;
 }
 
 export const useConversationStatusEnhanced = () => {
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
-  // Melhorar persistência com localStorage mais robusto
   const getStatusKey = (channelId: string, conversationId: string) => 
     `conversation_status_${channelId}_${conversationId}`;
 
@@ -28,7 +30,9 @@ export const useConversationStatusEnhanced = () => {
         return {
           status: parsed.status || 'unread',
           lastActivity: parsed.lastActivity || new Date().toISOString(),
-          lastViewed: parsed.lastViewed || new Date().toISOString()
+          lastViewed: parsed.lastViewed || new Date().toISOIS(),
+          lastMessageTime: parsed.lastMessageTime,
+          autoResolvedAt: parsed.autoResolvedAt
         };
       } catch (error) {
         console.error('❌ [STATUS] Error parsing saved status:', error);
@@ -50,7 +54,7 @@ export const useConversationStatusEnhanced = () => {
     const statusKey = getStatusKey(channelId, conversationId);
     localStorage.setItem(statusKey, JSON.stringify(data));
     
-    // Também salvar em uma estrutura global para estatísticas mais rápidas
+    // Também salvar em estrutura global para estatísticas
     const globalKey = 'conversation_stats_cache';
     const globalStats = JSON.parse(localStorage.getItem(globalKey) || '{}');
     
@@ -62,31 +66,75 @@ export const useConversationStatusEnhanced = () => {
     localStorage.setItem(globalKey, JSON.stringify(globalStats));
   }, []);
 
-  // Auto-resolver conversas antigas
+  // Função para detectar nova mensagem e reativar conversa resolvida
+  const handleNewMessage = useCallback((channelId: string, conversationId: string, messageTime: string) => {
+    console.log(`📩 [STATUS] Nova mensagem detectada em ${channelId}/${conversationId}`);
+    
+    const currentData = getConversationStatusData(channelId, conversationId);
+    
+    // Se estava resolvida, voltar para pendente
+    if (currentData.status === 'resolved') {
+      console.log(`🔄 [STATUS] Reativando conversa resolvida para pendente`);
+      const updatedData: ConversationStatusData = {
+        ...currentData,
+        status: 'unread',
+        lastActivity: messageTime,
+        lastMessageTime: messageTime,
+        autoResolvedAt: undefined // Remove marcação de auto-resolução
+      };
+      saveConversationStatusData(channelId, conversationId, updatedData);
+      return true; // Indica que houve mudança
+    }
+    
+    // Atualizar timestamp da última mensagem para conversas ativas
+    if (currentData.status === 'unread' || currentData.status === 'in_progress') {
+      const updatedData: ConversationStatusData = {
+        ...currentData,
+        lastActivity: messageTime,
+        lastMessageTime: messageTime
+      };
+      saveConversationStatusData(channelId, conversationId, updatedData);
+    }
+    
+    return false;
+  }, [getConversationStatusData, saveConversationStatusData]);
+
+  // Auto-resolver conversas antigas (24 horas sem interação)
   useEffect(() => {
     const checkAndAutoResolve = () => {
-      console.log('🤖 [STATUS] Checking for auto-resolve candidates');
+      console.log('🤖 [STATUS] Verificando conversas para auto-resolução');
       const now = new Date();
       const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      let resolvedCount = 0;
 
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('conversation_status_')) {
           try {
             const statusData = JSON.parse(localStorage.getItem(key) || '{}');
             
+            // Auto-resolver apenas conversas "em andamento" após 24h sem atividade
             if (statusData.status === 'in_progress' && statusData.lastActivity) {
               const lastActivityDate = new Date(statusData.lastActivity);
               if (lastActivityDate < twentyFourHoursAgo) {
-                const updatedData = { ...statusData, status: 'resolved' };
+                const updatedData = { 
+                  ...statusData, 
+                  status: 'resolved',
+                  autoResolvedAt: now.toISOString()
+                };
                 localStorage.setItem(key, JSON.stringify(updatedData));
-                console.log(`🤖 [STATUS] Auto-resolved conversation: ${key}`);
+                resolvedCount++;
+                console.log(`🤖 [STATUS] Auto-resolvida: ${key}`);
               }
             }
           } catch (error) {
-            console.error('❌ [STATUS] Error in auto-resolve:', error);
+            console.error('❌ [STATUS] Erro na auto-resolução:', error);
           }
         }
       });
+
+      if (resolvedCount > 0) {
+        console.log(`🤖 [STATUS] ${resolvedCount} conversas auto-resolvidas`);
+      }
     };
 
     // Verificar imediatamente e depois a cada hora
@@ -109,13 +157,15 @@ export const useConversationStatusEnhanced = () => {
     
     try {
       setUpdating(true);
-      console.log(`🔄 [STATUS] Updating conversation ${conversationId} in ${channelId} to ${status}`);
+      console.log(`🔄 [STATUS] Atualizando conversa ${conversationId} em ${channelId} para ${status}`);
       
       const currentData = getConversationStatusData(channelId, conversationId);
       const updatedData: ConversationStatusData = {
         ...currentData,
         status,
-        lastActivity: new Date().toISOString()
+        lastActivity: new Date().toISOString(),
+        // Limpar auto-resolução se foi manualmente alterado
+        ...(status !== 'resolved' && { autoResolvedAt: undefined })
       };
       
       saveConversationStatusData(channelId, conversationId, updatedData);
@@ -123,24 +173,37 @@ export const useConversationStatusEnhanced = () => {
       // Marcar mensagens como lidas no banco se necessário
       if (status === 'in_progress' || status === 'resolved') {
         try {
-          const { error } = await supabase.rpc('mark_messages_as_read', {
-            table_name: `${channelId}_conversas`,
-            p_session_id: conversationId
-          });
+          const tableMapping: Record<string, string> = {
+            'chat': 'yelena_ai_conversas',
+            'canarana': 'canarana_conversas',
+            'souto-soares': 'souto_soares_conversas',
+            'joao-dourado': 'joao_dourado_conversas',
+            'america-dourada': 'america_dourada_conversas',
+            'gerente-lojas': 'gerente_lojas_conversas',
+            'gerente-externo': 'gerente_externo_conversas'
+          };
           
-          if (error) {
-            console.error('❌ [STATUS] Error marking messages as read:', error);
-          } else {
-            console.log('✅ [STATUS] Messages marked as read in database');
+          const tableName = tableMapping[channelId];
+          if (tableName) {
+            const { error } = await supabase.rpc('mark_messages_as_read', {
+              table_name: tableName,
+              p_session_id: conversationId
+            });
+            
+            if (error) {
+              console.error('❌ [STATUS] Erro ao marcar mensagens como lidas:', error);
+            } else {
+              console.log('✅ [STATUS] Mensagens marcadas como lidas no banco');
+            }
           }
         } catch (dbError) {
-          console.error('❌ [STATUS] Database error:', dbError);
+          console.error('❌ [STATUS] Erro no banco de dados:', dbError);
         }
       }
       
       if (showToast) {
         const statusMessages = {
-          'unread': 'não lida',
+          'unread': 'pendente',
           'in_progress': 'em andamento', 
           'resolved': 'resolvida'
         };
@@ -151,10 +214,10 @@ export const useConversationStatusEnhanced = () => {
         });
       }
       
-      console.log('✅ [STATUS] Status updated successfully');
+      console.log('✅ [STATUS] Status atualizado com sucesso');
       return true;
     } catch (err) {
-      console.error('❌ [STATUS] Error updating conversation status:', err);
+      console.error('❌ [STATUS] Erro ao atualizar status da conversa:', err);
       if (showToast) {
         toast({
           title: "Erro",
@@ -174,10 +237,10 @@ export const useConversationStatusEnhanced = () => {
   }, [getConversationStatusData]);
 
   const markConversationAsViewed = useCallback(async (channelId: string, conversationId: string) => {
-    console.log(`👁️ [STATUS] Marking conversation ${conversationId} as viewed`);
+    console.log(`👁️ [STATUS] Marcando conversa ${conversationId} como visualizada`);
     const currentData = getConversationStatusData(channelId, conversationId);
     
-    // Auto-transição de unread para in_progress quando visualizada
+    // Auto-transição de pendente para em andamento quando visualizada
     if (currentData.status === 'unread') {
       await updateConversationStatus(channelId, conversationId, 'in_progress', false);
     } else {
@@ -200,6 +263,7 @@ export const useConversationStatusEnhanced = () => {
     updateConversationStatus,
     getConversationStatus,
     markConversationAsViewed,
+    handleNewMessage,
     getAllConversationStats,
     updating
   };
