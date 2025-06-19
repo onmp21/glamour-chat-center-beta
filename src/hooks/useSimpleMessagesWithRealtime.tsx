@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { getTableNameForChannelSync } from '@/utils/channelMapping';
-import GlobalRealtimeManager from '@/services/GlobalRealtimeManager';
+import PollingManager from '@/services/PollingManager';
 
 interface SimpleMessage {
   id: string;
@@ -22,7 +22,7 @@ export const useSimpleMessagesWithRealtime = (
   const [messages, setMessages] = useState<SimpleMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const subscriberIdRef = useRef<string | null>(null);
+  const pollingIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const loadMessages = useCallback(async () => {
@@ -75,7 +75,7 @@ export const useSimpleMessagesWithRealtime = (
     }
   }, [channelId, conversationId]);
 
-  // Setup realtime subscription
+  // Setup polling
   useEffect(() => {
     mountedRef.current = true;
     
@@ -89,48 +89,41 @@ export const useSimpleMessagesWithRealtime = (
       return;
     }
 
-    const realtimeCallback = (payload: any) => {
-      if (!mountedRef.current) return;
-      
-      console.log(`🔴 [SIMPLE_MESSAGES_RT] Nova mensagem via realtime:`, payload);
-      
-      // Check if the new message belongs to this conversation
-      if (payload.new && payload.new.session_id === conversationId) {
-        // Refresh messages after a short delay
-        setTimeout(() => {
-          if (mountedRef.current) {
-            loadMessages();
-          }
-        }, 200);
+    const pollingCallback = () => {
+      if (mountedRef.current) {
+        console.log(`🔄 [SIMPLE_MESSAGES_RT] Polling update for messages ${channelId}/${conversationId}`);
+        loadMessages();
       }
     };
 
-    const setupSubscription = async () => {
+    const setupPolling = () => {
       try {
-        const manager = GlobalRealtimeManager.getInstance();
-        const subscriberId = await manager.subscribe(tableName, realtimeCallback);
+        const manager = PollingManager.getInstance();
+        const pollingKey = `${tableName}_messages_${conversationId}`;
+        const pollingId = manager.startPolling(pollingKey, pollingCallback, 3000); // 3 segundos
         
         if (mountedRef.current) {
-          subscriberIdRef.current = subscriberId;
-          console.log(`✅ [SIMPLE_MESSAGES_RT] Realtime subscription iniciado para mensagens ${channelId} com ID ${subscriberId}`);
+          pollingIdRef.current = pollingId;
+          console.log(`✅ [SIMPLE_MESSAGES_RT] Polling iniciado para mensagens ${channelId} com ID ${pollingId}`);
         }
       } catch (error) {
-        console.error(`❌ [SIMPLE_MESSAGES_RT] Erro ao criar subscription:`, error);
+        console.error(`❌ [SIMPLE_MESSAGES_RT] Erro ao criar polling:`, error);
       }
     };
 
-    setupSubscription();
+    setupPolling();
 
     return () => {
       mountedRef.current = false;
       
-      if (subscriberIdRef.current) {
-        console.log(`🔌 [SIMPLE_MESSAGES_RT] Realtime subscription interrompido para mensagens ${channelId}, subscriber ${subscriberIdRef.current}`);
+      if (pollingIdRef.current) {
+        console.log(`🔌 [SIMPLE_MESSAGES_RT] Polling interrompido para mensagens ${channelId}, poller ${pollingIdRef.current}`);
         try {
-          const manager = GlobalRealtimeManager.getInstance();
-          manager.unsubscribe(tableName, subscriberIdRef.current);
+          const manager = PollingManager.getInstance();
+          const pollingKey = `${getTableNameForChannelSync(channelId)}_messages_${conversationId}`;
+          manager.stopPolling(pollingKey, pollingIdRef.current);
         } catch (error) {
-          console.error(`❌ [SIMPLE_MESSAGES_RT] Erro ao fazer cleanup do realtime subscription:`, error);
+          console.error(`❌ [SIMPLE_MESSAGES_RT] Erro ao fazer cleanup do polling:`, error);
         }
       }
     };

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client.ts';
 import { useAuth } from '@/contexts/AuthContext';
 import { ContactNameResolver } from '@/services/ContactNameResolver';
 import { getTableNameForChannelSync } from '@/utils/channelMapping';
-import GlobalRealtimeManager from '@/services/GlobalRealtimeManager';
+import PollingManager from '@/services/PollingManager';
 
 interface SimpleConversation {
   id: string;
@@ -33,7 +33,7 @@ export const useSimpleConversationsWithRealtime = (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isAuthenticated, user } = useAuth();
-  const subscriberIdRef = useRef<string | null>(null);
+  const pollingIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const getTableName = (channelId: string): string => {
@@ -146,7 +146,7 @@ export const useSimpleConversationsWithRealtime = (
     }
   }, [channelId, isAuthenticated, user?.name]);
 
-  // Setup realtime subscription
+  // Setup polling
   useEffect(() => {
     mountedRef.current = true;
     
@@ -160,45 +160,39 @@ export const useSimpleConversationsWithRealtime = (
       return;
     }
 
-    const realtimeCallback = (payload: any) => {
-      if (!mountedRef.current) return;
-      
-      console.log(`🔴 [SIMPLE_CONVERSATIONS_RT] Nova mensagem via realtime:`, payload);
-      
-      // Refresh conversations after a short delay
-      setTimeout(() => {
-        if (mountedRef.current) {
-          loadConversations();
-        }
-      }, 300);
-    };
-
-    const setupSubscription = async () => {
-      try {
-        const manager = GlobalRealtimeManager.getInstance();
-        const subscriberId = await manager.subscribe(tableName, realtimeCallback);
-        
-        if (mountedRef.current) {
-          subscriberIdRef.current = subscriberId;
-          console.log(`✅ [SIMPLE_CONVERSATIONS_RT] Realtime subscription iniciado para o canal ${channelId} com ID ${subscriberId}`);
-        }
-      } catch (error) {
-        console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao criar subscription:`, error);
+    const pollingCallback = () => {
+      if (mountedRef.current) {
+        console.log(`🔄 [SIMPLE_CONVERSATIONS_RT] Polling update for ${channelId}`);
+        loadConversations();
       }
     };
 
-    setupSubscription();
+    const setupPolling = () => {
+      try {
+        const manager = PollingManager.getInstance();
+        const pollingId = manager.startPolling(tableName, pollingCallback, 4000); // 4 segundos
+        
+        if (mountedRef.current) {
+          pollingIdRef.current = pollingId;
+          console.log(`✅ [SIMPLE_CONVERSATIONS_RT] Polling iniciado para o canal ${channelId} com ID ${pollingId}`);
+        }
+      } catch (error) {
+        console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao criar polling:`, error);
+      }
+    };
+
+    setupPolling();
 
     return () => {
       mountedRef.current = false;
       
-      if (subscriberIdRef.current) {
-        console.log(`🔌 [SIMPLE_CONVERSATIONS_RT] Realtime subscription interrompido para o canal ${channelId}, subscriber ${subscriberIdRef.current}`);
+      if (pollingIdRef.current) {
+        console.log(`🔌 [SIMPLE_CONVERSATIONS_RT] Polling interrompido para o canal ${channelId}, poller ${pollingIdRef.current}`);
         try {
-          const manager = GlobalRealtimeManager.getInstance();
-          manager.unsubscribe(tableName, subscriberIdRef.current);
+          const manager = PollingManager.getInstance();
+          manager.stopPolling(tableName, pollingIdRef.current);
         } catch (error) {
-          console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao fazer cleanup do realtime subscription:`, error);
+          console.error(`❌ [SIMPLE_CONVERSATIONS_RT] Erro ao fazer cleanup do polling:`, error);
         }
       }
     };
