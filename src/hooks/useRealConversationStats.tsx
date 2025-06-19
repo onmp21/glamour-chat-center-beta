@@ -40,15 +40,18 @@ export const useRealConversationStats = () => {
       setLoading(true);
       console.log('🌍 [GLOBAL_STATS] Starting global conversation statistics calculation');
       
-      // Mapear TODOS os canais (sem filtro de permissão para estatísticas globais)
+      // CORREÇÃO: Mapear TODOS os canais corretamente
       const channelMapping = {
         'Yelena-AI': 'chat',
+        'Óticas Villa Glamour': 'chat', // Alternativo para Yelena
         'Canarana': 'canarana',
         'Souto Soares': 'souto-soares',
         'João Dourado': 'joao-dourado',
         'América Dourada': 'america-dourada',
-        'Gustavo Gerente das Lojas': 'gerente-lojas',
-        'Andressa Gerente Externo': 'gerente-externo'
+        'Gerente das Lojas': 'gerente-lojas', // CORRIGIDO
+        'Gustavo Gerente das Lojas': 'gerente-lojas', // Alternativo
+        'Gerente do Externo': 'gerente-externo', // CORRIGIDO
+        'Andressa Gerente Externo': 'gerente-externo' // Alternativo
       };
 
       // Array para armazenar todas as conversas de todos os canais
@@ -65,7 +68,9 @@ export const useRealConversationStats = () => {
           continue;
         }
 
-        const channelId = channelMapping[channel.name as keyof typeof channelMapping];
+        // CORREÇÃO: Buscar o channelId usando múltiplas variações do nome
+        const channelId = channelMapping[channel.name as keyof typeof channelMapping] || 
+                         channelMapping[channel.name.replace(/^\w+\s+/, '') as keyof typeof channelMapping]; // Remove primeiro nome se existir
         
         console.log(`📊 [GLOBAL_STATS] Processing channel ${i + 1}/${channels.length}: ${channel.name} -> ${channelId}`);
         
