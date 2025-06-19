@@ -26,57 +26,68 @@ export interface AIPromptTypeDefinition {
   label: string;
   description: string;
   defaultPrompt: string;
+  category: 'chat' | 'reports';
 }
 
 export function getPromptTypes(): AIPromptTypeDefinition[] {
   return [
+    // Prompts do ChatOverlay
     {
       type: 'conversation_summary',
       label: 'Resumo Automático de Conversas',
-      description: 'Prompt para gerar resumos automáticos de conversas individuais',
-      defaultPrompt: 'Analise a conversa e forneça um resumo conciso dos pontos principais discutidos.'
+      description: 'Prompt para gerar resumos automáticos de conversas individuais no ChatOverlay',
+      defaultPrompt: 'Analise a conversa e forneça um resumo conciso dos pontos principais discutidos.',
+      category: 'chat'
     },
     {
       type: 'quick_response',
       label: 'Resposta Rápida IA',
-      description: 'Prompt para gerar respostas rápidas baseadas no contexto da conversa',
-      defaultPrompt: 'Com base no contexto da conversa, sugira uma resposta apropriada e profissional.'
+      description: 'Prompt para gerar respostas rápidas baseadas no contexto da conversa no ChatOverlay',
+      defaultPrompt: 'Com base no contexto da conversa, sugira uma resposta apropriada e profissional.',
+      category: 'chat'
     },
+    // Prompts de Relatórios
     {
       type: 'summary',
       label: 'Resumo Detalhado Individual',
-      description: 'Prompt para resumir conversas específicas com mais detalhes',
-      defaultPrompt: 'Faça um resumo detalhado desta conversa, destacando os pontos principais, problemas identificados e soluções propostas.'
+      description: 'Prompt para resumir conversas específicas com mais detalhes em relatórios',
+      defaultPrompt: 'Faça um resumo detalhado desta conversa, destacando os pontos principais, problemas identificados e soluções propostas.',
+      category: 'reports'
     },
     {
       type: 'report',
       label: 'Relatório Estruturado da Conversa',
       description: 'Prompt para relatórios estruturados e formais de conversas',
-      defaultPrompt: 'Crie um relatório estruturado desta conversa incluindo: resumo, problemas identificados, ações tomadas e próximos passos.'
+      defaultPrompt: 'Crie um relatório estruturado desta conversa incluindo: resumo, problemas identificados, ações tomadas e próximos passos.',
+      category: 'reports'
     },
     {
       type: 'report_conversations',
       label: 'Análise Completa de Conversas',
-      description: 'Prompt para análise detalhada de múltiplas conversas',
-      defaultPrompt: 'Analise as conversas fornecidas e gere um relatório detalhado com insights sobre padrões de comunicação, volume de mensagens e tendências.'
+      description: 'Prompt para análise detalhada de múltiplas conversas em relatórios',
+      defaultPrompt: 'Analise as conversas fornecidas e gere um relatório detalhado com insights sobre padrões de comunicação, volume de mensagens e tendências.',
+      category: 'reports'
     },
     {
       type: 'report_channels',
       label: 'Performance de Canais',
       description: 'Prompt para análise de performance e engajamento dos canais',
-      defaultPrompt: 'Analise os dados dos canais e forneça insights sobre performance, engajamento e oportunidades de melhoria.'
+      defaultPrompt: 'Analise os dados dos canais e forneça insights sobre performance, engajamento e oportunidades de melhoria.',
+      category: 'reports'
     },
     {
       type: 'report_custom',
       label: 'Relatório Personalizado',
       description: 'Prompt base para relatórios personalizados e análises específicas',
-      defaultPrompt: 'Analise os dados fornecidos e gere um relatório personalizado conforme solicitado.'
+      defaultPrompt: 'Analise os dados fornecidos e gere um relatório personalizado conforme solicitado.',
+      category: 'reports'
     },
     {
       type: 'report_exams',
       label: 'Análise de Dados de Exames',
       description: 'Prompt para análise estatística de dados de exames médicos',
-      defaultPrompt: 'Analise os dados de exames fornecidos e gere um relatório com estatísticas de agendamentos, distribuição por cidade e insights.'
+      defaultPrompt: 'Analise os dados de exames fornecidos e gere um relatório com estatísticas de agendamentos, distribuição por cidade e insights.',
+      category: 'reports'
     }
   ];
 }
@@ -126,15 +137,28 @@ export class AIPromptService {
         updated_at: new Date().toISOString()
       };
 
+      // Verificar se já existe um prompt do mesmo tipo
+      const { data: existingPrompt, error: selectError } = await supabase
+        .from('ai_prompts')
+        .select('id')
+        .eq('prompt_type', prompt.prompt_type)
+        .eq('is_active', true)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        console.error('❌ [AI_PROMPT_SERVICE] Erro ao verificar prompt existente:', selectError);
+        throw selectError;
+      }
+
       let result;
       
-      if (prompt.id) {
-        // Atualizar prompt existente
-        console.log('🔄 [AI_PROMPT_SERVICE] Atualizando prompt existente:', prompt.id);
+      if (existingPrompt) {
+        // Atualizar o prompt existente do mesmo tipo
+        console.log('🔄 [AI_PROMPT_SERVICE] Atualizando prompt existente do tipo:', prompt.prompt_type);
         const { data, error } = await supabase
           .from('ai_prompts')
           .update(promptData)
-          .eq('id', prompt.id)
+          .eq('id', existingPrompt.id)
           .select()
           .single();
 
@@ -144,44 +168,19 @@ export class AIPromptService {
         }
         result = data;
       } else {
-        // Verificar se já existe um prompt do mesmo tipo
-        const { data: existingPrompt } = await supabase
+        // Criar novo prompt
+        console.log('➕ [AI_PROMPT_SERVICE] Criando novo prompt');
+        const { data, error } = await supabase
           .from('ai_prompts')
-          .select('id')
-          .eq('prompt_type', prompt.prompt_type)
-          .eq('is_active', true)
+          .insert([promptData])
+          .select()
           .single();
 
-        if (existingPrompt) {
-          // Atualizar o prompt existente do mesmo tipo
-          console.log('🔄 [AI_PROMPT_SERVICE] Atualizando prompt existente do tipo:', prompt.prompt_type);
-          const { data, error } = await supabase
-            .from('ai_prompts')
-            .update(promptData)
-            .eq('id', existingPrompt.id)
-            .select()
-            .single();
-
-          if (error) {
-            console.error('❌ [AI_PROMPT_SERVICE] Erro ao atualizar prompt:', error);
-            throw error;
-          }
-          result = data;
-        } else {
-          // Criar novo prompt
-          console.log('➕ [AI_PROMPT_SERVICE] Criando novo prompt');
-          const { data, error } = await supabase
-            .from('ai_prompts')
-            .insert([promptData])
-            .select()
-            .single();
-
-          if (error) {
-            console.error('❌ [AI_PROMPT_SERVICE] Erro ao criar prompt:', error);
-            throw error;
-          }
-          result = data;
+        if (error) {
+          console.error('❌ [AI_PROMPT_SERVICE] Erro ao criar prompt:', error);
+          throw error;
         }
+        result = data;
       }
 
       console.log('✅ [AI_PROMPT_SERVICE] Prompt salvo com sucesso:', result.id);

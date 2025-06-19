@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { AIPromptService, getPromptTypes, AIPromptType, AIPrompt } from "@/services/AIPromptService";
-import { FileText } from "lucide-react";
+import { FileText, MessageSquare, BarChart3 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface AIConfigPromptsSectionProps {
   isDarkMode: boolean;
@@ -32,6 +33,7 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AIPromptType | null>(null);
   const [promptContent, setPromptContent] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("chat");
 
   useEffect(() => {
     loadPrompts();
@@ -102,81 +104,105 @@ export const AIConfigPromptsSection: React.FC<AIConfigPromptsSectionProps> = ({ 
     }
   };
 
+  // Separar prompts do ChatOverlay dos prompts de Relatórios
+  const chatPrompts = getPromptTypes().filter(p => 
+    p.type === 'conversation_summary' || p.type === 'quick_response'
+  );
+
+  const reportPrompts = getPromptTypes().filter(p => 
+    p.type.startsWith('report_') || p.type === 'summary' || p.type === 'report'
+  );
+
+  const renderPromptCard = (def: any) => (
+    <Card key={def.type} className={isDarkMode ? "bg-card border-border" : "bg-gray-50 border-gray-200"}>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText size={18} className="text-primary" />
+          <CardTitle className={isDarkMode ? "text-foreground text-base" : "text-gray-900 text-base"}>
+            {def.label}
+          </CardTitle>
+        </div>
+        {editing !== def.type && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-2"
+            onClick={() => handleEdit(def.type as AIPromptType)}
+          >
+            Editar
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        <p className={isDarkMode ? "text-muted-foreground text-xs mb-2" : "text-gray-600 text-xs mb-2"}>
+          {def.description}
+        </p>
+        {editing === def.type ? (
+          <div className="space-y-2">
+            <Label>Prompt</Label>
+            <Textarea
+              value={promptContent}
+              onChange={(e) => setPromptContent(e.target.value)}
+              className="font-mono"
+              rows={4}
+            />
+            <div className="flex gap-2 mt-2">
+              <Button size="sm" onClick={() => handleSave(def.type as AIPromptType)} className="bg-primary text-primary-foreground">
+                Salvar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(null)}>
+                Cancelar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleRestoreDefault(def.type as AIPromptType)}>
+                Restaurar Padrão
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <Label>Prompt Atual:</Label>
+            <div
+              className={
+                "mt-1 rounded p-2 text-xs whitespace-pre-wrap font-mono " +
+                (isDarkMode ? "bg-card text-foreground" : "bg-white text-gray-800")
+              }
+              style={{ minHeight: 56 }}
+            >
+              {prompts[def.type]?.prompt_content || def.defaultPrompt}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div>
-      <Card className={`border ${isDarkMode ? "bg-[#232323] border-[#333]" : "bg-white border-gray-200 shadow"}`}>
+      <Card className={`border ${isDarkMode ? "bg-card border-border" : "bg-white border-gray-200 shadow"}`}>
         <CardContent className="space-y-6 pt-6">
           {loading ? (
-            <div className="text-center text-gray-500">Carregando...</div>
+            <div className="text-center text-muted-foreground">Carregando...</div>
           ) : (
-            <div className="space-y-4">
-              {getPromptTypes().map((def) => (
-                <Card key={def.type} className={isDarkMode ? "bg-[#181818] border-[#333]" : "bg-gray-50 border-gray-200"}>
-                  <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText size={18} className={isDarkMode ? "text-primary" : "text-primary"} />
-                      <CardTitle className={isDarkMode ? "text-white text-base" : "text-gray-900 text-base"}>
-                        {def.label}
-                      </CardTitle>
-                    </div>
-                    {editing !== def.type && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="ml-2"
-                        onClick={() => handleEdit(def.type as AIPromptType)}
-                      >
-                        Editar
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <p className={isDarkMode ? "text-gray-400 text-xs mb-2" : "text-gray-600 text-xs mb-2"}>
-                      {def.description}
-                    </p>
-                    {editing === def.type ? (
-                      <div className="space-y-2">
-                        <Label>Prompt</Label>
-                        <Textarea
-                          value={promptContent}
-                          onChange={(e) => setPromptContent(e.target.value)}
-                          className={
-                            isDarkMode
-                              ? "bg-[#232323] border-[#444] text-white font-mono"
-                              : "bg-white border-gray-300 font-mono"
-                          }
-                          rows={4}
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <Button size="sm" onClick={() => handleSave(def.type as AIPromptType)} className="bg-[#b5103c] text-white">
-                            Salvar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditing(null)}>
-                            Cancelar
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleRestoreDefault(def.type as AIPromptType)}>
-                            Restaurar Padrão
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <Label>Prompt Atual:</Label>
-                        <div
-                          className={
-                            "mt-1 rounded p-2 text-xs whitespace-pre-wrap font-mono " +
-                            (isDarkMode ? "bg-[#232323] text-gray-50" : "bg-white text-gray-800")
-                          }
-                          style={{ minHeight: 56 }}
-                        >
-                          {prompts[def.type]?.prompt_content || def.defaultPrompt}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="chat" className="flex items-center gap-2">
+                  <MessageSquare size={16} />
+                  Chat Overlay (2)
+                </TabsTrigger>
+                <TabsTrigger value="reports" className="flex items-center gap-2">
+                  <BarChart3 size={16} />
+                  Relatórios ({reportPrompts.length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="chat" className="space-y-4">
+                {chatPrompts.map(renderPromptCard)}
+              </TabsContent>
+              
+              <TabsContent value="reports" className="space-y-4">
+                {reportPrompts.map(renderPromptCard)}
+              </TabsContent>
+            </Tabs>
           )}
         </CardContent>
       </Card>
