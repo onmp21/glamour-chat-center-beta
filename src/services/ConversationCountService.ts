@@ -34,16 +34,19 @@ export class ConversationCountService {
       console.log(`🔢 [COUNT_SERVICE] Counting conversations for ${channelId} in ${tableName}`);
       
       // Usar função RPC para contar sessões únicas
-      const { data, error } = await supabase.rpc('count_unique_sessions', {
-        table_name: tableName
-      });
+      const { data, error } = await supabase.rpc(
+        'count_unique_sessions' as any,
+        {
+          table_name: tableName
+        }
+      );
 
       if (error) {
         console.error(`❌ [COUNT_SERVICE] Error counting for ${channelId}:`, error);
         return 0;
       }
 
-      const count = data || 0;
+      const count = Number(data) || 0;
       
       // Cache o resultado
       this.cache.set(cacheKey, { count, timestamp: Date.now() });
@@ -68,16 +71,19 @@ export class ConversationCountService {
       const tableName = this.getTableNameForChannel(channelId);
       
       // Usar função RPC para contar mensagens não lidas
-      const { data, error } = await supabase.rpc('count_unread_messages_total', {
-        table_name: tableName
-      });
+      const { data, error } = await supabase.rpc(
+        'count_unread_messages_total' as any,
+        {
+          table_name: tableName
+        }
+      );
 
       if (error) {
         console.error(`❌ [COUNT_SERVICE] Error counting unread for ${channelId}:`, error);
         return 0;
       }
 
-      const unreadCount = data || 0;
+      const unreadCount = Number(data) || 0;
       this.cache.set(cacheKey, { count: unreadCount, timestamp: Date.now() });
       
       return unreadCount;

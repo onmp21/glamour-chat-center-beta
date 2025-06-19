@@ -46,9 +46,12 @@ export const useChannelConversationCounts = (channelId: string) => {
       console.log(`📊 [CONVERSATION_COUNTS] Loading counts for ${channelId} from table ${tableName}`);
 
       // Usar rpc para contagem de conversas únicas
-      const { data: totalData, error: totalError } = await supabase.rpc('count_unique_sessions', {
-        table_name: tableName
-      });
+      const { data: totalData, error: totalError } = await supabase.rpc(
+        'count_unique_sessions' as any,
+        {
+          table_name: tableName
+        }
+      );
 
       if (totalError) {
         console.error(`❌ [CONVERSATION_COUNTS] Error counting total conversations:`, totalError);
@@ -56,14 +59,17 @@ export const useChannelConversationCounts = (channelId: string) => {
         return;
       }
 
-      const totalCount = totalData || 0;
+      const totalCount = Number(totalData) || 0;
 
       // Contar mensagens não lidas (pendentes)
-      const { data: unreadData, error: unreadError } = await supabase.rpc('count_unread_messages_total', {
-        table_name: tableName
-      });
+      const { data: unreadData, error: unreadError } = await supabase.rpc(
+        'count_unread_messages_total' as any,
+        {
+          table_name: tableName
+        }
+      );
 
-      const pendingCount = unreadError ? 0 : (unreadData || 0);
+      const pendingCount = unreadError ? 0 : (Number(unreadData) || 0);
 
       console.log(`✅ [CONVERSATION_COUNTS] ${channelId}: ${totalCount} conversations, ${pendingCount} unread messages`);
 
