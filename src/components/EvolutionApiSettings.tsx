@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -785,7 +786,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                         size="sm" 
                         onClick={() => unlinkChannel(mapping.channel_id)}
                       >
-                        <Un link className="h-4 w-4" />
+                        <Unlink className="h-4 w-4" />
                       </Button>
                     </li>
                   ))}
