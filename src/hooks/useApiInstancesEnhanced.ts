@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,14 +43,19 @@ export const useApiInstancesEnhanced = () => {
       }
 
       console.log('✅ [API_INSTANCES] Instâncias carregadas:', data?.length || 0);
-      setInstances(data || []);
+      // Ensure the data conforms to ApiInstanceWithConnection type
+      const formattedInstances: ApiInstanceWithConnection[] = (data || []).map(instance => ({
+        ...instance,
+        created_at: instance.created_at || new Date().toISOString(),
+      }));
+      setInstances(formattedInstances);
       
       // CORRIGIDO: Resetar sempre antes de buscar novas instâncias
       setEvolutionInstances([]);
       
       // Buscar instâncias do Evolution API com melhor tratamento de erro
-      if (data && data.length > 0) {
-        await fetchEvolutionInstances(data);
+      if (formattedInstances && formattedInstances.length > 0) {
+        await fetchEvolutionInstances(formattedInstances);
       }
     } catch (error) {
       console.error('❌ [API_INSTANCES] Erro inesperado ao carregar:', error);
@@ -132,14 +136,14 @@ export const useApiInstancesEnhanced = () => {
 
   const checkConnectionStatus = async (instance: ApiInstanceWithConnection) => {
     console.log('🔍 [API_INSTANCES] Verificando status da instância:', instance.instance_name);
-    setCheckingStatus(instance.id || '');
+    setCheckingStatus(instance.id);
     
     try {
       // CORRIGIDO: Usar import dinâmico ao invés de require
       const { ApiInstanceService } = await import("@/services/ApiInstanceService");
       const service = new ApiInstanceService();
 
-      const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id || '');
+      const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id);
       console.log("📡 [API_INSTANCES] Detalhes de conexão recebidos:", connectionDetails);
       
       setInstances(prev => prev.map(inst => 

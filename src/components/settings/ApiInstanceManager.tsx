@@ -20,12 +20,12 @@ export const ApiInstanceManager: React.FC = () => {
     instanceName: string;
   } | null>(null);
 
-  const handleEdit = async (instance: ApiInstance) => {
+  const handleEdit = async (instance: Omit<ApiInstance, 'id' | 'created_at' | 'updated_at'> & { id?: string }) => {
     try {
       if (instance.id) {
-        await updateInstance(instance.id, instance);
+        await updateInstance(instance.id, instance as Partial<ApiInstance>);
       } else {
-        await createInstance(instance);
+        await createInstance(instance as Omit<ApiInstance, 'id' | 'created_at' | 'updated_at'>);
       }
     } catch (error) {
       console.error('Error saving instance:', error);
