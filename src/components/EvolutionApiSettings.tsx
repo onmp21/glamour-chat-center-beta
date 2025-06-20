@@ -63,6 +63,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
   const [validatingApi, setValidatingApi] = useState(false);
   const [creatingInstance, setCreatingInstance] = useState(false);
+  const [loadingInstances, setLoadingInstances] = useState(false);
   const [newInstanceName, setNewInstanceName] = useState('');
   const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
   const [loggingOutInstance, setLoggingOutInstance] = useState<string | null>(null);
@@ -100,7 +101,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         const connection = JSON.parse(saved);
         setApiConnection(connection);
         
-        if (connection.isValidated) {
+        if (connection.isValidated && connection.baseUrl && connection.apiKey) {
+          console.log('🔄 [EVOLUTION_API_SETTINGS] Carregando instâncias salvas');
           await loadInstances(connection.baseUrl, connection.apiKey);
         }
       }
@@ -124,7 +126,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
-        instanceName: 'temp' // Temporary instance name for validation
+        instanceName: 'temp'
       });
 
       const result = await service.validateConnection();
@@ -138,6 +140,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         setApiConnection(updatedConnection);
         localStorage.setItem("evolution_api_connection", JSON.stringify(updatedConnection));
         
+        console.log('✅ [EVOLUTION_API_SETTINGS] API validada, carregando instâncias');
         await loadInstances(apiConnection.baseUrl, apiConnection.apiKey);
         
         toast({
@@ -162,35 +165,70 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   };
 
   const loadInstances = async (baseUrl: string, apiKey: string) => {
+    if (!baseUrl || !apiKey) {
+      console.error('❌ [EVOLUTION_API_SETTINGS] baseUrl ou apiKey não fornecidos');
+      return;
+    }
+
+    setLoadingInstances(true);
     try {
+      console.log('🔄 [EVOLUTION_API_SETTINGS] Iniciando carregamento das instâncias');
+      console.log('🔗 [EVOLUTION_API_SETTINGS] URL:', baseUrl);
+      
       const service = new EvolutionApiService({
         baseUrl,
         apiKey,
-        instanceName: 'temp' // Temporary instance name for listing
+        instanceName: 'temp'
       });
 
       const result = await service.listInstances();
-      console.log('📋 [EvolutionApiSettings] Resultado de listInstances:', result);
+      console.log('📋 [EVOLUTION_API_SETTINGS] Resultado de listInstances:', result);
       
-      if (result.success && result.instances) {
-        console.log('📋 [EvolutionApiSettings] Instâncias recebidas:', result.instances);
+      if (result.success) {
+        const instances = result.instances || [];
+        console.log('📋 [EVOLUTION_API_SETTINGS] Instâncias recebidas:', instances);
+        console.log('📊 [EVOLUTION_API_SETTINGS] Total de instâncias:', instances.length);
+        
         setApiConnection(prev => ({
           ...prev,
-          instances: result.instances || []
+          instances: instances
         }));
+
+        if (instances.length === 0) {
+          console.log('⚠️ [EVOLUTION_API_SETTINGS] Nenhuma instância encontrada na API');
+          toast({
+            title: "Aviso",
+            description: "Nenhuma instância encontrada na API. Crie uma nova instância.",
+            variant: "default"
+          });
+        } else {
+          console.log(`✅ [EVOLUTION_API_SETTINGS] ${instances.length} instâncias carregadas com sucesso`);
+        }
       } else {
-        console.error('Erro ao listar instâncias:', result.error);
+        console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao listar instâncias:', result.error);
+        toast({
+          title: "Erro",
+          description: `Erro ao carregar instâncias: ${result.error}`,
+          variant: "destructive"
+        });
         setApiConnection(prev => ({
           ...prev,
           instances: []
         }));
       }
     } catch (error) {
-      console.error('Erro ao carregar instâncias:', error);
+      console.error('❌ [EVOLUTION_API_SETTINGS] Erro ao carregar instâncias:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao carregar instâncias: ${error}`,
+        variant: "destructive"
+      });
       setApiConnection(prev => ({
         ...prev,
         instances: []
       }));
+    } finally {
+      setLoadingInstances(false);
     }
   };
 
@@ -275,7 +313,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
       await channelMappingService.createMapping(mapping as ChannelInstanceMapping);
 
-      // Configurar webhook para a instância recém-vinculada
       const evolutionService = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
@@ -510,6 +547,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
             <CardTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5" />
               Gerenciar Instâncias
+              {loadingInstances && <RotateCcw className="w-4 h-4 animate-spin ml-2" />}
             </CardTitle>
             <CardDescription>
               Crie e gerencie instâncias do WhatsApp conectadas à API Evolution.
@@ -537,11 +575,33 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 )}
                 Criar Instância
               </Button>
+              <Button
+                onClick={() => loadInstances(apiConnection.baseUrl, apiConnection.apiKey)}
+                disabled={loadingInstances}
+                variant="outline"
+                className={cn(
+                  isDarkMode ? "border-[#3f3f46] text-zinc-300 hover:bg-[#27272a]" : ""
+                )}
+              >
+                {loadingInstances ? (
+                  <RotateCcw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Atualizar
+              </Button>
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-lg font-semibold">Instâncias Existentes:</h4>
-              {apiConnection.instances.length === 0 ? (
+              <h4 className="text-lg font-semibold">
+                Instâncias Existentes ({apiConnection.instances.length}):
+              </h4>
+              {loadingInstances ? (
+                <div className="flex items-center justify-center p-4">
+                  <RotateCcw className="h-6 w-6 animate-spin mr-2" />
+                  <span>Carregando instâncias...</span>
+                </div>
+              ) : apiConnection.instances.length === 0 ? (
                 <p className="text-gray-500">Nenhuma instância encontrada.</p>
               ) : (
                 <ul className="space-y-2">
@@ -625,7 +685,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="selectChannel">Selecionar Canal Interno</Label>
                 <Select
@@ -653,11 +713,18 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                 <Select
                   onValueChange={setSelectedInstanceForMapping}
                   value={selectedInstanceForMapping}
+                  disabled={apiConnection.instances.length === 0}
                 >
                   <SelectTrigger className={cn(
                     isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
                   )}>
-                    <SelectValue placeholder="Selecione uma instância" />
+                    <SelectValue placeholder={
+                      loadingInstances 
+                        ? "Carregando instâncias..." 
+                        : apiConnection.instances.length === 0 
+                          ? "Nenhuma instância disponível" 
+                          : "Selecione uma instância"
+                    } />
                   </SelectTrigger>
                   <SelectContent className={cn(
                     isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900"
@@ -665,15 +732,25 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                     {apiConnection.instances.map(instance => (
                       <SelectItem key={instance.instanceName} value={instance.instanceName}>
                         {instance.instanceName}
+                        {instance.profileName && (
+                          <span className="text-xs text-gray-400 ml-2">
+                            ({instance.profileName})
+                          </span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {apiConnection.instances.length === 0 && !loadingInstances && (
+                  <p className="text-sm text-amber-600 mt-1">
+                    ⚠️ Nenhuma instância encontrada. Crie uma instância primeiro.
+                  </p>
+                )}
               </div>
             </div>
             <Button
               onClick={linkChannelToInstance}
-              disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
+              disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping || apiConnection.instances.length === 0}
               className="w-full bg-[#b5103c] hover:bg-[#9d0e34] text-white"
             >
               {linkingChannel ? (
@@ -708,7 +785,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                         size="sm" 
                         onClick={() => unlinkChannel(mapping.channel_id)}
                       >
-                        <Unlink className="h-4 w-4" />
+                        <Un link className="h-4 w-4" />
                       </Button>
                     </li>
                   ))}
