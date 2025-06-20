@@ -255,19 +255,7 @@ export class ChannelManagementService {
 
       // Iniciar transação manual
       try {
-        // 1. Excluir mapeamentos de API relacionados ao canal
-        console.log('🔄 [CHANNEL_MANAGEMENT] Deleting API mappings...');
-        const { error: mappingError } = await supabase
-          .from('channel_api_mappings')
-          .delete()
-          .eq('channel_id', channelId);
-
-        if (mappingError) {
-          console.error('❌ [CHANNEL_MANAGEMENT] Error deleting API mappings:', mappingError);
-          // Não falhar por causa disso, apenas logar
-        }
-
-        // 2. Excluir mapeamentos de instância relacionados ao canal
+        // 1. Excluir mapeamentos de instância relacionados ao canal
         console.log('🔄 [CHANNEL_MANAGEMENT] Deleting instance mappings...');
         const { error: instanceMappingError } = await supabase
           .from('channel_instance_mappings')
@@ -279,23 +267,26 @@ export class ChannelManagementService {
           // Não falhar por causa disso, apenas logar
         }
 
-        // 3. Criar backup se solicitado
+        // 2. Criar backup se solicitado (sem falhar se der erro)
         if (createBackup) {
           console.log('🔄 [CHANNEL_MANAGEMENT] Creating backup...');
-          const { error: backupError } = await supabase.rpc('backup_conversation_table', {
-            table_name: tableName
-          });
+          try {
+            const { error: backupError } = await supabase.rpc('backup_conversation_table', {
+              table_name: tableName
+            });
 
-          if (backupError) {
-            console.error('❌ [CHANNEL_MANAGEMENT] Error creating backup:', backupError);
-            // Continuar mesmo se backup falhar, mas avisar
-            console.warn('⚠️ [CHANNEL_MANAGEMENT] Continuing deletion without backup');
-          } else {
-            console.log('✅ [CHANNEL_MANAGEMENT] Backup created successfully');
+            if (backupError) {
+              console.error('❌ [CHANNEL_MANAGEMENT] Error creating backup:', backupError);
+              console.warn('⚠️ [CHANNEL_MANAGEMENT] Continuing deletion without backup');
+            } else {
+              console.log('✅ [CHANNEL_MANAGEMENT] Backup created successfully');
+            }
+          } catch (backupException) {
+            console.warn('⚠️ [CHANNEL_MANAGEMENT] Backup failed, continuing with deletion');
           }
         }
 
-        // 4. Excluir tabela de conversas
+        // 3. Excluir tabela de conversas
         console.log('🔄 [CHANNEL_MANAGEMENT] Dropping conversation table...');
         const { error: dropError } = await supabase.rpc('drop_conversation_table', {
           table_name: tableName
@@ -312,7 +303,7 @@ export class ChannelManagementService {
           console.log('✅ [CHANNEL_MANAGEMENT] Conversation table dropped successfully');
         }
 
-        // 5. Excluir canal
+        // 4. Excluir canal
         console.log('🔄 [CHANNEL_MANAGEMENT] Deleting channel record...');
         const { error: deleteError } = await supabase
           .from('channels')
@@ -326,7 +317,7 @@ export class ChannelManagementService {
 
         console.log('✅ [CHANNEL_MANAGEMENT] Channel record deleted successfully');
 
-        // 6. Invalidar cache após exclusão
+        // 5. Invalidar cache após exclusão
         invalidateChannelCache();
         console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
         

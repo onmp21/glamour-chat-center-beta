@@ -1,6 +1,6 @@
 
 export interface ApiInstance {
-  id?: string;
+  id: string; // Required in base interface
   instance_name: string;
   base_url: string;
   api_key: string;
@@ -11,6 +11,7 @@ export interface ApiInstance {
 }
 
 export interface ApiInstanceWithConnection extends ApiInstance {
+  // All properties are inherited, id is required from base
   qr_code?: string;
   connection_status?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
 }

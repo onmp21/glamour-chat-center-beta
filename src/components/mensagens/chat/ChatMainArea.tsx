@@ -130,15 +130,15 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
   };
 
   // Função para obter o tipo de mídia baseado na URL
-  const getMediaType = (url: string): 'image' | 'video' | 'audio' | 'file' => {
-    if (!url) return 'file';
+  const getMediaType = (url: string): 'image' | 'video' | 'audio' => {
+    if (!url) return 'image'; // Default fallback
     
     // Se é data URL, detectar pelo MIME type
     if (url.startsWith('data:')) {
       if (url.includes('image/')) return 'image';
       if (url.includes('video/')) return 'video';
       if (url.includes('audio/')) return 'audio';
-      return 'file';
+      return 'image'; // Default fallback
     }
     
     const extension = url.split('.').pop()?.toLowerCase();
@@ -152,7 +152,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     if (['mp3', 'wav', 'ogg', 'webm'].includes(extension || '')) {
       return 'audio';
     }
-    return 'file';
+    return 'image'; // Default fallback instead of 'file'
   };
 
   // Função para construir a URL completa da mídia
