@@ -18,7 +18,7 @@ class PollingManager {
   public startPolling(
     key: string,
     callback: () => void,
-    intervalMs: number = 3000 // 3 segundos por padrão
+    intervalMs: number = 2000 // Reduzido para 2 segundos para melhor responsividade
   ): string {
     const callbackId = `${key}_${++this.callbackCounter}_${Date.now()}`;
     

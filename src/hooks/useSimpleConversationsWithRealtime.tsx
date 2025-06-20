@@ -170,7 +170,7 @@ export const useSimpleConversationsWithRealtime = (
     const setupPolling = () => {
       try {
         const manager = PollingManager.getInstance();
-        const pollingId = manager.startPolling(tableName, pollingCallback, 4000); // 4 segundos
+        const pollingId = manager.startPolling(tableName, pollingCallback, 3000); // Reduzido para 3 segundos
         
         if (mountedRef.current) {
           pollingIdRef.current = pollingId;

@@ -13,6 +13,7 @@ interface ApiInstance {
   api_key: string;
   created_at: string;
   connection_status?: 'connected' | 'disconnected' | 'connecting';
+  qr_code?: string;
 }
 
 interface ApiInstanceCardProps {
@@ -50,13 +51,18 @@ export const ApiInstanceCard: React.FC<ApiInstanceCardProps> = ({
                 ) : (
                   <WifiOff className="h-3 w-3 mr-1" />
                 )}
-                {instance.connection_status === 'connected' ? 'Conectado' : 'Desconectado'}
+                {instance.connection_status === 'connected' ? 'Conectado' : instance.connection_status === 'connecting' ? 'Conectando' : 'Desconectado'}
               </Badge>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {instance.qr_code && (
+          <div className="flex justify-center items-center p-4 bg-white rounded-md">
+            <img src={`data:image/png;base64,${instance.qr_code}`} alt="QR Code" className="w-32 h-32" />
+          </div>
+        )}
         <div className="space-y-2">
           <div>
             <span className={cn("text-sm font-medium", isDarkMode ? "text-zinc-300" : "text-gray-700")}>
@@ -94,17 +100,7 @@ export const ApiInstanceCard: React.FC<ApiInstanceCardProps> = ({
             Verificar Status
           </Button>
           
-          <Button
-            onClick={() => onShowQRCode(instance.id)}
-            variant="outline"
-            size="sm"
-            className={cn(
-              isDarkMode ? "border-[#3f3f46] text-zinc-300 hover:bg-[#27272a]" : ""
-            )}
-          >
-            <QrCode className="h-4 w-4 mr-2" />
-            QR Code
-          </Button>
+
           
           <Button
             onClick={() => onDelete(instance)}

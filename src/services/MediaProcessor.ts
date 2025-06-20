@@ -1,4 +1,3 @@
-
 export interface MediaResult {
   isProcessed: boolean;
   url?: string;
@@ -16,14 +15,29 @@ export class MediaProcessor {
     }
 
     try {
-      // Se já é uma URL completa, retornar como está
+      // Regex para detectar URLs do Supabase Storage, incluindo o bucket 'file'
+      const supabaseStorageUrlRegex = /^https:\/\/uxccfhptochnfomurulr\.supabase\.co\/storage\/v1\/object\/(public\/)?file\//;
+
+      // Se é uma URL completa, verificar se é do Supabase Storage ou externa
       if (content.startsWith('http')) {
-        console.log(`🔗 [MEDIA_PROCESSOR] URL completa detectada:`, content.substring(0, 50));
+        console.log(`🔗 [MEDIA_PROCESSOR] URL detectada:`, content.substring(0, 50));
         return {
           isProcessed: true,
           url: content,
-          type: this.getTypeFromMessageType(messageType),
+          type: this.getTypeFromMessageType(messageType) || this.getTypeFromUrl(content),
           mimeType: this.getMimeTypeFromUrl(content)
+        };
+      }
+
+      // Se é uma URL relativa (ex: file/yelena/...), tratar como Supabase Storage
+      if (content.startsWith('file/')) {
+        const fullUrl = `https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/${content}`;
+        console.log(`🔗 [MEDIA_PROCESSOR] URL relativa detectada, convertendo para:`, fullUrl.substring(0, 50));
+        return {
+          isProcessed: true,
+          url: fullUrl,
+          type: this.getTypeFromMessageType(messageType) || this.getTypeFromUrl(fullUrl),
+          mimeType: this.getMimeTypeFromUrl(fullUrl)
         };
       }
 
@@ -162,6 +176,31 @@ export class MediaProcessor {
       case 'sticker':
         return 'sticker';
       default:
+        return ''; // Retorna vazio para que getTypeFromUrl possa tentar detectar
+    }
+  }
+
+  // Obter tipo de URL baseado na extensão
+  private static getTypeFromUrl(url: string): string {
+    const extension = url.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+        return 'image';
+      case 'mp3':
+      case 'ogg':
+      case 'wav':
+        return 'audio';
+      case 'mp4':
+      case 'webm':
+      case 'mov':
+        return 'video';
+      case 'pdf':
+        return 'document';
+      default:
         return 'document';
     }
   }
@@ -231,3 +270,4 @@ export class MediaProcessor {
     return { isProcessed: false, error: 'Método deprecado' };
   }
 }
+

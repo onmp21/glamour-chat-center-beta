@@ -8,6 +8,7 @@ import { useNonRealtimeMessages } from '@/hooks/useNonRealtimeMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChannelConversation } from '@/types/messages';
 import { useConversationStatus } from '@/hooks/useConversationStatus';
+import { useMessageNotificationManager } from '@/hooks/useMessageNotificationManager';
 
 interface ChatOverlayRefactoredProps {
   channelId: string;
@@ -63,6 +64,7 @@ interface DisplayMessage {
   read: boolean;
   nome_do_contato?: string;
   mensagemtype?: string;
+  message?: string; // Adicionar campo message para compatibilidade com notificações
 }
 
 interface ConversationForHeader {
@@ -199,9 +201,22 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
       fileName: msg.message || undefined,
       read: typeof msg.is_read === 'boolean' ? msg.is_read : true,
       nome_do_contato: msg.nome_do_contato,
-      mensagemtype: msg.mensagemtype
+      mensagemtype: msg.mensagemtype,
+      message: msg.message // Adicionar campo message para compatibilidade
     };
   });
+
+  // Gerenciar notificações sonoras para novas mensagens externas
+  const { resetNotificationState } = useMessageNotificationManager({
+    messages: displayMessages,
+    isOverlayOpen: true, // O overlay está sempre aberto quando este componente está renderizado
+    enabled: true
+  });
+
+  // Reset notification state when conversation changes
+  useEffect(() => {
+    resetNotificationState();
+  }, [selectedConversation, resetNotificationState]);
 
   const conversationForHeader: ConversationForHeader | null = selectedConvData ? {
     contactName: selectedConvData.contact_name,

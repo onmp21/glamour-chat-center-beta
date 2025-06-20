@@ -12,8 +12,7 @@ interface MessageContentFixedProps {
 export const MessageContentFixed: React.FC<MessageContentFixedProps> = ({
   message,
   isDarkMode
-}) => {
-  // Verificar se é mídia
+}) => {  // Verificar se é mídia (priorizando messageType) ou se é uma data URL
   const isMediaMessage = 
     (message.messageType && message.messageType !== 'text') ||
     message.content.startsWith('data:') ||

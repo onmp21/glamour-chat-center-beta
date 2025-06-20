@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -48,16 +47,21 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
 
   return (
     <div 
-      className="media-overlay animate-fade-in"
+      className={cn(
+        "fixed inset-0 z-[99999] flex items-center justify-center",
+        "bg-black/90 backdrop-blur-sm animate-in fade-in-0 duration-300"
+      )}
       onClick={handleBackdropClick}
-      style={{ zIndex: 99999 }}
     >
-      <div className="media-overlay-content">
+      <div className="relative max-w-[95vw] max-h-[95vh] flex items-center justify-center">
         <button
           onClick={onClose}
-          className="media-overlay-close"
+          className={cn(
+            "absolute top-4 right-4 z-[100000] p-2 rounded-full",
+            "bg-black/50 hover:bg-black/70 text-white transition-colors",
+            "backdrop-blur-sm border border-white/20"
+          )}
           aria-label="Fechar"
-          style={{ zIndex: 100000 }}
         >
           <X size={20} />
         </button>
@@ -66,14 +70,14 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
           <img
             src={mediaUrl}
             alt="Imagem ampliada"
-            className="media-overlay-image"
+            className={cn(
+              "max-w-full max-h-full object-contain rounded-lg",
+              "shadow-2xl border border-white/10"
+            )}
             onClick={(e) => e.stopPropagation()}
             style={{ 
               maxWidth: '90vw', 
-              maxHeight: '90vh',
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain'
+              maxHeight: '90vh'
             }}
           />
         ) : (
@@ -81,14 +85,14 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
             src={mediaUrl}
             controls
             autoPlay
-            className="media-overlay-video"
+            className={cn(
+              "max-w-full max-h-full object-contain rounded-lg",
+              "shadow-2xl border border-white/10"
+            )}
             onClick={(e) => e.stopPropagation()}
             style={{ 
               maxWidth: '90vw', 
-              maxHeight: '90vh',
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain'
+              maxHeight: '90vh'
             }}
           >
             Seu navegador não suporta reprodução de vídeo.
@@ -98,3 +102,4 @@ export const MediaOverlay: React.FC<MediaOverlayProps> = ({
     </div>
   );
 };
+

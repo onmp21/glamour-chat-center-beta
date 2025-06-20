@@ -118,12 +118,12 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
 
   const { url, mimeType, type, size } = processedResult;
 
-  // Exibir apenas se URL está no storage público.
-  const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/');
-  if (!isBucketUrl) {
-    console.warn("[MediaRendererFixed] URL da mídia NÃO É do storage público:", url);
-    return renderError();
-  }
+  // Exibir apenas se URL está no storage público ou no bucket 'file'
+  // const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/');
+  // if (!isBucketUrl) {
+  //   console.warn("[MediaRendererFixed] URL da mídia NÃO É do storage do Supabase:", url);
+  //   return renderError();
+  // }
 
   // Renderizar áudio
   if (type === 'audio') {
@@ -337,14 +337,14 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
           "text-xs",
           isDarkMode ? "text-muted-foreground" : "text-gray-500"
         )}>
-          {size || 'Clique para abrir'}
+          {mimeType}
         </div>
-        {mimeType && (
+        {size && (
           <div className={cn(
             "text-xs mt-1",
             isDarkMode ? "text-muted-foreground/80" : "text-gray-400"
           )}>
-            {mimeType}
+            {size}
           </div>
         )}
       </div>
@@ -379,3 +379,4 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     </div>
   );
 };
+

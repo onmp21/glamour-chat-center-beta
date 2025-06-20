@@ -1,233 +1,93 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
+// Constants
+const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+const CONVERSATION_TABLES = [
+  'yelena_ai_conversas',
+  'canarana_conversas', 
+  'souto_soares_conversas',
+  'joao_dourado_conversas',
+  'america_dourada_conversas',
+  'gerente_lojas_conversas',
+  'gerente_externo_conversas'
+]
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+const BATCH_SIZE = 10
+const MESSAGE_DELAY = 200 // ms
+const BATCH_DELAY = 500 // ms
+const STORAGE_BUCKET = 'media-files'
 
-    console.log('🚀 [MIGRATE_BASE64_BATCH] Starting batch migration for all tables')
+// Types
+interface BatchMigrationResults {
+  totalProcessed: number
+  totalErrors: number
+  tableResults: Record<string, TableResult>
+}
 
-    // Lista de todas as tabelas de conversas
-    const tables = [
-      'yelena_ai_conversas',
-      'canarana_conversas', 
-      'souto_soares_conversas',
-      'joao_dourado_conversas',
-      'america_dourada_conversas',
-      'gerente_lojas_conversas',
-      'gerente_externo_conversas'
-    ]
+interface TableResult {
+  processed: number
+  errors: number
+}
 
-    const results = {
-      totalProcessed: 0,
-      totalErrors: 0,
-      tableResults: {} as Record<string, { processed: number; errors: number }>
-    }
+interface UploadResult {
+  success: boolean
+  url?: string
+  error?: string
+}
 
-    // Processar cada tabela
-    for (const tableName of tables) {
-      console.log(`🔄 [MIGRATE_BASE64_BATCH] Processing table: ${tableName}`)
-      
-      let tableProcessed = 0
-      let tableErrors = 0
-      let hasMore = true
-      const batchSize = 10
+interface MessageRecord {
+  id: string
+  media_base64: string
+}
 
-      while (hasMore) {
-        try {
-          // Buscar mensagens com base64
-          const { data: messages, error: fetchError } = await supabase.rpc('get_base64_messages', {
-            table_name: tableName,
-            batch_size: batchSize
-          })
-
-          if (fetchError) {
-            console.error(`❌ [MIGRATE_BASE64_BATCH] Fetch error for ${tableName}:`, fetchError)
-            tableErrors++
-            break
-          }
-
-          if (!messages || messages.length === 0) {
-            console.log(`✅ [MIGRATE_BASE64_BATCH] No more base64 messages in ${tableName}`)
-            hasMore = false
-            break
-          }
-
-          // Processar cada mensagem
-          for (const message of messages) {
-            if (message.media_base64 && message.media_base64.startsWith('data:')) {
-              try {
-                // Upload base64 para storage
-                const uploadResult = await uploadBase64ToStorage(supabase, message.media_base64)
-                
-                if (uploadResult.success && uploadResult.url) {
-                  // Atualizar registro na tabela
-                  const { error: updateError } = await supabase.rpc('update_media_url', {
-                    table_name: tableName,
-                    record_id: message.id,
-                    media_url: uploadResult.url,
-                    placeholder_message: getPlaceholderMessage(message.media_base64)
-                  })
-
-                  if (updateError) {
-                    console.error(`❌ [MIGRATE_BASE64_BATCH] Update error for message ${message.id}:`, updateError)
-                    tableErrors++
-                  } else {
-                    tableProcessed++
-                    console.log(`✅ [MIGRATE_BASE64_BATCH] Migrated message ${message.id} in ${tableName}`)
-                  }
-                } else {
-                  console.error(`❌ [MIGRATE_BASE64_BATCH] Upload failed for message ${message.id}:`, uploadResult.error)
-                  tableErrors++
-                }
-
-                // Pausa entre uploads para evitar rate limiting
-                await new Promise(resolve => setTimeout(resolve, 200))
-
-              } catch (error) {
-                console.error(`❌ [MIGRATE_BASE64_BATCH] Error processing message ${message.id}:`, error)
-                tableErrors++
-              }
-            }
-          }
-
-          // Se processou menos que o batch size, não há mais
-          if (messages.length < batchSize) {
-            hasMore = false
-          }
-
-          // Pausa entre batches
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-        } catch (error) {
-          console.error(`❌ [MIGRATE_BASE64_BATCH] Batch error for ${tableName}:`, error)
-          tableErrors++
-          break
-        }
-      }
-
-      results.tableResults[tableName] = {
-        processed: tableProcessed,
-        errors: tableErrors
-      }
-      results.totalProcessed += tableProcessed
-      results.totalErrors += tableErrors
-
-      console.log(`📊 [MIGRATE_BASE64_BATCH] Table ${tableName} completed: ${tableProcessed} processed, ${tableErrors} errors`)
-    }
-
-    console.log(`🎉 [MIGRATE_BASE64_BATCH] Migration completed: ${results.totalProcessed} total processed, ${results.totalErrors} total errors`)
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        ...results,
-        message: `Migration completed: ${results.totalProcessed} processed, ${results.totalErrors} errors`
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    )
-
-  } catch (error) {
-    console.error('❌ [MIGRATE_BASE64_BATCH] Function error:', error)
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        message: 'Migration failed'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
-    )
-  }
-})
-
-async function uploadBase64ToStorage(supabase: any, base64Content: string) {
-  try {
-    // Extrair base64 puro
-    const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '')
-    
-    // Detectar MIME type
-    const mimeType = detectMimeType(base64Content)
-    
-    // Gerar nome do arquivo
-    const extension = getExtensionFromMimeType(mimeType)
-    const fileName = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}${extension}`
-
-    // Converter base64 para blob
-    const byteCharacters = atob(cleanBase64)
-    const byteNumbers = new Array(byteCharacters.length)
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i)
-    }
-    const byteArray = new Uint8Array(byteNumbers)
-    const blob = new Blob([byteArray], { type: mimeType })
-
-    // Upload para Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('media-files')
-      .upload(fileName, blob, {
-        contentType: mimeType,
-        upsert: true
-      })
-
-    if (error) {
-      return { success: false, error: error.message }
-    }
-
-    // Gerar URL pública
-    const { data: { publicUrl } } = supabase.storage
-      .from('media-files')
-      .getPublicUrl(data.path)
-
-    return { success: true, url: publicUrl }
-
-  } catch (error) {
-    return { 
+// Utility Functions
+function createErrorResponse(message: string, error?: string, status: number = 500) {
+  return new Response(
+    JSON.stringify({ 
       success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error || 'Unknown error',
+      message 
+    }),
+    { 
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      status 
     }
-  }
+  )
 }
 
-function detectMimeType(base64Content: string): string {
-  if (base64Content.includes('data:')) {
-    const match = base64Content.match(/data:([^;]+)/)
-    if (match) return match[1]
-  }
-
-  const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '')
-  
-  if (cleanBase64.startsWith('/9j/')) return 'image/jpeg'
-  if (cleanBase64.startsWith('iVBORw')) return 'image/png'
-  if (cleanBase64.startsWith('R0lGO')) return 'image/gif'
-  if (cleanBase64.startsWith('UklGR')) return 'image/webp'
-  if (cleanBase64.startsWith('SUQz') || cleanBase64.startsWith('//uQ')) return 'audio/mpeg'
-  if (cleanBase64.startsWith('T2dn')) return 'audio/ogg'
-  if (cleanBase64.startsWith('AAAAGG') || cleanBase64.startsWith('AAAAFG')) return 'video/mp4'
-  
-  return 'application/octet-stream'
+function createSuccessResponse(data: any) {
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      ...data 
+    }),
+    { 
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      status: 200 
+    }
+  )
 }
 
-function getExtensionFromMimeType(mimeType: string): string {
-  const extensions: Record<string, string> = {
+// MIME Type and File Utilities (reused from migrate-base64)
+class MediaTypeUtils {
+  private static readonly MIME_SIGNATURES: Record<string, string> = {
+    '/9j/': 'image/jpeg',
+    'iVBORw': 'image/png',
+    'R0lGO': 'image/gif',
+    'UklGR': 'image/webp',
+    'SUQz': 'audio/mpeg',
+    '//uQ': 'audio/mpeg',
+    'T2dn': 'audio/ogg',
+    'AAAAGG': 'video/mp4',
+    'AAAAFG': 'video/mp4'
+  }
+
+  private static readonly EXTENSIONS: Record<string, string> = {
     'image/jpeg': '.jpg',
     'image/png': '.png',
     'image/gif': '.gif',
@@ -237,16 +97,279 @@ function getExtensionFromMimeType(mimeType: string): string {
     'video/mp4': '.mp4',
     'application/pdf': '.pdf'
   }
-  return extensions[mimeType] || '.bin'
+
+  private static readonly PLACEHOLDERS: Record<string, string> = {
+    'image': '[Imagem]',
+    'audio': '[Áudio]',
+    'video': '[Vídeo]',
+    'application/pdf': '[Documento PDF]'
+  }
+
+  static detectMimeType(base64Content: string): string {
+    // Check for data URL format
+    if (base64Content.includes('data:')) {
+      const match = base64Content.match(/data:([^;]+)/)
+      if (match) return match[1]
+    }
+
+    // Clean base64 content and check signatures
+    const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '')
+    
+    for (const [signature, mimeType] of Object.entries(this.MIME_SIGNATURES)) {
+      if (cleanBase64.startsWith(signature)) {
+        return mimeType
+      }
+    }
+    
+    return 'application/octet-stream'
+  }
+
+  static getExtension(mimeType: string): string {
+    return this.EXTENSIONS[mimeType] || '.bin'
+  }
+
+  static getPlaceholder(mimeType: string): string {
+    const category = mimeType.split('/')[0]
+    return this.PLACEHOLDERS[category] || this.PLACEHOLDERS[mimeType] || '[Mídia]'
+  }
+
+  static generateFileName(mimeType: string): string {
+    const extension = this.getExtension(mimeType)
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substr(2, 9)
+    return `media_${timestamp}_${randomId}${extension}`
+  }
 }
 
-function getPlaceholderMessage(base64Content: string): string {
-  const mimeType = detectMimeType(base64Content)
-  
-  if (mimeType.startsWith('image/')) return '[Imagem]'
-  if (mimeType.startsWith('audio/')) return '[Áudio]'
-  if (mimeType.startsWith('video/')) return '[Vídeo]'
-  if (mimeType === 'application/pdf') return '[Documento PDF]'
-  
-  return '[Mídia]'
+// Base64 Processing
+class Base64Processor {
+  static convertToBlob(base64Content: string): { blob: Blob, mimeType: string } {
+    const cleanBase64 = base64Content.replace(/^data:[^;]+;base64,/, '')
+    const mimeType = MediaTypeUtils.detectMimeType(base64Content)
+    
+    const byteCharacters = atob(cleanBase64)
+    const byteNumbers = new Array(byteCharacters.length)
+    
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: mimeType })
+    
+    return { blob, mimeType }
+  }
 }
+
+// Storage Service
+class StorageService {
+  constructor(private supabase: any) {}
+
+  async uploadBase64(base64Content: string): Promise<UploadResult> {
+    try {
+      const { blob, mimeType } = Base64Processor.convertToBlob(base64Content)
+      const fileName = MediaTypeUtils.generateFileName(mimeType)
+
+      const { data, error } = await this.supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(fileName, blob, {
+          contentType: mimeType,
+          upsert: true
+        })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      // Generate public URL
+      const { data: { publicUrl } } = this.supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(data.path)
+
+      return { success: true, url: publicUrl }
+
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  }
+}
+
+// Database Service
+class DatabaseService {
+  constructor(private supabase: any) {}
+
+  async getBase64Messages(tableName: string, batchSize: number): Promise<MessageRecord[]> {
+    const { data: messages, error } = await this.supabase.rpc('get_base64_messages', {
+      table_name: tableName,
+      batch_size: batchSize
+    })
+
+    if (error) {
+      throw new Error(`Failed to fetch messages from ${tableName}: ${error.message}`)
+    }
+
+    return messages || []
+  }
+
+  async updateMediaUrl(tableName: string, recordId: string, mediaUrl: string, placeholderMessage: string): Promise<void> {
+    const { error } = await this.supabase.rpc('update_media_url', {
+      table_name: tableName,
+      record_id: recordId,
+      media_url: mediaUrl,
+      placeholder_message: placeholderMessage
+    })
+
+    if (error) {
+      throw new Error(`Failed to update message ${recordId}: ${error.message}`)
+    }
+  }
+}
+
+// Batch Migration Service
+class BatchMigrationService {
+  constructor(
+    private dbService: DatabaseService,
+    private storageService: StorageService
+  ) {}
+
+  async migrateAllTables(): Promise<BatchMigrationResults> {
+    console.log('🚀 [MIGRATE_BASE64_BATCH] Starting batch migration for all tables')
+
+    const results: BatchMigrationResults = {
+      totalProcessed: 0,
+      totalErrors: 0,
+      tableResults: {}
+    }
+
+    for (const tableName of CONVERSATION_TABLES) {
+      const tableResult = await this.migrateTable(tableName)
+      results.tableResults[tableName] = tableResult
+      results.totalProcessed += tableResult.processed
+      results.totalErrors += tableResult.errors
+
+      console.log(`📊 [MIGRATE_BASE64_BATCH] Table ${tableName} completed: ${tableResult.processed} processed, ${tableResult.errors} errors`)
+    }
+
+    console.log(`🎉 [MIGRATE_BASE64_BATCH] Migration completed: ${results.totalProcessed} total processed, ${results.totalErrors} total errors`)
+    return results
+  }
+
+  private async migrateTable(tableName: string): Promise<TableResult> {
+    console.log(`🔄 [MIGRATE_BASE64_BATCH] Processing table: ${tableName}`)
+    
+    let tableProcessed = 0
+    let tableErrors = 0
+    let hasMore = true
+
+    while (hasMore) {
+      try {
+        const messages = await this.dbService.getBase64Messages(tableName, BATCH_SIZE)
+
+        if (messages.length === 0) {
+          console.log(`✅ [MIGRATE_BASE64_BATCH] No more base64 messages in ${tableName}`)
+          hasMore = false
+          break
+        }
+
+        // Process each message in the batch
+        for (const message of messages) {
+          if (this.isValidBase64Message(message)) {
+            try {
+              await this.migrateMessage(tableName, message)
+              tableProcessed++
+              console.log(`✅ [MIGRATE_BASE64_BATCH] Migrated message ${message.id} in ${tableName}`)
+            } catch (error) {
+              console.error(`❌ [MIGRATE_BASE64_BATCH] Error processing message ${message.id}:`, error)
+              tableErrors++
+            }
+
+            // Delay between messages to prevent rate limiting
+            await this.delay(MESSAGE_DELAY)
+          }
+        }
+
+        // If we got fewer messages than batch size, we're done
+        if (messages.length < BATCH_SIZE) {
+          hasMore = false
+        }
+
+        // Delay between batches
+        await this.delay(BATCH_DELAY)
+
+      } catch (error) {
+        console.error(`❌ [MIGRATE_BASE64_BATCH] Batch error for ${tableName}:`, error)
+        tableErrors++
+        break
+      }
+    }
+
+    return { processed: tableProcessed, errors: tableErrors }
+  }
+
+  private async migrateMessage(tableName: string, message: MessageRecord): Promise<void> {
+    // Upload base64 to storage
+    const uploadResult = await this.storageService.uploadBase64(message.media_base64)
+    
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(`Upload failed: ${uploadResult.error}`)
+    }
+
+    // Update database record
+    const mimeType = MediaTypeUtils.detectMimeType(message.media_base64)
+    const placeholderMessage = MediaTypeUtils.getPlaceholder(mimeType)
+    
+    await this.dbService.updateMediaUrl(
+      tableName, 
+      message.id, 
+      uploadResult.url, 
+      placeholderMessage
+    )
+  }
+
+  private isValidBase64Message(message: MessageRecord): boolean {
+    return message.media_base64 && message.media_base64.startsWith('data:')
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+}
+
+// Main Handler
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: CORS_HEADERS })
+  }
+
+  try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Initialize services
+    const dbService = new DatabaseService(supabase)
+    const storageService = new StorageService(supabase)
+    const migrationService = new BatchMigrationService(dbService, storageService)
+
+    // Execute batch migration
+    const results = await migrationService.migrateAllTables()
+
+    return createSuccessResponse({
+      ...results,
+      message: `Migration completed: ${results.totalProcessed} processed, ${results.totalErrors} errors`
+    })
+
+  } catch (error) {
+    console.error('❌ [MIGRATE_BASE64_BATCH] Function error:', error)
+    return createErrorResponse(
+      'Migration failed',
+      error instanceof Error ? error.message : 'Unknown error'
+    )
+  }
+})
+

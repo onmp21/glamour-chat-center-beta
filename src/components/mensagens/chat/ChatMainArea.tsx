@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Brain, Loader2 } from 'lucide-react';
 import { AIResumoOverlay } from '@/components/chat/AIResumoOverlay';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
+import { MediaPlayer } from '@/components/ui/MediaPlayer';
 
 interface Message {
   id: string;
@@ -19,6 +20,7 @@ interface Message {
   read: boolean;
   Nome_do_contato?: string;
   mensagemtype?: string;
+  media_url?: string;
 }
 interface Conversation {
   contactName: string;
@@ -112,6 +114,79 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       'gerente-externo': 'Andressa Gerente'
     };
     return mapping[channel] || channel;
+  };
+
+  // Função para detectar se é uma mensagem de mídia
+  const isMediaMessage = (message: Message): boolean => {
+    // Verificar múltiplas condições para detectar mídia
+    const hasMediaUrl = !!message.media_url && message.media_url.trim() !== '';
+    const hasFileUrl = !!message.fileUrl && message.fileUrl.trim() !== '';
+    const isMediaType = message.type && ['image', 'audio', 'video', 'file'].includes(message.type);
+    const isDataUrl = message.content && message.content.startsWith('data:');
+    const isSupabaseUrl = message.content && message.content.includes('supabase.co/storage');
+    const isMediaContent = message.content === "media";
+    
+    return hasMediaUrl || hasFileUrl || isMediaType || isDataUrl || isSupabaseUrl || (isMediaContent && hasMediaUrl);
+  };
+
+  // Função para obter o tipo de mídia baseado na URL
+  const getMediaType = (url: string): 'image' | 'video' | 'audio' | 'file' => {
+    if (!url) return 'file';
+    
+    // Se é data URL, detectar pelo MIME type
+    if (url.startsWith('data:')) {
+      if (url.includes('image/')) return 'image';
+      if (url.includes('video/')) return 'video';
+      if (url.includes('audio/')) return 'audio';
+      return 'file';
+    }
+    
+    const extension = url.split('.').pop()?.toLowerCase();
+    
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) {
+      return 'image';
+    }
+    if (['mp4', 'webm', 'avi', 'mov'].includes(extension || '')) {
+      return 'video';
+    }
+    if (['mp3', 'wav', 'ogg', 'webm'].includes(extension || '')) {
+      return 'audio';
+    }
+    return 'file';
+  };
+
+  // Função para construir a URL completa da mídia
+  const buildMediaUrl = (message: Message): string | null => {
+    // Priorizar media_url se existir
+    if (message.media_url && message.media_url.trim() !== '') {
+      const mediaUrl = message.media_url.trim();
+      
+      // Se já é uma URL completa ou data URL, retorna como está
+      if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://') || mediaUrl.startsWith('data:')) {
+        return mediaUrl;
+      }
+      
+      // Se é um caminho relativo, constrói a URL completa
+      return `${window.location.origin}/${mediaUrl.replace(/^\/+/, '')}`;
+    }
+    
+    // Fallback para fileUrl
+    if (message.fileUrl && message.fileUrl.trim() !== '') {
+      const fileUrl = message.fileUrl.trim();
+      
+      if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://') || fileUrl.startsWith('data:')) {
+        return fileUrl;
+      }
+      
+      return `${window.location.origin}/${fileUrl.replace(/^\/+/, '')}`;
+    }
+    
+    // Fallback para content se for data URL ou URL do Supabase
+    if (message.content && (message.content.startsWith('data:') || message.content.includes('supabase.co/storage'))) {
+      return message.content;
+    }
+    
+    return null;
   };
 
   const handleGenerateSummary = () => {
@@ -230,7 +305,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
           <div className="space-y-4">
             {messages.map((message) => {
               const isAgent =
-                message.tipo_remetente === "USUARIO_INTERNO" ||
+                message.tipo_remetente === "CONTATO_INTERNO" ||
                 message.tipo_remetente === "Yelena-ai" ||
                 message.sender === "agent";
               const contactName =
@@ -243,6 +318,24 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
               const hora = (message as any).read_at
                 ? formatHour((message as any).read_at)
                 : formatHour(message.timestamp || new Date().toISOString());
+
+              // Verificar se é uma mensagem de mídia
+              const isMedia = isMediaMessage(message);
+              const mediaUrl = isMedia ? buildMediaUrl(message) : null;
+              const mediaType = mediaUrl ? getMediaType(mediaUrl) : null;
+
+              // Log para debug
+              if (isMedia) {
+                console.log('🎬 [CHAT_MAIN_AREA] Mensagem de mídia detectada:', {
+                  messageId: message.id,
+                  isMedia,
+                  mediaUrl,
+                  mediaType,
+                  originalMediaUrl: message.media_url,
+                  fileUrl: message.fileUrl,
+                  content: message.content?.substring(0, 50)
+                });
+              }
 
               return (
                 <div
@@ -268,7 +361,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                           <span>
                             {canalNome}
                           </span>
-                          {message.tipo_remetente === "USUARIO_INTERNO" && !!message.Nome_do_contato && (
+                          {message.tipo_remetente === "CONTATO_INTERNO" && !!message.Nome_do_contato && (
                             <span className="font-semibold">
                               {message.Nome_do_contato}
                             </span>
@@ -276,9 +369,27 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                         </>
                       )}
                     </div>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {message.content}
-                    </p>
+                    
+                    {/* Renderizar mídia se for uma mensagem de mídia */}
+                    {isMedia && mediaUrl && mediaType ? (
+                      <div className="mb-2">
+                        <MediaPlayer
+                          mediaUrl={mediaUrl}
+                          mediaType={mediaType}
+                          fileName={message.fileName}
+                          isDarkMode={isDarkMode}
+                          className="max-w-full"
+                        />
+                      </div>
+                    ) : null}
+                    
+                    {/* Renderizar texto se não for apenas mídia ou se houver texto adicional */}
+                    {(!isMedia || (message.content && message.content !== "media" && !message.content.startsWith('data:') && !message.content.includes('supabase.co/storage'))) && (
+                      <p className="text-sm whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                    )}
+                    
                     <p className="text-xs opacity-70 mt-1 text-right">{hora}</p>
                   </div>
                 </div>

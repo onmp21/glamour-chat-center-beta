@@ -10,6 +10,7 @@ interface ApiInstance {
   api_key: string;
   created_at: string;
   connection_status?: 'connected' | 'disconnected' | 'connecting';
+  qr_code?: string;
 }
 
 interface EvolutionInstance {
@@ -143,27 +144,22 @@ export const useApiInstancesEnhanced = () => {
     
     try {
       // CORRIGIDO: Usar import dinâmico ao invés de require
-      const { EvolutionApiService } = await import('@/services/EvolutionApiService');
-      const service = new EvolutionApiService({
-        baseUrl: instance.base_url,
-        apiKey: instance.api_key,
-        instanceName: instance.instance_name
-      });
+      const { ApiInstanceService } = await import("@/services/ApiInstanceService");
+      const service = new ApiInstanceService();
 
-      const result = await service.getConnectionStatus();
-      console.log('📡 [API_INSTANCES] Status recebido:', result);
+      const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id);
+      console.log("📡 [API_INSTANCES] Detalhes de conexão recebidos:", connectionDetails);
       
-      // Atualizar status local
       setInstances(prev => prev.map(inst => 
         inst.id === instance.id 
-          ? { ...inst, connection_status: result.connected ? 'connected' : 'disconnected' }
+           ? { ...inst, connection_status: connectionDetails?.connection_status, qr_code: connectionDetails?.qrCode || null }
           : inst
       ));
 
       toast({
         title: "Status Verificado",
-        description: `Instância ${instance.instance_name}: ${result.connected ? 'Conectada' : 'Desconectada'}`,
-        variant: result.connected ? "default" : "destructive"
+        description: `Instância ${instance.instance_name}: ${connectionDetails?.connection_status === 'connected' ? 'Conectada' : connectionDetails?.connection_status === 'connecting' ? 'Conectando' : 'Desconectada'}`,
+        variant: connectionDetails?.connection_status === 'connected' ? "default" : "destructive"
       });
     } catch (error) {
       console.error('❌ [API_INSTANCES] Erro ao verificar status:', error);

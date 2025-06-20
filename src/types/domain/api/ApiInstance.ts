@@ -9,6 +9,6 @@ export interface ApiInstance {
 
 export interface ApiInstanceWithConnection extends ApiInstance {
   qr_code?: string;
-  connection_status?: 'connected' | 'disconnected' | 'connecting';
+  connection_status?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
 }
 

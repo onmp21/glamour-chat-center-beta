@@ -240,61 +240,108 @@ export class ChannelManagementService {
         .single();
 
       if (fetchError || !channel) {
+        console.error('❌ [CHANNEL_MANAGEMENT] Channel not found:', fetchError);
         return { success: false, error: 'Canal não encontrado' };
       }
 
       // Verificar se é canal padrão
       if (channel.is_default) {
+        console.warn('⚠️ [CHANNEL_MANAGEMENT] Attempting to delete default channel');
         return { success: false, error: 'Não é possível excluir o canal padrão' };
       }
 
       const tableName = this.generateTableName(channel.name);
+      console.log('📋 [CHANNEL_MANAGEMENT] Generated table name for deletion:', tableName);
 
-      // Criar backup se solicitado
-      if (createBackup) {
-        const { error: backupError } = await supabase.rpc('backup_conversation_table', {
+      // Iniciar transação manual
+      try {
+        // 1. Excluir mapeamentos de API relacionados ao canal
+        console.log('🔄 [CHANNEL_MANAGEMENT] Deleting API mappings...');
+        const { error: mappingError } = await supabase
+          .from('channel_api_mappings')
+          .delete()
+          .eq('channel_id', channelId);
+
+        if (mappingError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error deleting API mappings:', mappingError);
+          // Não falhar por causa disso, apenas logar
+        }
+
+        // 2. Excluir mapeamentos de instância relacionados ao canal
+        console.log('🔄 [CHANNEL_MANAGEMENT] Deleting instance mappings...');
+        const { error: instanceMappingError } = await supabase
+          .from('channel_instance_mappings')
+          .delete()
+          .eq('channel_id', channelId);
+
+        if (instanceMappingError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error deleting instance mappings:', instanceMappingError);
+          // Não falhar por causa disso, apenas logar
+        }
+
+        // 3. Criar backup se solicitado
+        if (createBackup) {
+          console.log('🔄 [CHANNEL_MANAGEMENT] Creating backup...');
+          const { error: backupError } = await supabase.rpc('backup_conversation_table', {
+            table_name: tableName
+          });
+
+          if (backupError) {
+            console.error('❌ [CHANNEL_MANAGEMENT] Error creating backup:', backupError);
+            // Continuar mesmo se backup falhar, mas avisar
+            console.warn('⚠️ [CHANNEL_MANAGEMENT] Continuing deletion without backup');
+          } else {
+            console.log('✅ [CHANNEL_MANAGEMENT] Backup created successfully');
+          }
+        }
+
+        // 4. Excluir tabela de conversas
+        console.log('🔄 [CHANNEL_MANAGEMENT] Dropping conversation table...');
+        const { error: dropError } = await supabase.rpc('drop_conversation_table', {
           table_name: tableName
         });
 
-        if (backupError) {
-          console.error('❌ [CHANNEL_MANAGEMENT] Error creating backup:', backupError);
-          return { success: false, error: 'Erro ao criar backup' };
+        if (dropError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error dropping table:', dropError);
+          // Tentar continuar mesmo se a tabela não existir
+          if (!dropError.message?.includes('não existe') && !dropError.message?.includes('does not exist')) {
+            return { success: false, error: 'Erro ao excluir tabela de conversas' };
+          }
+          console.warn('⚠️ [CHANNEL_MANAGEMENT] Table may not exist, continuing...');
+        } else {
+          console.log('✅ [CHANNEL_MANAGEMENT] Conversation table dropped successfully');
         }
+
+        // 5. Excluir canal
+        console.log('🔄 [CHANNEL_MANAGEMENT] Deleting channel record...');
+        const { error: deleteError } = await supabase
+          .from('channels')
+          .delete()
+          .eq('id', channelId);
+
+        if (deleteError) {
+          console.error('❌ [CHANNEL_MANAGEMENT] Error deleting channel:', deleteError);
+          return { success: false, error: 'Erro ao excluir canal do banco de dados' };
+        }
+
+        console.log('✅ [CHANNEL_MANAGEMENT] Channel record deleted successfully');
+
+        // 6. Invalidar cache após exclusão
+        invalidateChannelCache();
+        console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
+        
+        toast({
+          title: 'Sucesso',
+          description: `Canal "${channel.name}" excluído com sucesso!`
+        });
+
+        return { success: true };
+
+      } catch (transactionError) {
+        console.error('❌ [CHANNEL_MANAGEMENT] Transaction error:', transactionError);
+        return { success: false, error: 'Erro durante a exclusão do canal' };
       }
 
-      // Excluir tabela de conversas
-      const { error: dropError } = await supabase.rpc('drop_conversation_table', {
-        table_name: tableName
-      });
-
-      if (dropError) {
-        console.error('❌ [CHANNEL_MANAGEMENT] Error dropping table:', dropError);
-        return { success: false, error: 'Erro ao excluir tabela de conversas' };
-      }
-
-      // Excluir canal
-      const { error: deleteError } = await supabase
-        .from('channels')
-        .delete()
-        .eq('id', channelId);
-
-      if (deleteError) {
-        console.error('❌ [CHANNEL_MANAGEMENT] Error deleting channel:', deleteError);
-        return { success: false, error: 'Erro ao excluir canal' };
-      }
-
-      // Invalidar cache após exclusão
-      invalidateChannelCache();
-
-      console.log('✅ [CHANNEL_MANAGEMENT] Channel deleted successfully');
-      console.log('🔄 [CHANNEL_MANAGEMENT] Channel cache invalidated');
-      
-      toast({
-        title: 'Sucesso',
-        description: `Canal "${channel.name}" excluído com sucesso!`
-      });
-
-      return { success: true };
     } catch (error) {
       console.error('❌ [CHANNEL_MANAGEMENT] Unexpected error:', error);
       return { success: false, error: 'Erro inesperado ao excluir canal' };

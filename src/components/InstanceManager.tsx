@@ -114,6 +114,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         return 'bg-yellow-500';
       case 'close':
         return 'bg-red-500';
+      case 'unknown':
       default:
         return 'bg-gray-500';
     }
@@ -129,6 +130,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         return 'QR Code';
       case 'close':
         return 'Desconectado';
+      case 'unknown':
       default:
         return 'Desconhecido';
     }
@@ -155,7 +157,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         instanceName
       });
 
-      const result = await service.getQRCodeForInstance();
+      const result = await service.getQRCodeForInstance(instanceName);
       
       if (result.success && result.qrCode) {
         setQrCodeModal({ instanceName, qrCode: result.qrCode });
@@ -183,7 +185,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         instanceName
       });
 
-      const result = await service.deleteInstance();
+      const result = await service.deleteInstance(instanceName);
       
       if (result.success) {
         toast({
@@ -297,7 +299,7 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      {instance.connectionStatus === 'open' ? (
+                      {(instance.connectionStatus || 'unknown') === 'open' ? (
                         <Wifi className="h-5 w-5 text-green-500" />
                       ) : (
                         <WifiOff className="h-5 w-5 text-red-500" />
@@ -312,10 +314,10 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                     <Badge
                       className={cn(
                         "text-white",
-                        getStatusColor(instance.connectionStatus)
+                        getStatusColor(instance.connectionStatus || 'unknown')
                       )}
                     >
-                      {getStatusText(instance.connectionStatus)}
+                      {getStatusText(instance.connectionStatus || 'unknown')}
                     </Badge>
                     <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
                       N8N
@@ -363,16 +365,16 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteModal({ isOpen: true, instanceName: instance.instanceName });
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteModal({ isOpen: true, instanceName: instance.instanceName });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                   </div>
                 </div>
               </CardContent>
@@ -381,32 +383,38 @@ export const InstanceManager: React.FC<InstanceManagerProps> = ({
         )}
       </div>
 
-      {/* Modal de QR Code */}
-      {qrCodeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={cn(
-            "bg-white dark:bg-[#18181b] p-6 rounded-lg max-w-md w-full mx-4",
-            "border border-gray-200 dark:border-gray-800"
-          )}>
-            <h3 className="text-lg font-semibold mb-4">
-              QR Code - {qrCodeModal.instanceName}
-            </h3>
-            <div className="flex justify-center mb-4">
-              <img
-                src={`data:image/png;base64,${qrCodeModal.qrCode}`}
-                alt="QR Code"
-                className="max-w-full h-auto"
-              />
+        {/* Modal de QR Code */}
+        {qrCodeModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className={cn(
+              "bg-white dark:bg-[#18181b] p-6 rounded-lg max-w-md w-full mx-4",
+              "border border-gray-200 dark:border-gray-800"
+            )}>
+              <h3 className="text-lg font-semibold mb-4">
+                QR Code - {qrCodeModal.instanceName}
+              </h3>
+              <div className="flex justify-center mb-4">
+                {qrCodeModal.qrCode ? (
+                  <img
+                    src={qrCodeModal.qrCode.startsWith('data:') ? qrCodeModal.qrCode : `data:image/png;base64,${qrCodeModal.qrCode}`}
+                    alt="QR Code"
+                    className="max-w-full h-auto border border-gray-300 rounded"
+                  />
+                ) : (
+                  <div className="w-64 h-64 flex items-center justify-center border border-gray-300 rounded bg-gray-100">
+                    <p className="text-gray-500">QR Code não disponível</p>
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={() => setQrCodeModal(null)}
+                className="w-full"
+              >
+                Fechar
+              </Button>
             </div>
-            <Button
-              onClick={() => setQrCodeModal(null)}
-              className="w-full"
-            >
-              Fechar
-            </Button>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Modal de confirmação de exclusão */}
       <DeleteInstanceModal

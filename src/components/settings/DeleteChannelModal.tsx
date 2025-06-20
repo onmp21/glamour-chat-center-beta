@@ -38,12 +38,26 @@ export const DeleteChannelModal: React.FC<DeleteChannelModalProps> = ({
     
     if (!channel || !confirmDelete) return;
 
-    const result = await deleteChannel(channel.id, createBackup);
-    
-    if (result.success) {
-      setConfirmDelete(false);
-      setCreateBackup(true);
-      onClose();
+    try {
+      console.log('🗑️ [DELETE_CHANNEL_MODAL] Starting channel deletion:', {
+        channelId: channel.id,
+        channelName: channel.name,
+        createBackup
+      });
+
+      const result = await deleteChannel(channel.id, createBackup);
+      
+      if (result.success) {
+        console.log('✅ [DELETE_CHANNEL_MODAL] Channel deleted successfully');
+        setConfirmDelete(false);
+        setCreateBackup(true);
+        onClose();
+      } else {
+        console.error('❌ [DELETE_CHANNEL_MODAL] Channel deletion failed:', result.error);
+        // O erro já é mostrado pelo hook useChannelManagement via toast
+      }
+    } catch (error) {
+      console.error('❌ [DELETE_CHANNEL_MODAL] Unexpected error during deletion:', error);
     }
   };
 

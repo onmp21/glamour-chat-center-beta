@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from "@/integrations/supabase/client";
+import PollingManager from '@/services/PollingManager';
 
 // Reflete a tipagem real da tabela channels do Supabase + legacyId para o sistema
 export interface InternalChannel {
@@ -87,26 +88,17 @@ export const useInternalChannels = () => {
   useEffect(() => {
     fetchChannels();
 
-    // Configurar realtime para mudanças na tabela channels
-    const channel = supabase
-      .channel('channels-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Escutar todos os eventos (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'channels'
-        },
-        (payload) => {
-          console.log('🔄 [useInternalChannels] Mudança na tabela channels detectada:', payload);
-          // Recarregar canais quando houver mudanças
-          fetchChannels();
-        }
-      )
-      .subscribe();
+    // Usar polling em vez de realtime subscription para evitar erro de subscribe múltiplo
+    const pollingCallback = () => {
+      console.log('🔄 [useInternalChannels] Polling update for channels');
+      fetchChannels();
+    };
+
+    const manager = PollingManager.getInstance();
+    const pollingId = manager.startPolling('channels', pollingCallback, 10000); // 10 segundos
 
     return () => {
-      supabase.removeChannel(channel);
+      manager.stopPolling('channels', pollingId);
     };
   }, []);
 
@@ -131,7 +123,8 @@ export const useInternalChannels = () => {
         variant: "default"
       });
 
-      // O realtime subscription já vai recarregar automaticamente
+      // Recarregar manualmente após atualização
+      await fetchChannels();
     } catch (error) {
       console.error('Erro ao atualizar canal:', error);
       toast({

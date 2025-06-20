@@ -3,62 +3,259 @@ import { RawMessage, ChannelConversation } from '@/types/messages';
 import { TableName, getTableNameForChannelSync } from '@/utils/channelMapping';
 import { supabase } from '@/integrations/supabase/client.ts';
 
-export class MessageService {
-  private repositories: Map<string, MessageRepository> = new Map();
-  private channelId: string;
+// Types
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+interface ChannelStats {
+  totalMessages: number;
+  totalConversations: number;
+  unreadMessages: number;
+}
+
+interface MessageQuery {
+  data: RawMessage[];
+}
+
+// Constants
+const CACHE_DURATION = 30000; // 30 seconds
+const DEFAULT_MESSAGE_LIMIT = 50;
+const DEFAULT_CONVERSATION_LIMIT = 20;
+const STATS_CONVERSATION_LIMIT = 1000;
+
+// Cache Manager
+class CacheManager {
+  private static cache: Map<string, CacheEntry<any>> = new Map();
+
+  static get<T>(key: string): T | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      console.log(`📊 [MESSAGE_SERVICE] Cache hit for ${key}`);
+      return cached.data;
+    }
+    return null;
+  }
+
+  static set<T>(key: string, data: T): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  static clear(): void {
+    this.cache.clear();
+    console.log(`🧹 [MESSAGE_SERVICE] Cache cleared`);
+  }
+
+  static invalidate(): void {
+    this.clear();
+  }
+}
+
+// Subscription Manager
+class SubscriptionManager {
   private static activeSubscriptions: Map<string, any> = new Map();
-  private static queryCache: Map<string, { data: any; timestamp: number }> = new Map();
-  private static readonly CACHE_DURATION = 30000; // 30 segundos
+
+  static create(
+    tableName: string,
+    callback: (payload: any) => void,
+    channelSuffix: string = ''
+  ): any {
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
+    
+    if (this.activeSubscriptions.has(subscriptionKey)) {
+      console.log(`⚠️ [MESSAGE_SERVICE] Subscription already exists for ${subscriptionKey}, skipping creation`);
+      return this.activeSubscriptions.get(subscriptionKey);
+    }
+    
+    console.log(`🔌 [MESSAGE_SERVICE] Creating new subscription for ${subscriptionKey}`);
+    
+    try {
+      const channel = supabase
+        .channel(`${tableName}-changes${channelSuffix}-${Date.now()}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: tableName as any },
+          (payload) => {
+            console.log(`🔔 [MESSAGE_SERVICE] Realtime update for ${tableName}:`, payload);
+            CacheManager.invalidate();
+            callback(payload);
+          }
+        );
+
+      this.activeSubscriptions.set(subscriptionKey, channel);
+      
+      channel.subscribe((status) => {
+        console.log(`📡 [MESSAGE_SERVICE] Subscription status for ${subscriptionKey}:`, status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`✅ [MESSAGE_SERVICE] Successfully subscribed to ${subscriptionKey}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`❌ [MESSAGE_SERVICE] Subscription error for ${subscriptionKey}`);
+          this.activeSubscriptions.delete(subscriptionKey);
+        }
+      });
+      
+      return channel;
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE] Error creating subscription for ${subscriptionKey}:`, error);
+      this.activeSubscriptions.delete(subscriptionKey);
+      throw error;
+    }
+  }
+
+  static unsubscribe(channelSuffix: string, tableName: string): void {
+    const subscriptionKey = `${tableName}-${channelSuffix}`;
+    const channel = this.activeSubscriptions.get(subscriptionKey);
+    
+    if (channel) {
+      console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from ${subscriptionKey}`);
+      try {
+        supabase.removeChannel(channel);
+        this.activeSubscriptions.delete(subscriptionKey);
+        console.log(`✅ [MESSAGE_SERVICE] Successfully unsubscribed from ${subscriptionKey}`);
+      } catch (error) {
+        console.error(`❌ [MESSAGE_SERVICE] Error unsubscribing from ${subscriptionKey}:`, error);
+        this.activeSubscriptions.delete(subscriptionKey);
+      }
+    } else {
+      console.log(`ℹ️ [MESSAGE_SERVICE] No active subscription found for ${subscriptionKey}`);
+    }
+  }
+
+  static unsubscribeAll(): void {
+    console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from all active subscriptions`);
+    const subscriptionKeys = Array.from(this.activeSubscriptions.keys());
+    
+    subscriptionKeys.forEach(key => {
+      const channel = this.activeSubscriptions.get(key);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+          console.log(`✅ [MESSAGE_SERVICE] Unsubscribed from ${key}`);
+        } catch (error) {
+          console.error(`❌ [MESSAGE_SERVICE] Error unsubscribing from ${key}:`, error);
+        }
+      }
+    });
+    
+    this.activeSubscriptions.clear();
+    console.log(`✅ [MESSAGE_SERVICE] All subscriptions cleared`);
+  }
+}
+
+// Conversation Processor
+class ConversationProcessor {
+  static extractPhoneFromSessionId(sessionId: string): string {
+    const match = sessionId.match(/(\d+)@/);
+    return match ? match[1] : sessionId;
+  }
+
+  static processConversationsFromMessages(messages: any[], limit: number): ChannelConversation[] {
+    const conversationsMap = new Map<string, ChannelConversation>();
+    
+    messages.forEach((message: any) => {
+      const sessionId = message.session_id;
+      
+      if (conversationsMap.has(sessionId)) {
+        const existing = conversationsMap.get(sessionId)!;
+        if (!message.is_read) {
+          existing.unread_count = (existing.unread_count || 0) + 1;
+        }
+        // Keep the most recent message
+        if (message.read_at > existing.last_message_time!) {
+          existing.last_message = message.message;
+          existing.last_message_time = message.read_at;
+        }
+      } else {
+        // Create new conversation
+        conversationsMap.set(sessionId, {
+          id: sessionId,
+          contact_name: message.nome_do_contato || 'Unknown',
+          contact_phone: this.extractPhoneFromSessionId(sessionId),
+          last_message: message.message,
+          last_message_time: message.read_at || new Date().toISOString(),
+          status: message.is_read ? 'resolved' : 'unread',
+          updated_at: message.read_at || new Date().toISOString(),
+          unread_count: message.is_read ? 0 : 1
+        });
+      }
+    });
+
+    return Array.from(conversationsMap.values())
+      .sort((a, b) => new Date(b.last_message_time!).getTime() - new Date(a.last_message_time!).getTime())
+      .slice(0, limit);
+  }
+
+  static calculateStats(conversations: ChannelConversation[]): ChannelStats {
+    return {
+      totalMessages: 0, // Placeholder, as this can be expensive
+      totalConversations: conversations.length,
+      unreadMessages: conversations.filter(c => c.status === 'unread').length
+    };
+  }
+}
+
+// Repository Manager
+class RepositoryManager {
+  private repositories: Map<string, MessageRepository> = new Map();
+
+  getRepository(channelId: string): MessageRepository {
+    if (!this.repositories.has(channelId)) {
+      const tableName = getTableNameForChannelSync(channelId);
+      this.repositories.set(channelId, new MessageRepository(tableName));
+    }
+    return this.repositories.get(channelId)!;
+  }
+}
+
+// Main Service
+export class MessageService {
+  private repositoryManager = new RepositoryManager();
+  private channelId: string;
 
   constructor(channelId?: string) {
     this.channelId = channelId || '';
   }
 
+  // Private Methods
   private getRepository(channelId?: string): MessageRepository {
     const targetChannelId = channelId || this.channelId;
-    if (!this.repositories.has(targetChannelId)) {
-      const tableName = getTableNameForChannelSync(targetChannelId);
-      this.repositories.set(targetChannelId, new MessageRepository(tableName));
-    }
-    return this.repositories.get(targetChannelId)!;
+    return this.repositoryManager.getRepository(targetChannelId);
   }
 
   private getCacheKey(method: string, params: any = {}): string {
     return `${this.channelId}-${method}-${JSON.stringify(params)}`;
   }
 
-  private getFromCache<T>(cacheKey: string): T | null {
-    const cached = MessageService.queryCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < MessageService.CACHE_DURATION) {
-      console.log(`📊 [MESSAGE_SERVICE] Cache hit for ${cacheKey}`);
-      return cached.data;
-    }
-    return null;
-  }
-
-  private setCache(cacheKey: string, data: any): void {
-    MessageService.queryCache.set(cacheKey, {
-      data,
-      timestamp: Date.now()
-    });
-  }
-
-  async getMessagesForChannel(limit = 50): Promise<RawMessage[]> {
-    const cacheKey = this.getCacheKey('getMessages', { limit });
-    const cached = this.getFromCache<RawMessage[]>(cacheKey);
+  private async executeWithCache<T>(
+    cacheKey: string,
+    operation: () => Promise<T>
+  ): Promise<T> {
+    const cached = CacheManager.get<T>(cacheKey);
     if (cached) return cached;
 
-    const repository = this.getRepository();
-    console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${this.channelId} from table ${repository.getTableName()}`);
-    
     try {
-      const messages = await repository.findAll(limit);
-      this.setCache(cacheKey, messages);
-      return messages;
+      const result = await operation();
+      CacheManager.set(cacheKey, result);
+      return result;
     } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting messages for channel ${this.channelId}:`, error);
-      return [];
+      console.error(`❌ [MESSAGE_SERVICE] Operation failed for ${cacheKey}:`, error);
+      throw error;
     }
+  }
+
+  // Public Methods - Message Operations
+  async getMessagesForChannel(limit = DEFAULT_MESSAGE_LIMIT): Promise<RawMessage[]> {
+    const cacheKey = this.getCacheKey('getMessages', { limit });
+    
+    return this.executeWithCache(cacheKey, async () => {
+      const repository = this.getRepository();
+      console.log(`📋 [MESSAGE_SERVICE] Getting messages for channel ${this.channelId} from table ${repository.getTableName()}`);
+      
+      return await repository.findAll(limit);
+    });
   }
 
   async saveMessage(messageData: Partial<RawMessage>): Promise<RawMessage> {
@@ -67,8 +264,7 @@ export class MessageService {
     
     try {
       const result = await repository.create(messageData);
-      // Invalidar cache após salvar
-      MessageService.queryCache.clear();
+      CacheManager.invalidate();
       return result;
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error saving message to channel ${this.channelId}:`, error);
@@ -78,20 +274,13 @@ export class MessageService {
 
   async getMessagesByPhoneNumber(phoneNumber: string): Promise<RawMessage[]> {
     const cacheKey = this.getCacheKey('getByPhone', { phoneNumber });
-    const cached = this.getFromCache<RawMessage[]>(cacheKey);
-    if (cached) return cached;
-
-    const repository = this.getRepository();
-    console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${this.channelId}`);
     
-    try {
-      const messages = await repository.findByPhoneNumber(phoneNumber);
-      this.setCache(cacheKey, messages);
-      return messages;
-    } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by phone for channel ${this.channelId}:`, error);
-      return [];
-    }
+    return this.executeWithCache(cacheKey, async () => {
+      const repository = this.getRepository();
+      console.log(`🔍 [MESSAGE_SERVICE] Getting messages by phone ${phoneNumber} for channel ${this.channelId}`);
+      
+      return await repository.findByPhoneNumber(phoneNumber);
+    });
   }
 
   async getNewMessages(afterTimestamp: string): Promise<RawMessage[]> {
@@ -119,25 +308,22 @@ export class MessageService {
     
     try {
       await repository.markAsRead(sessionId);
-      // Invalidar cache após atualização
-      MessageService.queryCache.clear();
+      CacheManager.invalidate();
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE] Error marking conversation as read:`, error);
     }
   }
 
-  async getConversations(limit = 20): Promise<ChannelConversation[]> {
+  // Conversation Operations
+  async getConversations(limit = DEFAULT_CONVERSATION_LIMIT): Promise<ChannelConversation[]> {
     const cacheKey = this.getCacheKey('getConversations', { limit });
-    const cached = this.getFromCache<ChannelConversation[]>(cacheKey);
-    if (cached) return cached;
-
-    const repository = this.getRepository();
-    const tableName = repository.getTableName();
     
-    try {
+    return this.executeWithCache(cacheKey, async () => {
+      const repository = this.getRepository();
+      const tableName = repository.getTableName();
+      
       console.log(`📋 [MESSAGE_SERVICE] Getting conversations from ${tableName} with limit ${limit}`);
       
-      // Query otimizada para contar conversas corretamente
       const { data, error } = await supabase
         .from(tableName as any)
         .select(`
@@ -154,62 +340,20 @@ export class MessageService {
         return [];
       }
 
-      // Agrupar por session_id para contar conversas únicas
-      const conversationsMap = new Map<string, ChannelConversation>();
-      
-      (data || []).forEach((message: any) => {
-        const sessionId = message.session_id;
-        
-        // Se já existe, só atualizar unread_count se necessário
-        if (conversationsMap.has(sessionId)) {
-          const existing = conversationsMap.get(sessionId)!;
-          if (!message.is_read) {
-            existing.unread_count = (existing.unread_count || 0) + 1;
-          }
-          // Manter a mensagem mais recente
-          if (message.read_at > existing.last_message_time!) {
-            existing.last_message = message.message;
-            existing.last_message_time = message.read_at;
-          }
-        } else {
-          // Criar nova conversa
-          conversationsMap.set(sessionId, {
-            id: sessionId,
-            contact_name: message.nome_do_contato || 'Unknown',
-            contact_phone: this.extractPhoneFromSessionId(sessionId),
-            last_message: message.message,
-            last_message_time: message.read_at || new Date().toISOString(),
-            status: message.is_read ? 'resolved' : 'unread',
-            updated_at: message.read_at || new Date().toISOString(),
-            unread_count: message.is_read ? 0 : 1
-          });
-        }
-      });
-
-      // Converter para array e limitar
-      const conversations = Array.from(conversationsMap.values())
-        .sort((a, b) => new Date(b.last_message_time!).getTime() - new Date(a.last_message_time!).getTime())
-        .slice(0, limit);
-      
+      const conversations = ConversationProcessor.processConversationsFromMessages(data || [], limit);
       console.log(`✅ [MESSAGE_SERVICE] Loaded ${conversations.length} unique conversations from ${tableName}`);
       
-      this.setCache(cacheKey, conversations);
       return conversations;
-    } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting conversations:`, error);
-      return [];
-    }
+    });
   }
 
-  async getMessagesByConversation(sessionId: string, limit = 50): Promise<{ data: RawMessage[] }> {
+  async getMessagesByConversation(sessionId: string, limit = DEFAULT_MESSAGE_LIMIT): Promise<MessageQuery> {
     const cacheKey = this.getCacheKey('getByConversation', { sessionId, limit });
-    const cached = this.getFromCache<{ data: RawMessage[] }>(cacheKey);
-    if (cached) return cached;
-
-    const repository = this.getRepository();
-    const tableName = repository.getTableName();
     
-    try {
+    return this.executeWithCache(cacheKey, async () => {
+      const repository = this.getRepository();
+      const tableName = repository.getTableName();
+      
       const { data, error } = await supabase
         .from(tableName as any)
         .select('*')
@@ -223,112 +367,61 @@ export class MessageService {
       }
 
       const mappedData = (data || []).map(row => repository.mapDatabaseRowToRawMessage(row));
-      const result = { data: mappedData };
+      return { data: mappedData };
+    });
+  }
+
+  // Statistics
+  async getChannelStats(): Promise<ChannelStats> {
+    const cacheKey = this.getCacheKey('getStats');
+    
+    return this.executeWithCache(cacheKey, async () => {
+      console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId}`);
       
-      this.setCache(cacheKey, result);
-      return result;
-    } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting messages by conversation:`, error);
-      return { data: [] };
-    }
+      const conversations = await this.getConversations(STATS_CONVERSATION_LIMIT);
+      return ConversationProcessor.calculateStats(conversations);
+    });
   }
 
-  async getAllMessages(limit = 50): Promise<RawMessage[]> {
-    return this.getMessagesForChannel(limit);
-  }
-
-  extractPhoneFromSessionId(sessionId: string): string {
-    const match = sessionId.match(/(\d+)@/);
-    return match ? match[1] : sessionId;
-  }
-
+  // Realtime Subscriptions
   createRealtimeSubscription(callback: (payload: any) => void, channelSuffix: string = '') {
     const repository = this.getRepository();
     const tableName = repository.getTableName();
-    const subscriptionKey = `${tableName}-${channelSuffix}`;
     
-    // Check if subscription already exists and remove it first
-    if (MessageService.activeSubscriptions.has(subscriptionKey)) {
-      console.log(`🔌 [MESSAGE_SERVICE] Removing existing subscription for ${subscriptionKey}`);
-      const existingChannel = MessageService.activeSubscriptions.get(subscriptionKey);
-      supabase.removeChannel(existingChannel);
-      MessageService.activeSubscriptions.delete(subscriptionKey);
-    }
-    
-    const channel = supabase
-      .channel(`${tableName}-changes${channelSuffix}-${Date.now()}`) // Add timestamp to make unique
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: tableName as any },
-        (payload) => {
-          console.log(`🔔 [MESSAGE_SERVICE] Realtime update for ${tableName}:`, payload);
-          // Invalidar cache quando há mudanças
-          MessageService.queryCache.clear();
-          callback(payload);
-        }
-      );
-
-    // Store the subscription
-    MessageService.activeSubscriptions.set(subscriptionKey, channel);
-    
-    return channel;
+    return SubscriptionManager.create(tableName, callback, channelSuffix);
   }
 
-  static unsubscribeChannel(channelSuffix: string, tableName: string) {
-    const subscriptionKey = `${tableName}-${channelSuffix}`;
-    const channel = MessageService.activeSubscriptions.get(subscriptionKey);
-    
-    if (channel) {
-      console.log(`🔌 [MESSAGE_SERVICE] Unsubscribing from ${subscriptionKey}`);
-      supabase.removeChannel(channel);
-      MessageService.activeSubscriptions.delete(subscriptionKey);
-    }
+  // Utility Methods
+  extractPhoneFromSessionId(sessionId: string): string {
+    return ConversationProcessor.extractPhoneFromSessionId(sessionId);
   }
 
-  static clearCache() {
-    MessageService.queryCache.clear();
-    console.log(`🧹 [MESSAGE_SERVICE] Cache cleared`);
-  }
-
-  async getChannelStats(): Promise<{
-    totalMessages: number;
-    totalConversations: number;
-    unreadMessages: number;
-  }> {
-    const cacheKey = this.getCacheKey('getStats');
-    const cached = this.getFromCache<any>(cacheKey);
-    if (cached) return cached;
-
-    const repository = this.getRepository();
-    console.log(`📊 [MESSAGE_SERVICE] Getting stats for channel ${this.channelId} from table ${repository.getTableName()}`);
-    
-    try {
-      // Stats baseados nas conversas únicas
-      const conversations = await this.getConversations(1000); // Get more for accurate stats
-      const stats = {
-        totalMessages: 0, // Placeholder, as this can be expensive
-        totalConversations: conversations.length,
-        unreadMessages: conversations.filter(c => c.status === 'unread').length
-      };
-      
-      this.setCache(cacheKey, stats);
-      return stats;
-    } catch (error) {
-      console.error(`❌ [MESSAGE_SERVICE] Error getting channel stats:`, error);
-      return {
-        totalMessages: 0,
-        totalConversations: 0,
-        unreadMessages: 0
-      };
-    }
+  // Legacy Method Aliases (for backward compatibility)
+  async getAllMessages(limit = DEFAULT_MESSAGE_LIMIT): Promise<RawMessage[]> {
+    return this.getMessagesForChannel(limit);
   }
 
   async getNewMessagesAfterTimestamp(timestamp: string): Promise<RawMessage[]> {
     return this.getNewMessages(timestamp);
   }
 
-  async fetchMessages(limit = 50): Promise<RawMessage[]> {
+  async fetchMessages(limit = DEFAULT_MESSAGE_LIMIT): Promise<RawMessage[]> {
     return this.getMessagesForChannel(limit);
+  }
+
+  // Static Methods
+  static unsubscribeChannel(channelSuffix: string, tableName: string): void {
+    SubscriptionManager.unsubscribe(channelSuffix, tableName);
+  }
+
+  static unsubscribeAll(): void {
+    SubscriptionManager.unsubscribeAll();
+  }
+
+  static clearCache(): void {
+    CacheManager.clear();
   }
 }
 
 export const messageService = new MessageService();
+

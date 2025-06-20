@@ -40,7 +40,38 @@
 - [x] Implementar limite de palavras no nome do contato nos cards para não passar das margens
 
 ## 6. Mídia no WhatsApp Style
-- [x] Modificar MediaProcessor para suportar URLs relativas (file/yelena/...)
-- [x] Melhorar detecção de tipo de mídia por extensão de arquivo
-- [x] Componentes de renderização já implementados
+- [ ] Modificar MediaProcessor para suportar URLs relativas (file/yelena/...)
+- [ ] Melhorar detecção de tipo de mídia por extensão de arquivo
+- [ ] Componentes de renderização já implementados
+- [ ] Analisar `MediaProcessor.ts` para entender como as URLs de mídia são processadas e identificar a causa da não exibição de mídias com links.
+
+## 7. Instâncias Conectadas
+- [ ] Verificar o componente ou página que lista as instâncias e garantir que ele utilize `ApiInstanceService.getInstanceWithConnectionDetails` para obter o status e o QR code.
+- [ ] Investigar o processo de criação de instâncias para garantir que a nova instância seja corretamente persistida e exibida.
+- [ ] Analisar `useApiInstancesEnhanced` e `ApiInstanceCard` para entender como o status de conexão é tratado e exibido.
+- [ ] Modificar `useApiInstancesEnhanced` para buscar os detalhes de conexão completos (incluindo QR code) para cada instância.
+- [ ] Modificar `ApiInstanceCard` para exibir o QR code e o status de conexão de forma mais proeminente.
+- [ ] Modificar `ApiInstanceService.ts` para garantir que `getInstanceWithConnectionDetails` retorne o QR code corretamente.
+- [ ] Adicionar `qr_code?: string;` à interface `ApiInstance` em `useApiInstancesEnhanced.ts`.
+- [ ] Adicionar `qr_code?: string;` à interface `ApiInstance` em `ApiInstanceCard.tsx`.
+- [ ] Analisar `ApiInstanceForm.tsx` para verificar se o processo de criação de instâncias está funcionando corretamente.
+- [ ] Analisar `ApiInstanceList.tsx` para verificar se o processo de criação de instâncias está funcionando corretamente.
+- [ ] Analisar `ApiInstanceRepository.ts` para verificar se o processo de criação de instâncias está funcionando corretamente.
+- [ ] Problema identificado: Erro "Invalid integration" ao criar instância na Evolution API. Verificar se o payload de criação está correto.
+- [ ] Problema identificado: Sistema de login não está funcionando com credenciais admin/admin. Verificar configuração de autenticação.
+
+## 8. Roteamento de Conversas
+- [ ] Investigar por que canais criados estão abrindo conversas e contatos do canal \'yelena\'.
+- [ ] Analisar o código responsável pelo roteamento de mensagens e contatos para os canais corretos.
+
+## 9. Mensagens em Tempo Real
+- [ ] Garantir que as mensagens apareçam em tempo real, similar ao WhatsApp.
+- [ ] Verificar a implementação de WebSockets ou polling para atualização de mensagens.
+
+## 10. Nomes das Planilhas
+- [ ] Verificar a foto das tabelas fornecida pelo usuário para identificar os nomes corretos de todas as planilhas e garantir que o sistema as utilize adequadamente.
+
+## 11. Interface do Usuário
+- [ ] Garantir que nenhuma alteração na interface do usuário seja feita, conforme solicitado pelo usuário.
+
 

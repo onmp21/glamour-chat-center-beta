@@ -97,7 +97,7 @@ export class ApiInstanceService {
 
       return {
         pairingCode: data.pairingCode,
-        qrCode: data.code, // O campo 'code' contém o QR code base64
+        qrCode: data.qrCode, // O campo 'qrCode' contém o QR code base64
         status: 'connecting'
       };
     } catch (error) {
@@ -117,9 +117,8 @@ export class ApiInstanceService {
       const connectionStatus = await this.getInstanceConnectionState(instanceId);
       let connectionData = null;
       
-      if (connectionStatus !== 'connected') {
-        connectionData = await this.connectInstance(instanceId);
-      }
+      // Sempre tentar conectar para obter o QR Code, independentemente do status atual
+      connectionData = await this.connectInstance(instanceId);
 
       return {
         ...instance,

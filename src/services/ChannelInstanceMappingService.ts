@@ -316,3 +316,7 @@ export class ChannelInstanceMappingService {
     }
   }
 }
+
+
+export const channelMappingService = new ChannelInstanceMappingService();
+

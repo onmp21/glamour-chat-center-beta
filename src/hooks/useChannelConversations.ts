@@ -47,7 +47,17 @@ export function useChannelConversations(channelId: string) {
       'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
     };
     
-    return channelTableMapping[channelId] || 'yelena_ai_conversas';
+    // Buscar primeiro por channelId direto, depois por legacyId
+    let tableName = channelTableMapping[channelId];
+    
+    if (!tableName) {
+      // Se não encontrou, buscar pelo legacyId (para compatibilidade)
+      console.log(`🔍 [CHANNEL_MAPPING] Canal ${channelId} não encontrado no mapeamento direto, usando fallback`);
+      tableName = 'yelena_ai_conversas'; // Fallback padrão
+    }
+    
+    console.log(`🎯 [CHANNEL_MAPPING] Canal ${channelId} → Tabela ${tableName}`);
+    return tableName;
   }, []);
 
   const loadConversations = useCallback(async () => {
