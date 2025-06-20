@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CreateChannelData {
@@ -16,6 +17,7 @@ export interface UpdateChannelData {
 interface ChannelDeleteResult {
   success: boolean;
   message: string;
+  error?: string;
   details?: any;
 }
 
