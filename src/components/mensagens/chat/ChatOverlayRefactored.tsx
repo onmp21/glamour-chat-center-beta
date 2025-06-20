@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -118,14 +117,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     updated_at: conv.updated_at
   }));
 
-  useEffect(() => {
-    if (conversations.length > 0 && !selectedConversation) {
-      const firstConversation = conversations[0];
-      console.log('🎯 [CHAT_OVERLAY] Auto-selecting first conversation:', firstConversation.id);
-      setSelectedConversation(firstConversation.id);
-    }
-  }, [conversations, selectedConversation]);
-
   const handleConversationSelect = (conversationId: string) => {
     console.log('📱 [CHAT_OVERLAY] Conversation selected:', conversationId);
     setSelectedConversation(conversationId);
@@ -206,16 +197,18 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     };
   });
 
-  // Gerenciar notificações sonoras para novas mensagens externas
+  // Gerenciar notificações sonoras APENAS quando uma conversa estiver selecionada
   const { resetNotificationState } = useMessageNotificationManager({
-    messages: displayMessages,
-    isOverlayOpen: true, // O overlay está sempre aberto quando este componente está renderizado
-    enabled: true
+    messages: selectedConversation ? displayMessages : [], // Só ativar quando conversa estiver selecionada
+    isOverlayOpen: !!selectedConversation, // Só considerar "aberto" quando conversa estiver selecionada
+    enabled: !!selectedConversation // Só habilitar quando conversa estiver selecionada
   });
 
   // Reset notification state when conversation changes
   useEffect(() => {
-    resetNotificationState();
+    if (selectedConversation) {
+      resetNotificationState();
+    }
   }, [selectedConversation, resetNotificationState]);
 
   const conversationForHeader: ConversationForHeader | null = selectedConvData ? {

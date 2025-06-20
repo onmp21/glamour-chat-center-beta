@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { MediaProcessor, MediaResult } from '@/services/MediaProcessor';
 import { MediaDownloadService } from '@/services/MediaDownloadService';
@@ -33,15 +34,18 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    console.log("🖼️ [MediaRendererFixed] Chamando processAsync para:", { content, messageType, messageId });
+    
+    console.log("🖼️ [MediaRendererFixed] Processing media:", { 
+      content: content?.substring(0, 100), 
+      messageType, 
+      messageId 
+    });
     
     MediaProcessor.processAsync(content, messageType).then(result => {
       if (mounted) {
+        console.log("🖼️ [MediaRendererFixed] Processing result:", result);
         setProcessedResult(result);
         setLoading(false);
-        if (result && !result.isProcessed) {
-          console.warn("[MediaRendererFixed] Não processou mídia:", result.error, {content});
-        }
       }
     });
     
@@ -112,18 +116,11 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   }
 
   if (!processedResult.isProcessed || !processedResult.url) {
-    console.warn("[MediaRendererFixed] Falha ao processar/renderizar mídia para mensagem:", messageId, processedResult);
+    console.warn("[MediaRendererFixed] Failed to process media for message:", messageId, processedResult);
     return renderError();
   }
 
   const { url, mimeType, type, size } = processedResult;
-
-  // Exibir apenas se URL está no storage público ou no bucket 'file'
-  // const isBucketUrl = url && url.startsWith('https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/');
-  // if (!isBucketUrl) {
-  //   console.warn("[MediaRendererFixed] URL da mídia NÃO É do storage do Supabase:", url);
-  //   return renderError();
-  // }
 
   // Renderizar áudio
   if (type === 'audio') {
@@ -379,4 +376,3 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     </div>
   );
 };
-

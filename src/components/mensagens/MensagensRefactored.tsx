@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,125 +38,61 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  // Usar dados estáticos dos canais sem polling constante
   const { channels: internalChannels } = useInternalChannels();
   const { getAccessibleChannels } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Carregar canais apenas uma vez na inicialização
-  const [canaisData, setCanaisData] = useState(() => {
-    if (user?.role === 'admin') {
-      return internalChannels
-        .filter(channel =>
-          channel.isActive &&
-          channel.name &&
-          channel.name.toLowerCase() !== 'pedro'
-        )
-        .map(channel => ({
-          id: channel.legacyId,
-          nome: channel.name,
-          tipo: channel.type === 'general' ? 'IA Assistant' :
-                channel.type === 'store' ? 'Loja' :
-                channel.type === 'manager' ? 'Gerente' : 'Canal',
-          status: 'ativo' as const,
-          conversasNaoLidas: 0,
-          ultimaAtividade: 'Online'
-        }));
-    } else {
-      const accessibleChannels = getAccessibleChannels();
-      return internalChannels
-        .filter(channel =>
-          channel.isActive &&
-          channel.name &&
-          channel.name.toLowerCase() !== 'pedro' &&
-          accessibleChannels.includes(channel.legacyId)
-        )
-        .map(channel => ({
-          id: channel.legacyId,
-          nome: channel.name,
-          tipo: channel.type === 'general' ? 'IA Assistant' :
-                channel.type === 'store' ? 'Loja' :
-                channel.type === 'manager' ? 'Gerente' : 'Canal',
-          status: 'ativo' as const,
-          conversasNaoLidas: 0,
-          ultimaAtividade: 'Online'
-        }));
-    }
-  });
+  // Memoizar dados dos canais para evitar re-renders desnecessários
+  const canaisData = useMemo(() => {
+    if (!internalChannels.length) return [];
 
-  // Atualizar canais apenas quando há mudanças reais nos dados
-  useEffect(() => {
-    if (internalChannels.length > 0) {
-      let newCanaisData = [];
-      if (user?.role === 'admin') {
-        newCanaisData = internalChannels
-          .filter(channel =>
-            channel.isActive &&
-            channel.name &&
-            channel.name.toLowerCase() !== 'pedro'
-          )
-          .map(channel => ({
-            id: channel.legacyId,
-            nome: channel.name,
-            tipo: channel.type === 'general' ? 'IA Assistant' :
-                  channel.type === 'store' ? 'Loja' :
-                  channel.type === 'manager' ? 'Gerente' : 'Canal',
-            status: 'ativo' as const,
-            conversasNaoLidas: 0,
-            ultimaAtividade: 'Online'
-          }));
-      } else {
-        const accessibleChannels = getAccessibleChannels();
-        newCanaisData = internalChannels
-          .filter(channel =>
-            channel.isActive &&
-            channel.name &&
-            channel.name.toLowerCase() !== 'pedro' &&
-            accessibleChannels.includes(channel.legacyId)
-          )
-          .map(channel => ({
-            id: channel.legacyId,
-            nome: channel.name,
-            tipo: channel.type === 'general' ? 'IA Assistant' :
-                  channel.type === 'store' ? 'Loja' :
-                  channel.type === 'manager' ? 'Gerente' : 'Canal',
-            status: 'ativo' as const,
-            conversasNaoLidas: 0,
-            ultimaAtividade: 'Online'
-          }));
-      }
-      
-      // Só atualizar se houve mudança real nos dados
-      if (JSON.stringify(newCanaisData) !== JSON.stringify(canaisData)) {
-        setCanaisData(newCanaisData);
-      }
-    }
+    const accessibleChannels = user?.role === 'admin' ? 
+      internalChannels.map(ch => ch.legacyId) : 
+      getAccessibleChannels();
+
+    return internalChannels
+      .filter(channel =>
+        channel.isActive &&
+        channel.name &&
+        channel.name.toLowerCase() !== 'pedro' &&
+        (user?.role === 'admin' || accessibleChannels.includes(channel.legacyId))
+      )
+      .map(channel => ({
+        id: channel.legacyId,
+        nome: channel.name,
+        tipo: channel.type === 'general' ? 'IA Assistant' :
+              channel.type === 'store' ? 'Loja' :
+              channel.type === 'manager' ? 'Gerente' : 'Canal',
+        status: 'ativo' as const,
+        conversasNaoLidas: 0,
+        ultimaAtividade: 'Online'
+      }));
   }, [internalChannels, user?.role, getAccessibleChannels]);
 
+  // Tratar parâmetros iniciais apenas uma vez
   useEffect(() => {
-    console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
-    
     if (initialChannel && initialPhone) {
-      const mappedInitialChannel = initialChannel;
-      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
-      setSelectedChannel(mappedInitialChannel);
+      console.log('🔍 [MENSAGENS] Opening channel from URL:', initialChannel);
+      setSelectedChannel(initialChannel);
     }
   }, [initialChannel, initialPhone]);
 
   const handleSendFile = async (file: File, caption?: string) => {
-    console.log('File sending handled by ChatOverlayRefactored');
+    console.log('📎 [MENSAGENS] File sending handled by ChatOverlayRefactored');
   };
 
   const handleSendAudio = async (audioBlob: Blob, duration: number) => {
-    console.log('Audio sending handled by ChatOverlayRefactored');
+    console.log('🎵 [MENSAGENS] Audio sending handled by ChatOverlayRefactored');
   };
 
   const handleChannelClick = (channelId: string) => {
+    console.log('📱 [MENSAGENS] Channel selected:', channelId);
     setSelectedChannel(channelId);
   };
 
   const handleCloseOverlay = () => {
+    console.log('❌ [MENSAGENS] Closing chat overlay');
     setSelectedChannel(null);
     const newUrl = "/?section=mensagens";
     window.history.replaceState({}, "", newUrl);
@@ -233,7 +169,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className={cn(
               "pl-10",
-              isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
+              isDarkMode ? "bg-[#18181b] border-[#3f3f46]"     : "bg-white border-gray-200"
             )}
           />
         </div>

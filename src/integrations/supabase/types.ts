@@ -385,7 +385,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -396,7 +395,6 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -407,7 +405,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -421,7 +418,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -432,7 +428,6 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message: string
           nome_do_contato?: string | null
@@ -443,7 +438,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -626,7 +620,7 @@ export type Database = {
         }
         Relationships: []
       }
-      teste_conversas_backup_20250619_180343: {
+      teste_conversas_backup_20250619_203220: {
         Row: {
           id: number | null
           is_read: boolean | null
@@ -662,7 +656,7 @@ export type Database = {
         }
         Relationships: []
       }
-      teste_conversas_backup_20250619_180344: {
+      teste_conversas_backup_20250620_044911: {
         Row: {
           id: number | null
           is_read: boolean | null
@@ -698,7 +692,7 @@ export type Database = {
         }
         Relationships: []
       }
-      teste_conversas_backup_20250619_180402: {
+      teste_conversas_backup_20250620_044913: {
         Row: {
           id: number | null
           is_read: boolean | null

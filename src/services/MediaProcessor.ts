@@ -1,3 +1,4 @@
+
 export interface MediaResult {
   isProcessed: boolean;
   url?: string;
@@ -15,12 +16,17 @@ export class MediaProcessor {
     }
 
     try {
-      // Regex para detectar URLs do Supabase Storage, incluindo o bucket 'file'
-      const supabaseStorageUrlRegex = /^https:\/\/uxccfhptochnfomurulr\.supabase\.co\/storage\/v1\/object\/(public\/)?file\//;
+      console.log('🔄 [MEDIA_PROCESSOR] Processing content:', {
+        contentLength: content.length,
+        messageType,
+        startsWithHttp: content.startsWith('http'),
+        startsWithData: content.startsWith('data:'),
+        startsWithFile: content.startsWith('file/')
+      });
 
-      // Se é uma URL completa, verificar se é do Supabase Storage ou externa
+      // Se é uma URL completa (incluindo URLs do Supabase Storage)
       if (content.startsWith('http')) {
-        console.log(`🔗 [MEDIA_PROCESSOR] URL detectada:`, content.substring(0, 50));
+        console.log(`🔗 [MEDIA_PROCESSOR] Processing URL:`, content.substring(0, 100));
         return {
           isProcessed: true,
           url: content,
@@ -29,10 +35,10 @@ export class MediaProcessor {
         };
       }
 
-      // Se é uma URL relativa (ex: file/yelena/...), tratar como Supabase Storage
+      // Se é uma URL relativa do storage (ex: file/yelena/...)
       if (content.startsWith('file/')) {
         const fullUrl = `https://uxccfhptochnfomurulr.supabase.co/storage/v1/object/public/${content}`;
-        console.log(`🔗 [MEDIA_PROCESSOR] URL relativa detectada, convertendo para:`, fullUrl.substring(0, 50));
+        console.log(`🔗 [MEDIA_PROCESSOR] Converting relative URL to:`, fullUrl.substring(0, 100));
         return {
           isProcessed: true,
           url: fullUrl,
@@ -43,7 +49,7 @@ export class MediaProcessor {
 
       // Se é data URL (base64), processar
       if (content.startsWith('data:')) {
-        console.log(`📄 [MEDIA_PROCESSOR] Data URL detectada:`, content.substring(0, 50));
+        console.log(`📄 [MEDIA_PROCESSOR] Processing data URL:`, content.substring(0, 50));
         const mimeType = this.extractMimeFromDataUrl(content);
         return {
           isProcessed: true,
@@ -57,7 +63,7 @@ export class MediaProcessor {
       if (this.looksLikeBase64(content)) {
         const mimeType = this.detectMimeType(content, messageType);
         const dataUrl = `data:${mimeType};base64,${content}`;
-        console.log(`🔄 [MEDIA_PROCESSOR] Base64 convertido para data URL:`, mimeType);
+        console.log(`🔄 [MEDIA_PROCESSOR] Converting base64 to data URL:`, mimeType);
         return {
           isProcessed: true,
           url: dataUrl,
@@ -67,9 +73,10 @@ export class MediaProcessor {
       }
 
       // Caso contrário, retornar como não processado
+      console.log('❌ [MEDIA_PROCESSOR] Content not recognized as media');
       return { isProcessed: false, error: 'Formato não reconhecido' };
     } catch (error) {
-      console.error('❌ [MEDIA_PROCESSOR] Erro no processamento assíncrono:', error);
+      console.error('❌ [MEDIA_PROCESSOR] Error processing:', error);
       return { isProcessed: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
     }
   }
@@ -176,7 +183,7 @@ export class MediaProcessor {
       case 'sticker':
         return 'sticker';
       default:
-        return ''; // Retorna vazio para que getTypeFromUrl possa tentar detectar
+        return '';
     }
   }
 
@@ -248,26 +255,4 @@ export class MediaProcessor {
         return '📎';
     }
   }
-
-  // Métodos síncronos mantidos para compatibilidade mas deprecados
-  static processAudio(content: string): MediaResult {
-    console.warn('⚠️ [MEDIA_PROCESSOR] processAudio() é deprecado, use processAsync()');
-    return { isProcessed: false, error: 'Método deprecado' };
-  }
-
-  static processImage(content: string): MediaResult {
-    console.warn('⚠️ [MEDIA_PROCESSOR] processImage() é deprecado, use processAsync()');
-    return { isProcessed: false, error: 'Método deprecado' };
-  }
-
-  static processVideo(content: string): MediaResult {
-    console.warn('⚠️ [MEDIA_PROCESSOR] processVideo() é deprecado, use processAsync()');
-    return { isProcessed: false, error: 'Método deprecado' };
-  }
-
-  static processDocument(content: string): MediaResult {
-    console.warn('⚠️ [MEDIA_PROCESSOR] processDocument() é deprecado, use processAsync()');
-    return { isProcessed: false, error: 'Método deprecado' };
-  }
 }
-
