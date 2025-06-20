@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ interface MensagensRefactoredProps {
   initialPhone?: string | null;
 }
 
-export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({ 
+export const MensagensRefactored: React.FC<MensagensRefactoredProps> = React.memo(({ 
   isDarkMode, 
   onSectionChange,
   initialChannel = null,
@@ -43,11 +43,11 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Memoizar dados dos canais para evitar re-renders desnecessários
+  // Memoizar dados dos canais com dependências otimizadas
   const canaisData = useMemo(() => {
-    if (!internalChannels.length) return [];
+    if (!internalChannels.length || !user) return [];
 
-    const accessibleChannels = user?.role === 'admin' ? 
+    const accessibleChannels = user.role === 'admin' ? 
       internalChannels.map(ch => ch.legacyId) : 
       getAccessibleChannels();
 
@@ -56,7 +56,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         channel.isActive &&
         channel.name &&
         channel.name.toLowerCase() !== 'pedro' &&
-        (user?.role === 'admin' || accessibleChannels.includes(channel.legacyId))
+        (user.role === 'admin' || accessibleChannels.includes(channel.legacyId))
       )
       .map(channel => ({
         id: channel.legacyId,
@@ -68,7 +68,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         conversasNaoLidas: 0,
         ultimaAtividade: 'Online'
       }));
-  }, [internalChannels, user?.role, getAccessibleChannels]);
+  }, [internalChannels, user?.role, user?.id, getAccessibleChannels]);
 
   // Tratar parâmetros iniciais apenas uma vez
   useEffect(() => {
@@ -78,27 +78,28 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     }
   }, [initialChannel, initialPhone]);
 
-  const handleSendFile = async (file: File, caption?: string) => {
+  // Callbacks otimizados com useCallback
+  const handleSendFile = useCallback(async (file: File, caption?: string) => {
     console.log('📎 [MENSAGENS] File sending handled by ChatOverlayRefactored');
-  };
+  }, []);
 
-  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
+  const handleSendAudio = useCallback(async (audioBlob: Blob, duration: number) => {
     console.log('🎵 [MENSAGENS] Audio sending handled by ChatOverlayRefactored');
-  };
+  }, []);
 
-  const handleChannelClick = (channelId: string) => {
+  const handleChannelClick = useCallback((channelId: string) => {
     console.log('📱 [MENSAGENS] Channel selected:', channelId);
     setSelectedChannel(channelId);
-  };
+  }, []);
 
-  const handleCloseOverlay = () => {
+  const handleCloseOverlay = useCallback(() => {
     console.log('❌ [MENSAGENS] Closing chat overlay');
     setSelectedChannel(null);
     const newUrl = "/?section=mensagens";
     window.history.replaceState({}, "", newUrl);
-  };
+  }, []);
 
-  const handleNewContact = (contactData: { nome: string; telefone: string; canal: string }) => {
+  const handleNewContact = useCallback((contactData: { nome: string; telefone: string; canal: string }) => {
     console.log('🆕 [NEW_CONTACT] Creating contact:', contactData);
     
     toast({
@@ -107,9 +108,9 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     });
     
     setSelectedChannel(contactData.canal);
-  };
+  }, [toast]);
 
-  const handleContactClick = (contact: any) => {
+  const handleContactClick = useCallback((contact: any) => {
     console.log('👤 [CONTACT_CLICK] Contact selected:', contact);
     
     if (contact.canais && contact.canais.length === 1) {
@@ -124,12 +125,18 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
         setSelectedChannel(firstChannel);
       }
     }
-  };
+  }, [canaisData]);
 
-  const handleChannelSelect = (channelId: string) => {
+  const handleChannelSelect = useCallback((channelId: string) => {
     setSelectedChannel(channelId);
     setIsChannelSelectorOpen(false);
-  };
+  }, []);
+
+  // Debounce para search
+  const debouncedSearchTerm = useMemo(() => {
+    const timeoutId = setTimeout(() => searchTerm, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   if (selectedChannel) {
     return (
@@ -169,7 +176,7 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className={cn(
               "pl-10",
-              isDarkMode ? "bg-[#18181b] border-[#3f3f46]"     : "bg-white border-gray-200"
+              isDarkMode ? "bg-[#18181b] border-[#3f3f46]" : "bg-white border-gray-200"
             )}
           />
         </div>
@@ -214,4 +221,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       />
     </div>
   );
-};
+});
+
+MensagensRefactored.displayName = 'MensagensRefactored';

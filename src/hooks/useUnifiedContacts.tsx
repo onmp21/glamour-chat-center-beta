@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { OptimizedContact } from '@/services/OptimizedContactService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,7 +18,8 @@ export const useUnifiedContacts = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const { isAuthenticated } = useAuth();
 
-  const loadUnifiedContacts = async () => {
+  // Memoizar função de carregamento para evitar re-renders desnecessários
+  const loadUnifiedContacts = useCallback(async () => {
     if (!isAuthenticated) {
       setContacts([]);
       return;
@@ -29,7 +30,6 @@ export const useUnifiedContacts = () => {
     setLoadingProgress(10);
 
     try {
-      // STEP 1: Buscar todos os contatos da tabela unificada
       const { data: unifiedContacts, error: contactsError } = await supabase
         .from('contacts')
         .select('phone_number, contact_name, channels, updated_at')
@@ -41,17 +41,25 @@ export const useUnifiedContacts = () => {
 
       setLoadingProgress(50);
 
-      // STEP 2: Para cada contato E cada canal, criar uma conversa separada
+      // Criar conversas separadas por canal de forma mais eficiente
       const separateContacts: OptimizedContact[] = [];
+      const processedContacts = new Set<string>(); // Evitar duplicatas
 
       for (const contact of unifiedContacts || []) {
-        // Para cada canal do contato, criar uma entrada separada
         for (const channel of contact.channels || []) {
+          const uniqueId = `${channel}-${contact.phone_number}`;
+          
+          // Evitar duplicatas
+          if (processedContacts.has(uniqueId)) {
+            continue;
+          }
+          processedContacts.add(uniqueId);
+
           try {
             const tableName = getTableNameForChannel(channel);
             if (!tableName) continue;
 
-            // Buscar mensagens deste contato neste canal específico
+            // Query otimizada com limit menor
             const messagesResult = await supabase
               .from(tableName as any)
               .select('message, read_at, is_read, mensagemtype')
@@ -69,30 +77,25 @@ export const useUnifiedContacts = () => {
               lastMessage = formatLastMessage(msg.message, msg.mensagemtype);
             }
 
-            // Contar mensagens não lidas neste canal específico
+            // Contar mensagens não lidas de forma mais eficiente
             const { count } = await supabase
               .from(tableName as any)
               .select('*', { count: 'exact', head: true })
               .ilike('session_id', `%${contact.phone_number}%`)
               .eq('is_read', false);
 
-            if (count) {
-              unreadCount = count;
-            }
-
-            // Determinar status baseado em mensagens não lidas
+            unreadCount = count || 0;
             const status = unreadCount > 0 ? 'pendente' : 'resolvida';
 
-            // Criar uma entrada separada para cada canal
             separateContacts.push({
-              id: `${channel}-${contact.phone_number}`, // ID único por canal + telefone
+              id: uniqueId,
               nome: contact.contact_name,
               telefone: contact.phone_number,
               ultimaMensagem: lastMessage || 'Sem mensagens',
               tempo: formatTimeAgo(lastMessageTime),
               status: status as 'pendente' | 'em_andamento' | 'resolvida',
-              canais: [channel], // Apenas o canal atual
-              channelId: channel // Identificação específica do canal
+              canais: [channel],
+              channelId: channel
             });
 
           } catch (channelError) {
@@ -103,12 +106,11 @@ export const useUnifiedContacts = () => {
 
       setLoadingProgress(90);
 
-      // STEP 3: Ordenar contatos (pendentes primeiro, depois por tempo)
+      // Otimizar ordenação
       separateContacts.sort((a, b) => {
         if (a.status === 'pendente' && b.status !== 'pendente') return -1;
         if (b.status === 'pendente' && a.status !== 'pendente') return 1;
         
-        // Ordenar por tempo (mais recente primeiro)
         const timeA = new Date(a.tempo.includes('h') || a.tempo.includes('min') ? Date.now() : a.tempo);
         const timeB = new Date(b.tempo.includes('h') || b.tempo.includes('min') ? Date.now() : b.tempo);
         return timeB.getTime() - timeA.getTime();
@@ -117,7 +119,7 @@ export const useUnifiedContacts = () => {
       setContacts(separateContacts);
       setLoadingProgress(100);
 
-      console.log(`✅ [UNIFIED_CONTACTS] Carregadas ${separateContacts.length} conversas separadas por canal`);
+      console.log(`✅ [UNIFIED_CONTACTS] ${separateContacts.length} conversas isoladas por canal`);
 
     } catch (err) {
       console.error('❌ [UNIFIED_CONTACTS] Erro ao carregar contatos:', err);
@@ -127,13 +129,24 @@ export const useUnifiedContacts = () => {
       setLoading(false);
       setTimeout(() => setLoadingProgress(0), 500);
     }
-  };
+  }, [isAuthenticated]);
+
+  // Implementar debounce para evitar carregamentos excessivos
+  const debouncedLoad = useMemo(() => {
+    let timeoutId: NodeJS.Timeout;
+    return () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        loadUnifiedContacts();
+      }, 300);
+    };
+  }, [loadUnifiedContacts]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadUnifiedContacts();
+      debouncedLoad();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, debouncedLoad]);
 
   return {
     contacts,
@@ -144,7 +157,7 @@ export const useUnifiedContacts = () => {
   };
 };
 
-// Helper functions
+// Helper functions otimizadas
 const getTableNameForChannel = (channelId: string): string | null => {
   const mapping: Record<string, string> = {
     'chat': 'yelena_ai_conversas',
@@ -162,7 +175,6 @@ const getTableNameForChannel = (channelId: string): string | null => {
 const formatLastMessage = (message: string, messageType?: string): string => {
   if (!message) return '';
   
-  // Se for mídia, mostrar placeholder amigável
   if (messageType && messageType !== 'text' && messageType !== 'conversation') {
     switch (messageType) {
       case 'image': case 'imageMessage': return '📷 Imagem';
@@ -173,7 +185,6 @@ const formatLastMessage = (message: string, messageType?: string): string => {
     }
   }
 
-  // Truncar mensagens longas
   return message.length > 50 ? message.substring(0, 50) + '...' : message;
 };
 

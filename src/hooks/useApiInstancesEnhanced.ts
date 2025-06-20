@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ApiInstance, ApiInstanceWithConnection } from '@/types/domain/api/ApiInstance';
 
@@ -23,7 +23,17 @@ export const useApiInstancesEnhanced = () => {
   const [loading, setLoading] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState<string | null>(null);
 
-  const fetchInstances = async () => {
+  // Cache para evitar múltiplas requisições
+  const [lastFetch, setLastFetch] = useState<number>(0);
+  const CACHE_DURATION = 30000; // 30 segundos
+
+  const fetchInstances = useCallback(async (forceRefresh = false) => {
+    const now = Date.now();
+    if (!forceRefresh && now - lastFetch < CACHE_DURATION) {
+      console.log('🔄 [API_INSTANCES] Using cached data');
+      return;
+    }
+
     console.log('🔄 [API_INSTANCES] Carregando instâncias...');
     setLoading(true);
     
@@ -44,17 +54,17 @@ export const useApiInstancesEnhanced = () => {
       }
 
       console.log('✅ [API_INSTANCES] Instâncias carregadas:', data?.length || 0);
-      // Ensure the data conforms to ApiInstanceWithConnection type
       const formattedInstances: ApiInstanceWithConnection[] = (data || []).map(instance => ({
         ...instance,
         created_at: instance.created_at || new Date().toISOString(),
       }));
-      setInstances(formattedInstances);
       
-      // CORRIGIDO: Resetar sempre antes de buscar novas instâncias
+      setInstances(formattedInstances);
+      setLastFetch(now);
+      
+      // Resetar instâncias do Evolution antes de buscar novas
       setEvolutionInstances([]);
       
-      // Buscar instâncias do Evolution API com melhor tratamento de erro
       if (formattedInstances && formattedInstances.length > 0) {
         await fetchEvolutionInstances(formattedInstances);
       }
@@ -68,88 +78,95 @@ export const useApiInstancesEnhanced = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [lastFetch]);
 
-  const fetchEvolutionInstances = async (apiInstances: ApiInstance[]) => {
-    console.log('🔄 [EVOLUTION_INSTANCES] Buscando instâncias do Evolution API...');
-    
-    const allEvolutionInstances: EvolutionInstance[] = [];
-    
-    for (const apiInstance of apiInstances) {
-      try {
-        console.log(`📡 [EVOLUTION_INSTANCES] Verificando instâncias para: ${apiInstance.base_url}`);
+  // Memoizar função de fetch das instâncias Evolution
+  const fetchEvolutionInstances = useMemo(() => 
+    async (apiInstances: ApiInstance[]) => {
+      console.log('🔄 [EVOLUTION_INSTANCES] Buscando instâncias do Evolution API...');
+      
+      const allEvolutionInstances: EvolutionInstance[] = [];
+      
+      // Limitar processamento paralelo para evitar sobrecarga
+      const MAX_CONCURRENT = 3;
+      for (let i = 0; i < apiInstances.length; i += MAX_CONCURRENT) {
+        const batch = apiInstances.slice(i, i + MAX_CONCURRENT);
         
-        // CORRIGIDO: Adicionar timeout e melhor tratamento de erro
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-        
-        const response =  fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
-          method: 'GET',
-          headers: {
-            'apikey': apiInstance.api_key,
-            'Content-Type': 'application/json'
-          },
-          signal: controller.signal
+        const batchPromises = batch.map(async (apiInstance) => {
+          try {
+            console.log(`📡 [EVOLUTION_INSTANCES] Verificando: ${apiInstance.base_url}`);
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // Reduzir timeout
+            
+            const response = await fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
+              method: 'GET',
+              headers: {
+                'apikey': apiInstance.api_key,
+                'Content-Type': 'application/json'
+              },
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              console.error(`❌ [EVOLUTION_INSTANCES] HTTP ${response.status} para ${apiInstance.base_url}`);
+              return [];
+            }
+
+            const data = await response.json();
+            console.log(`✅ [EVOLUTION_INSTANCES] Dados de ${apiInstance.base_url}:`, data);
+            
+            if (Array.isArray(data)) {
+              return data.map((item: any) => ({
+                instanceName: item.instance?.instanceName || item.instanceName || 'Sem nome',
+                instanceId: item.instance?.instanceId || item.instanceId || '',
+                owner: item.instance?.owner || item.owner,
+                profileName: item.instance?.profileName || item.profileName,
+                profilePictureUrl: item.instance?.profilePictureUrl || item.profilePictureUrl,
+                profileStatus: item.instance?.profileStatus || item.profileStatus,
+                status: item.instance?.status || item.status || 'unknown',
+                serverUrl: item.instance?.serverUrl || apiInstance.base_url,
+                apikey: item.instance?.apikey || apiInstance.api_key,
+                apiInstanceId: apiInstance.id
+              }));
+            }
+            
+            return [];
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.error(`⏱️ [EVOLUTION_INSTANCES] Timeout: ${apiInstance.base_url}`);
+            } else {
+              console.error(`❌ [EVOLUTION_INSTANCES] Erro: ${apiInstance.base_url}:`, error);
+            }
+            return [];
+          }
         });
 
-        clearTimeout(timeoutId);
-
-        const result = await response;
-        if (!result.ok) {
-          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${result.status} para ${apiInstance.base_url}: ${result.statusText}`);
-          continue;
-        }
-
-        const data = await result.json();
-        console.log(`✅ [EVOLUTION_INSTANCES] Instâncias recebidas de ${apiInstance.base_url}:`, data);
-        
-        if (Array.isArray(data)) {
-          const formattedInstances = data.map((item: any) => ({
-            instanceName: item.instance?.instanceName || item.instanceName || 'Sem nome',
-            instanceId: item.instance?.instanceId || item.instanceId || '',
-            owner: item.instance?.owner || item.owner,
-            profileName: item.instance?.profileName || item.profileName,
-            profilePictureUrl: item.instance?.profilePictureUrl || item.profilePictureUrl,
-            profileStatus: item.instance?.profileStatus || item.profileStatus,
-            status: item.instance?.status || item.status || 'unknown',
-            serverUrl: item.instance?.serverUrl || apiInstance.base_url,
-            apikey: item.instance?.apikey || apiInstance.api_key,
-            apiInstanceId: apiInstance.id
-          }));
-          
-          allEvolutionInstances.push(...formattedInstances);
-          console.log(`📊 [EVOLUTION_INSTANCES] ${formattedInstances.length} instâncias processadas de ${apiInstance.base_url}`);
-        } else {
-          console.log(`⚠️ [EVOLUTION_INSTANCES] Resposta não é um array de ${apiInstance.base_url}:`, typeof data);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          console.error(`⏱️ [EVOLUTION_INSTANCES] Timeout ao buscar instâncias de ${apiInstance.base_url}`);
-        } else {
-          console.error(`❌ [EVOLUTION_INSTANCES] Erro ao buscar instâncias de ${apiInstance.base_url}:`, error);
-        }
+        const batchResults = await Promise.all(batchPromises);
+        allEvolutionInstances.push(...batchResults.flat());
       }
-    }
-    
-    console.log('✅ [EVOLUTION_INSTANCES] Total de instâncias encontradas:', allEvolutionInstances.length);
-    setEvolutionInstances(allEvolutionInstances);
-  };
+      
+      console.log('✅ [EVOLUTION_INSTANCES] Total encontradas:', allEvolutionInstances.length);
+      setEvolutionInstances(allEvolutionInstances);
+    }, []
+  );
 
-  const checkConnectionStatus = async (instance: ApiInstanceWithConnection) => {
-    console.log('🔍 [API_INSTANCES] Verificando status da instância:', instance.instance_name);
+  const checkConnectionStatus = useCallback(async (instance: ApiInstanceWithConnection) => {
+    console.log('🔍 [API_INSTANCES] Verificando status:', instance.instance_name);
     setCheckingStatus(instance.id);
     
     try {
-      // CORRIGIDO: Usar import dinâmico ao invés de require
       const { ApiInstanceService } = await import("@/services/ApiInstanceService");
       const service = new ApiInstanceService();
 
       const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id);
-      console.log("📡 [API_INSTANCES] Detalhes de conexão recebidos:", connectionDetails);
+      console.log("📡 [API_INSTANCES] Detalhes recebidos:", connectionDetails);
       
       setInstances(prev => prev.map(inst => 
         inst.id === instance.id 
-           ? { ...inst, connection_status: connectionDetails?.connection_status, qr_code: connectionDetails?.qr_code || null }
+          ? { ...inst, connection_status: connectionDetails?.connection_status, qr_code: connectionDetails?.qr_code || null }
           : inst
       ));
 
@@ -168,9 +185,9 @@ export const useApiInstancesEnhanced = () => {
     } finally {
       setCheckingStatus(null);
     }
-  };
+  }, []);
 
-  const deleteInstance = async (instance: ApiInstanceWithConnection) => {
+  const deleteInstance = useCallback(async (instance: ApiInstanceWithConnection) => {
     console.log('🗑️ [API_INSTANCES] Deletando instância:', instance.instance_name);
     
     try {
@@ -195,22 +212,22 @@ export const useApiInstancesEnhanced = () => {
         description: "Instância deletada com sucesso",
       });
 
-      fetchInstances();
+      fetchInstances(true); // Force refresh
     } catch (error) {
       console.error('❌ [API_INSTANCES] Erro inesperado ao deletar:', error);
     }
-  };
+  }, [fetchInstances]);
 
   useEffect(() => {
     fetchInstances();
-  }, []);
+  }, [fetchInstances]);
 
   return {
     instances,
     evolutionInstances,
     loading,
     checkingStatus,
-    fetchInstances,
+    fetchInstances: () => fetchInstances(true),
     checkConnectionStatus,
     deleteInstance
   };
