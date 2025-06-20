@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, AlertCircle, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,21 +37,26 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
   useEffect(() => {
     console.log('🎵 [WHATSAPP_AUDIO_PLAYER] Processing audio for message:', messageId);
     
-    const result = MediaProcessor.processAudio(audioContent);
-    
-    if (result.isProcessed && result.url) {
-      console.log('✅ [WHATSAPP_AUDIO_PLAYER] Audio processed successfully:', {
-        messageId,
-        mimeType: result.mimeType,
-        size: result.size
-      });
-      setAudioUrl(result.url);
-      setHasError(false);
-    } else {
-      console.error('❌ [WHATSAPP_AUDIO_PLAYER] Failed to process audio:', result.error);
+    // Use processAsync instead of processAudio
+    MediaProcessor.processAsync(audioContent, 'audio').then(result => {
+      if (result.isProcessed && result.url) {
+        console.log('✅ [WHATSAPP_AUDIO_PLAYER] Audio processed successfully:', {
+          messageId,
+          mimeType: result.mimeType,
+          size: result.size
+        });
+        setAudioUrl(result.url);
+        setHasError(false);
+      } else {
+        console.error('❌ [WHATSAPP_AUDIO_PLAYER] Failed to process audio:', result.error);
+        setHasError(true);
+        onError?.();
+      }
+    }).catch(error => {
+      console.error('❌ [WHATSAPP_AUDIO_PLAYER] Processing error:', error);
       setHasError(true);
       onError?.();
-    }
+    });
   }, [audioContent, messageId, onError]);
 
   // Configurar eventos do áudio quando URL estiver disponível
@@ -384,4 +390,3 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
     </div>
   );
 };
-

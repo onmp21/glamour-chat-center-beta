@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/components/theme-provider';
 import {
   Settings,
   Wifi,
@@ -43,8 +42,15 @@ interface QrCodeModal {
   loading: boolean;
 }
 
-export const EvolutionApiSettings: React.FC = () => {
-  const { isDarkMode } = useTheme();
+interface EvolutionApiSettingsProps {
+  isDarkMode?: boolean;
+  channelId?: string;
+}
+
+export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({ 
+  isDarkMode = false,
+  channelId = "default"
+}) => {
   const { toast } = useToast();
   const { channels: availableChannels } = useInternalChannels();
 
@@ -117,7 +123,8 @@ export const EvolutionApiSettings: React.FC = () => {
     try {
       const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey
+        apiKey: apiConnection.apiKey,
+        instanceName: 'temp' // Temporary instance name for validation
       });
 
       const result = await service.validateConnection();
@@ -158,7 +165,8 @@ export const EvolutionApiSettings: React.FC = () => {
     try {
       const service = new EvolutionApiService({
         baseUrl,
-        apiKey
+        apiKey,
+        instanceName: 'temp' // Temporary instance name for listing
       });
 
       const result = await service.listInstances();
@@ -198,7 +206,7 @@ export const EvolutionApiSettings: React.FC = () => {
 
     setCreatingInstance(true);
     try {
-           const service = new EvolutionApiService({
+      const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
         instanceName: newInstanceName
@@ -255,7 +263,7 @@ export const EvolutionApiSettings: React.FC = () => {
     try {
       const selectedChannel = availableChannels.find(c => c.id === selectedChannelForMapping);
       
-      const mapping: ChannelInstanceMapping = {
+      const mapping: Partial<ChannelInstanceMapping> = {
         channel_id: selectedChannelForMapping,
         instance_id: selectedInstanceForMapping,
         instance_name: selectedInstanceForMapping,
@@ -265,7 +273,7 @@ export const EvolutionApiSettings: React.FC = () => {
         is_active: true
       };
 
-      await channelMappingService.createMapping(mapping);
+      await channelMappingService.createMapping(mapping as ChannelInstanceMapping);
 
       // Configurar webhook para a instância recém-vinculada
       const evolutionService = new EvolutionApiService({
@@ -280,7 +288,6 @@ export const EvolutionApiSettings: React.FC = () => {
         toast({
           title: "Aviso",
           description: `Canal vinculado, mas houve um erro ao configurar o webhook: ${webhookResult.error}`,
-          variant: "warning"
         });
       } else {
         toast({
@@ -337,7 +344,7 @@ export const EvolutionApiSettings: React.FC = () => {
     }
   };
 
-  const logoutInstance = async (instanceName: string) => {
+  const disconnectInstance = async (instanceName: string) => {
     setLoggingOutInstance(instanceName);
     try {
       const service = new EvolutionApiService({
@@ -346,7 +353,7 @@ export const EvolutionApiSettings: React.FC = () => {
         instanceName
       });
 
-      const result = await service.logoutInstance(instanceName);
+      const result = await service.disconnectInstance(instanceName);
       
       if (result.success) {
         toast({
@@ -568,7 +575,7 @@ export const EvolutionApiSettings: React.FC = () => {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => logoutInstance(instance.instanceName)}
+                          onClick={() => disconnectInstance(instance.instanceName)}
                           disabled={loggingOutInstance === instance.instanceName}
                           className={cn(
                             isDarkMode ? "border-[#3f3f46] text-white hover:bg-[#3f3f46]" : "border-gray-300 hover:bg-gray-200"
@@ -728,16 +735,9 @@ export const EvolutionApiSettings: React.FC = () => {
             ) : (
               <p className="text-red-500">Não foi possível carregar o QR Code.</p>
             )}
-            {qrCodeModal.pairingCode && (
-              <p className="mt-4 text-center text-sm">
-                Ou use o código de pareamento: <span className="font-bold">{qrCodeModal.pairingCode}</span>
-              </p>
-            )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 };
-
-

@@ -1,3 +1,4 @@
+
 export interface ApiInstance {
   id?: string;
   instance_name: string;
@@ -5,10 +6,11 @@ export interface ApiInstance {
   api_key: string;
   created_at?: string;
   updated_at?: string;
+  connection_status?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
+  qr_code?: string;
 }
 
 export interface ApiInstanceWithConnection extends ApiInstance {
   qr_code?: string;
   connection_status?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
 }
-

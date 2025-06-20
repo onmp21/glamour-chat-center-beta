@@ -13,7 +13,6 @@ export const EvolutionAPIFullSection: React.FC<EvolutionAPIFullSectionProps> = (
     <div className="space-y-6">
       <EvolutionApiSettings 
         isDarkMode={isDarkMode}
-        channelId="default"
       />
     </div>
   );

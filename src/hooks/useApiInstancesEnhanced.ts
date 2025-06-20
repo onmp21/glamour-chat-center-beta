@@ -2,16 +2,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
-interface ApiInstance {
-  id: string;
-  instance_name: string;
-  base_url: string;
-  api_key: string;
-  created_at: string;
-  connection_status?: 'connected' | 'disconnected' | 'connecting';
-  qr_code?: string;
-}
+import { ApiInstance, ApiInstanceWithConnection } from '@/types/domain/api/ApiInstance';
 
 interface EvolutionInstance {
   instanceName: string;
@@ -27,7 +18,7 @@ interface EvolutionInstance {
 }
 
 export const useApiInstancesEnhanced = () => {
-  const [instances, setInstances] = useState<ApiInstance[]>([]);
+  const [instances, setInstances] = useState<ApiInstanceWithConnection[]>([]);
   const [evolutionInstances, setEvolutionInstances] = useState<EvolutionInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingStatus, setCheckingStatus] = useState<string | null>(null);
@@ -87,7 +78,7 @@ export const useApiInstancesEnhanced = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
         
-        const response = await fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
+        const response =  fetch(`${apiInstance.base_url}/instance/fetchInstances`, {
           method: 'GET',
           headers: {
             'apikey': apiInstance.api_key,
@@ -98,12 +89,13 @@ export const useApiInstancesEnhanced = () => {
 
         clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${response.status} para ${apiInstance.base_url}: ${response.statusText}`);
+        const result = await response;
+        if (!result.ok) {
+          console.error(`❌ [EVOLUTION_INSTANCES] Erro HTTP ${result.status} para ${apiInstance.base_url}: ${result.statusText}`);
           continue;
         }
 
-        const data = await response.json();
+        const data = await result.json();
         console.log(`✅ [EVOLUTION_INSTANCES] Instâncias recebidas de ${apiInstance.base_url}:`, data);
         
         if (Array.isArray(data)) {
@@ -138,21 +130,21 @@ export const useApiInstancesEnhanced = () => {
     setEvolutionInstances(allEvolutionInstances);
   };
 
-  const checkConnectionStatus = async (instance: ApiInstance) => {
+  const checkConnectionStatus = async (instance: ApiInstanceWithConnection) => {
     console.log('🔍 [API_INSTANCES] Verificando status da instância:', instance.instance_name);
-    setCheckingStatus(instance.id);
+    setCheckingStatus(instance.id || '');
     
     try {
       // CORRIGIDO: Usar import dinâmico ao invés de require
       const { ApiInstanceService } = await import("@/services/ApiInstanceService");
       const service = new ApiInstanceService();
 
-      const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id);
+      const connectionDetails = await service.getInstanceWithConnectionDetails(instance.id || '');
       console.log("📡 [API_INSTANCES] Detalhes de conexão recebidos:", connectionDetails);
       
       setInstances(prev => prev.map(inst => 
         inst.id === instance.id 
-           ? { ...inst, connection_status: connectionDetails?.connection_status, qr_code: connectionDetails?.qrCode || null }
+           ? { ...inst, connection_status: connectionDetails?.connection_status, qr_code: connectionDetails?.qr_code || null }
           : inst
       ));
 
@@ -173,7 +165,7 @@ export const useApiInstancesEnhanced = () => {
     }
   };
 
-  const deleteInstance = async (instance: ApiInstance) => {
+  const deleteInstance = async (instance: ApiInstanceWithConnection) => {
     console.log('🗑️ [API_INSTANCES] Deletando instância:', instance.instance_name);
     
     try {
