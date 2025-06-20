@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CreateChannelData {
@@ -136,7 +137,7 @@ export class ChannelManagementService {
     }
   }
 
-  static async deleteChannel(channelId: string): Promise<ChannelDeleteResult> {
+  async deleteChannel(channelId: string): Promise<ChannelDeleteResult> {
     console.log('🗑️ [CHANNEL_MANAGEMENT] Iniciando exclusão do canal:', channelId);
     
     try {
@@ -210,7 +211,7 @@ export class ChannelManagementService {
     }
   }
 
-  static async reactivateChannel(channelId: string): Promise<ChannelDeleteResult> {
+  async reactivateChannel(channelId: string): Promise<ChannelDeleteResult> {
     console.log('🔄 [CHANNEL_MANAGEMENT] Reativando canal:', channelId);
     
     try {
@@ -251,7 +252,7 @@ export class ChannelManagementService {
     }
   }
 
-  private static async logChannelOperation(operation: string, channelId: string, details: any) {
+  private async logChannelOperation(operation: string, channelId: string, details: any) {
     try {
       await supabase.from('audit_logs').insert({
         user_name: 'Sistema',
@@ -265,7 +266,7 @@ export class ChannelManagementService {
     }
   }
 
-  static async getChannelStats(channelId: string) {
+  async getChannelStats(channelId: string) {
     try {
       const { data: channel } = await supabase
         .from('channels')
