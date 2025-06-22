@@ -1,4 +1,3 @@
-
 interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
@@ -317,13 +316,42 @@ export class EvolutionApiService {
     }
   }
 
+  async getWebhook(): Promise<ApiResponse> {
+    try {
+      console.log('🔍 [EVOLUTION_API_SERVICE] Getting webhook for:', this.config.instanceName);
+      
+      const response = await fetch(`${this.getBaseUrl()}/webhook/find/${this.config.instanceName}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [EVOLUTION_API_SERVICE] Webhook retrieved:', data);
+      
+      return {
+        success: true,
+        webhook: data
+      };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get webhook:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao obter webhook'
+      };
+    }
+  }
+
   async setWebhook(webhookUrl?: string, events?: string[]): Promise<ApiResponse> {
     try {
       console.log('🔗 [EVOLUTION_API_SERVICE] Setting webhook for:', this.config.instanceName);
       
       const defaultWebhookUrl = webhookUrl || 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
       
-      // Eventos mínimos conforme solicitado: Webhook, Base64, GROUPS_UPSERT, MESSAGES_UPSERT
+      // Eventos mínimos conforme solicitado: Webhook Base64, GROUPS_UPSERT, MESSAGES_UPSERT
       const defaultEvents = events || [
         'MESSAGES_UPSERT',
         'GROUPS_UPSERT'
