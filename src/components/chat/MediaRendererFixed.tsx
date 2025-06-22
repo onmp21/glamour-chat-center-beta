@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Download, FileText, Play, Volume2, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Download, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface MediaRendererFixedProps {
@@ -29,65 +29,23 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
       messageType,
       contentLength: content?.length || 0,
       isStorageUrl: content?.includes('supabase.co/storage'),
-      isDataUrl: content?.startsWith('data:')
+      isDataUrl: content?.startsWith('data:'),
+      isHttpUrl: content?.startsWith('http')
     });
 
     setIsLoading(true);
     setMediaError(false);
 
-    // PRIORIDADE 1: URL do Supabase Storage (novo sistema)
+    // PRIORIDADE ÚNICA: URL do Supabase Storage ou HTTP URLs
     if (content && (content.startsWith('http') || content.includes('supabase.co/storage'))) {
-      console.log('✅ [MEDIA_RENDERER_FIXED] Using Storage URL directly');
+      console.log('✅ [MEDIA_RENDERER_FIXED] Using Storage/HTTP URL directly');
       setMediaUrl(content);
       setIsLoading(false);
       return;
     }
 
-    // PRIORIDADE 2: Data URL base64 (sistema antigo - compatibilidade)
-    if (content && content.startsWith('data:')) {
-      console.log('✅ [MEDIA_RENDERER_FIXED] Using Data URL (base64)');
-      setMediaUrl(content);
-      setIsLoading(false);
-      return;
-    }
-
-    // PRIORIDADE 3: Base64 puro (precisa processar)
-    if (content && content.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(content.replace(/\s/g, ''))) {
-      console.log('🔄 [MEDIA_RENDERER_FIXED] Processing raw base64');
-      try {
-        // Detectar MIME type baseado no messageType ou conteúdo
-        let mimeType = 'application/octet-stream';
-        
-        if (messageType) {
-          switch (messageType.toLowerCase()) {
-            case 'image': mimeType = 'image/jpeg'; break;
-            case 'audio': mimeType = 'audio/mpeg'; break;
-            case 'video': mimeType = 'video/mp4'; break;
-            case 'document': 
-            case 'file': mimeType = 'application/pdf'; break;
-          }
-        } else {
-          // Auto-detectar baseado no início do base64
-          if (content.startsWith('/9j/')) mimeType = 'image/jpeg';
-          else if (content.startsWith('iVBORw')) mimeType = 'image/png';
-          else if (content.startsWith('SUQz') || content.startsWith('//uQ')) mimeType = 'audio/mpeg';
-          else if (content.startsWith('AAAAGG')) mimeType = 'video/mp4';
-          else if (content.startsWith('JVBERi')) mimeType = 'application/pdf';
-        }
-
-        const dataUrl = `data:${mimeType};base64,${content}`;
-        setMediaUrl(dataUrl);
-        console.log('✅ [MEDIA_RENDERER_FIXED] Base64 processed successfully');
-      } catch (error) {
-        console.error('❌ [MEDIA_RENDERER_FIXED] Error processing base64:', error);
-        setMediaError(true);
-      }
-      setIsLoading(false);
-      return;
-    }
-
-    // Caso não seja mídia reconhecível
-    console.log('⚠️ [MEDIA_RENDERER_FIXED] Content not recognized as media');
+    // Se não é URL válida, considerar erro
+    console.log('⚠️ [MEDIA_RENDERER_FIXED] Content not recognized as valid media URL');
     setMediaError(true);
     setIsLoading(false);
   }, [content, messageType, messageId]);
@@ -95,15 +53,11 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   const getMediaType = () => {
     if (messageType) return messageType.toLowerCase();
     
-    // Auto-detectar baseado na URL ou conteúdo
-    if (mediaUrl.includes('image') || mediaUrl.includes('data:image') || 
-        mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/i)) return 'image';
-    if (mediaUrl.includes('audio') || mediaUrl.includes('data:audio') || 
-        mediaUrl.match(/\.(mp3|ogg|wav|m4a)($|\?)/i)) return 'audio';
-    if (mediaUrl.includes('video') || mediaUrl.includes('data:video') || 
-        mediaUrl.match(/\.(mp4|avi|mov|wmv)($|\?)/i)) return 'video';
-    if (mediaUrl.includes('document') || mediaUrl.includes('application/pdf') || 
-        mediaUrl.match(/\.(pdf|doc|docx|txt)($|\?)/i)) return 'document';
+    // Auto-detectar baseado na URL
+    if (mediaUrl.includes('image') || mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/i)) return 'image';
+    if (mediaUrl.includes('audio') || mediaUrl.match(/\.(mp3|ogg|wav|m4a)($|\?)/i)) return 'audio';
+    if (mediaUrl.includes('video') || mediaUrl.match(/\.(mp4|avi|mov|wmv)($|\?)/i)) return 'video';
+    if (mediaUrl.includes('document') || mediaUrl.match(/\.(pdf|doc|docx|txt)($|\?)/i)) return 'document';
     
     return 'file';
   };
@@ -141,7 +95,7 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
         isDarkMode ? "border-red-700 bg-red-900/20" : "border-red-200 bg-red-50"
       )}>
         <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-        <span className="text-sm text-red-600">Erro ao carregar mídia</span>
+        <span className="text-sm text-red-600">URL de mídia inválida ou não encontrada</span>
       </div>
     );
   }
@@ -178,7 +132,6 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
           "flex items-center space-x-3 p-3 rounded-lg border",
           isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-200 bg-gray-50"
         )}>
-          <Volume2 className="h-5 w-5 text-blue-500" />
           <div className="flex-1">
             <audio controls className="w-full">
               <source src={mediaUrl} />

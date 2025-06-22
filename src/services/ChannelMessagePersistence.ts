@@ -6,7 +6,7 @@ import { ChannelUuidResolver } from './ChannelUuidResolver';
 export class ChannelMessagePersistence {
   static async saveMessageToChannel(channelId: string, message: RawMessage): Promise<void> {
     const tableMapping: Record<string, string> = {
-      // UUIDs padrão dos canais (ajuste para seus UUIDs se necessário)
+      // UUIDs padrão dos canais
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
       '011b69ba-cf25-4f63-af2e-4ad0260d9516': 'canarana_conversas',
       'b7996f75-41a7-4725-8229-564f31868027': 'souto_soares_conversas',
@@ -14,7 +14,7 @@ export class ChannelMessagePersistence {
       '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas',
       'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas',
       'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas',
-      // Nomes legados e nomes "amigáveis"
+      // Nomes legados
       'yelena': 'yelena_ai_conversas',
       'chat': 'yelena_ai_conversas',
       'canarana': 'canarana_conversas',
@@ -31,7 +31,7 @@ export class ChannelMessagePersistence {
       throw new Error('Canal não encontrado para salvar mensagens');
     }
 
-    // Construir a mensagem para o banco - PRIORIZAR media_url
+    // Construir a mensagem para o banco - APENAS Storage URLs
     const dbMessage: any = {
       session_id: message.session_id,
       message: message.message,
@@ -41,82 +41,59 @@ export class ChannelMessagePersistence {
       tipo_remetente: message.tipo_remetente,
     };
 
-    // NOVA LÓGICA: Priorizar media_url sobre media_base64
+    // NOVA LÓGICA SIMPLIFICADA: Apenas Storage URLs
     if (message.media_url && typeof message.media_url === "string" && message.media_url.trim() !== "") {
-      // Se temos media_url, usar ela diretamente
-      dbMessage.media_url = message.media_url.trim();
-      
-      // Definir tipo de mensagem baseado na URL se não especificado
-      if (dbMessage.mensagemtype === "text" || !dbMessage.mensagemtype) {
-        const url = message.media_url.toLowerCase();
-        if (url.includes('image') || url.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
-          dbMessage.mensagemtype = "image";
-        } else if (url.includes('audio') || url.match(/\.(mp3|ogg|wav|m4a)$/)) {
-          dbMessage.mensagemtype = "audio";
-        } else if (url.includes('video') || url.match(/\.(mp4|avi|mov|wmv)$/)) {
-          dbMessage.mensagemtype = "video";
-        } else if (url.includes('document') || url.match(/\.(pdf|doc|docx|txt)$/)) {
-          dbMessage.mensagemtype = "document";
-        } else {
-          dbMessage.mensagemtype = "file";
+      // Verificar se é URL válida (HTTP ou Storage)
+      const url = message.media_url.trim();
+      if (url.startsWith('http') || url.includes('supabase.co/storage')) {
+        dbMessage.media_url = url;
+        
+        // Definir tipo de mensagem baseado na URL se não especificado
+        if (dbMessage.mensagemtype === "text" || !dbMessage.mensagemtype) {
+          const lowerUrl = url.toLowerCase();
+          if (lowerUrl.includes('image') || lowerUrl.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/)) {
+            dbMessage.mensagemtype = "image";
+          } else if (lowerUrl.includes('audio') || lowerUrl.match(/\.(mp3|ogg|wav|m4a)($|\?)/)) {
+            dbMessage.mensagemtype = "audio";
+          } else if (lowerUrl.includes('video') || lowerUrl.match(/\.(mp4|avi|mov|wmv)($|\?)/)) {
+            dbMessage.mensagemtype = "video";
+          } else if (lowerUrl.includes('document') || lowerUrl.match(/\.(pdf|doc|docx|txt)($|\?)/)) {
+            dbMessage.mensagemtype = "document";
+          } else {
+            dbMessage.mensagemtype = "file";
+          }
         }
-      }
 
-      // Placeholder para mensagem se não houver caption
-      if (!dbMessage.message || dbMessage.message.trim() === "") {
-        switch (dbMessage.mensagemtype) {
-          case "image": dbMessage.message = "[Imagem]"; break;
-          case "audio": dbMessage.message = "[Áudio]"; break;
-          case "video": dbMessage.message = "[Vídeo]"; break;
-          case "document": dbMessage.message = "[Documento]"; break;
-          default: dbMessage.message = "[Mídia]";
+        // Placeholder para mensagem se não houver caption
+        if (!dbMessage.message || dbMessage.message.trim() === "") {
+          switch (dbMessage.mensagemtype) {
+            case "image": dbMessage.message = "[Imagem]"; break;
+            case "audio": dbMessage.message = "[Áudio]"; break;
+            case "video": dbMessage.message = "[Vídeo]"; break;
+            case "document": dbMessage.message = "[Documento]"; break;
+            default: dbMessage.message = "[Mídia]";
+          }
         }
-      }
 
-      console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Using media_url: ${message.media_url}. Type: ${dbMessage.mensagemtype}`);
-
-    } else if (message.media_base64 && typeof message.media_base64 === "string" && message.media_base64.trim() !== "") {
-      // Fallback para base64 (compatibilidade com sistema antigo)
-      let base64 = message.media_base64.trim();
-      
-      // Garantir prefixo data: se necessário
-      if (!base64.startsWith("data:")) {
-        let type = (dbMessage.mensagemtype || "").toLowerCase();
-        let mime = "application/octet-stream";
-        if (type === "image") mime = "image/jpeg";
-        else if (type === "audio") mime = "audio/mpeg";
-        else if (type === "video") mime = "video/mp4";
-        else if (type === "document" || type === "file") mime = "application/pdf";
-        base64 = `data:${mime};base64,${base64}`;
+        console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Using media_url: ${url}. Type: ${dbMessage.mensagemtype}`);
+      } else {
+        console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Invalid media URL rejected: ${url}`);
+        dbMessage.media_url = null;
       }
-      
-      dbMessage.media_base64 = base64;
-      
-      // Placeholder para mensagem se não houver caption
-      if (!dbMessage.message || dbMessage.message.trim() === "") {
-        switch (dbMessage.mensagemtype) {
-          case "image": dbMessage.message = "[Imagem]"; break;
-          case "audio": dbMessage.message = "[Áudio]"; break;
-          case "video": dbMessage.message = "[Vídeo]"; break;
-          case "document": dbMessage.message = "[Documento]"; break;
-          default: dbMessage.message = "[Mídia]";
-        }
-      }
-
-      console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Using fallback media_base64. Type: ${dbMessage.mensagemtype}. Size: ${base64.length}`);
     } else {
       // Mensagem apenas de texto
       dbMessage.media_url = null;
-      dbMessage.media_base64 = null;
       console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Text-only message: ${dbMessage.message}`);
     }
+
+    // Remover suporte para media_base64 (sistema antigo)
+    dbMessage.media_base64 = null;
 
     console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Saving to ${tableName}:`, {
       session_id: dbMessage.session_id,
       message: dbMessage.message,
       mensagemtype: dbMessage.mensagemtype,
-      has_media_url: !!dbMessage.media_url,
-      has_media_base64: !!dbMessage.media_base64
+      has_media_url: !!dbMessage.media_url
     });
 
     const { error } = await (supabase as any)

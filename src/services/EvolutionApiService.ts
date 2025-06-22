@@ -34,8 +34,7 @@ export class EvolutionApiService {
   private getHeaders() {
     return {
       'Content-Type': 'application/json',
-      'apikey': this.config.apiKey,
-      'Authorization': `Bearer ${this.config.apiKey}`
+      'apikey': this.config.apiKey
     };
   }
 
@@ -88,7 +87,6 @@ export class EvolutionApiService {
       const data = await response.json();
       console.log('📋 [EVOLUTION_API_SERVICE] Raw response:', data);
 
-      // Processar a resposta baseada na estrutura da API Evolution
       let instances: InstanceInfo[] = [];
       if (Array.isArray(data)) {
         instances = data.map(item => ({
@@ -109,7 +107,6 @@ export class EvolutionApiService {
           integration: item.integration || 'WHATSAPP-BAILEYS'
         }));
       } else if (data && typeof data === 'object') {
-        // Se a resposta é um objeto com instâncias como propriedades
         instances = Object.entries(data).map(([key, value]: [string, any]) => ({
           instanceName: key,
           status: value?.instance?.state || value?.state || 'close',
@@ -176,7 +173,7 @@ export class EvolutionApiService {
     try {
       console.log('📱 [EVOLUTION_API_SERVICE] Getting QR Code for:', instanceName);
       
-      // Usar endpoint correto para QR Code
+      // URL corrigida conforme curl fornecido
       const qrResponse = await fetch(`${this.getBaseUrl()}/instance/connect/${instanceName}`, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -220,7 +217,7 @@ export class EvolutionApiService {
     try {
       console.log('🗑️ [EVOLUTION_API_SERVICE] Deleting instance:', instanceName);
       
-      // Usar endpoint correto para deletar instância
+      // URL corrigida conforme curl fornecido
       const response = await fetch(`${this.getBaseUrl()}/instance/delete/${instanceName}`, {
         method: 'DELETE',
         headers: this.getHeaders(),
@@ -231,13 +228,11 @@ export class EvolutionApiService {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
-      // Algumas APIs retornam 204 No Content para delete bem-sucedido
       let data = {};
       if (response.status !== 204) {
         try {
           data = await response.json();
         } catch (e) {
-          // Se não conseguir fazer parse do JSON, ainda considera sucesso
           data = { message: 'Instância removida com sucesso' };
         }
       }
@@ -283,6 +278,38 @@ export class EvolutionApiService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro ao desconectar instância'
+      };
+    }
+  }
+
+  async getConnectionStatus(): Promise<ApiResponse> {
+    try {
+      console.log('🔍 [EVOLUTION_API_SERVICE] Getting connection status for:', this.config.instanceName);
+      
+      // URL corrigida conforme curl fornecido
+      const response = await fetch(`${this.getBaseUrl()}/instance/connectionState/${this.config.instanceName}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [EVOLUTION_API_SERVICE] Connection status retrieved:', data);
+      
+      return {
+        success: true,
+        connected: data?.instance?.state === 'open',
+        data
+      };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get connection status:', error);
+      return {
+        success: false,
+        connected: false,
+        error: error instanceof Error ? error.message : 'Erro ao verificar status'
       };
     }
   }
@@ -365,37 +392,6 @@ export class EvolutionApiService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro ao configurar webhook'
-      };
-    }
-  }
-
-  async getConnectionStatus(): Promise<ApiResponse> {
-    try {
-      console.log('🔍 [EVOLUTION_API_SERVICE] Getting connection status for:', this.config.instanceName);
-      
-      const response = await fetch(`${this.getBaseUrl()}/instance/connectionState/${this.config.instanceName}`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ [EVOLUTION_API_SERVICE] Connection status retrieved:', data);
-      
-      return {
-        success: true,
-        connected: data?.instance?.state === 'open',
-        data
-      };
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get connection status:', error);
-      return {
-        success: false,
-        connected: false,
-        error: error instanceof Error ? error.message : 'Erro ao verificar status'
       };
     }
   }
