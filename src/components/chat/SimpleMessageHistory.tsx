@@ -9,6 +9,6 @@ interface SimpleMessageHistoryProps {
 }
 
 export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = (props) => {
-  // Phase 2: Switch to native Supabase realtime
+  // Usar apenas realtime nativo do Supabase
   return <RealtimeMessageHistory {...props} />;
 };

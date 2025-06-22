@@ -14,6 +14,6 @@ export const SimpleConversationsListWithRealtime: React.FC<SimpleConversationsLi
   enableRealtime = true,
   ...props
 }) => {
-  // Phase 2: Switch to native Supabase realtime
+  // Usar apenas realtime nativo do Supabase
   return <RealtimeConversationsList {...props} />;
 };

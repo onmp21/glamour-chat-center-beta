@@ -101,7 +101,7 @@ export const useRealtimeConversations = (channelId: string | null) => {
     }
   }, [channelId]);
 
-  // Setup Supabase realtime subscription - Phase 2
+  // Setup Supabase realtime subscription - APENAS REALTIME NATIVO
   useEffect(() => {
     mountedRef.current = true;
     

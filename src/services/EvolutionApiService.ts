@@ -1,3 +1,4 @@
+
 interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
@@ -18,7 +19,7 @@ export interface InstanceInfo {
   instanceName: string;
   status?: string;
   profileName?: string;
-  connectionStatus?: string;
+  connectionStatus?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
   serverUrl?: string;
   integration?: string;
 }
@@ -94,7 +95,7 @@ export class EvolutionApiService {
           instanceName: item.instance?.instanceName || item.instanceName,
           status: item.instance?.state || item.state || 'close',
           profileName: item.instance?.profileName || item.profileName,
-          connectionStatus: item.instance?.state || item.state || 'close',
+          connectionStatus: this.mapConnectionStatus(item.instance?.state || item.state || 'close'),
           serverUrl: item.serverUrl || this.getBaseUrl(),
           integration: item.integration || 'WHATSAPP-BAILEYS'
         }));
@@ -104,7 +105,7 @@ export class EvolutionApiService {
           instanceName: value?.instance?.instanceName || value?.instanceName || key,
           status: value?.instance?.state || value?.state || 'close',
           profileName: value?.instance?.profileName || value?.profileName,
-          connectionStatus: value?.instance?.state || value?.state || 'close',
+          connectionStatus: this.mapConnectionStatus(value?.instance?.state || value?.state || 'close'),
           serverUrl: this.getBaseUrl(),
           integration: 'WHATSAPP-BAILEYS'
         }));
@@ -123,6 +124,20 @@ export class EvolutionApiService {
         error: error instanceof Error ? error.message : 'Erro ao listar instâncias',
         instances: []
       };
+    }
+  }
+
+  private mapConnectionStatus(state: string): 'connected' | 'disconnected' | 'connecting' | 'unknown' {
+    switch (state?.toLowerCase()) {
+      case 'open':
+        return 'connected';
+      case 'close':
+      case 'closed':
+        return 'disconnected';
+      case 'connecting':
+        return 'connecting';
+      default:
+        return 'unknown';
     }
   }
 
@@ -180,8 +195,10 @@ export class EvolutionApiService {
       const qrData = await qrResponse.json();
       console.log('📱 [EVOLUTION_API_SERVICE] QR Response data:', qrData);
       
+      // Processar base64 apenas para QR code
       let qrCode = null;
       if (qrData?.base64) {
+        // Se já tem data: prefix, usar direto, senão adicionar
         qrCode = qrData.base64.startsWith('data:') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`;
       } else if (qrData?.qrcode?.base64) {
         qrCode = qrData.qrcode.base64.startsWith('data:') ? qrData.qrcode.base64 : `data:image/png;base64,${qrData.qrcode.base64}`;
@@ -301,9 +318,11 @@ export class EvolutionApiService {
       const data = await response.json();
       console.log('✅ [EVOLUTION_API_SERVICE] Connection status retrieved:', data);
       
+      const isConnected = data?.instance?.state === 'open';
+      
       return {
         success: true,
-        connected: data?.instance?.state === 'open',
+        connected: isConnected,
         data
       };
     } catch (error) {
@@ -351,7 +370,7 @@ export class EvolutionApiService {
       
       const defaultWebhookUrl = webhookUrl || 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
       
-      // Eventos mínimos conforme solicitado: Webhook Base64, GROUPS_UPSERT, MESSAGES_UPSERT
+      // Eventos conforme solicitado: Webhook Base64, GROUPS_UPSERT, MESSAGES_UPSERT
       const defaultEvents = events || [
         'MESSAGES_UPSERT',
         'GROUPS_UPSERT'
