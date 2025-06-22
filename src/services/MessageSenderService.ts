@@ -1,3 +1,4 @@
+
 import { supabase } from '../integrations/supabase/client';
 import { ChannelApiMappingService } from './ChannelApiMappingServiceRefactored';
 import { N8nMessagingService } from './N8nMessagingService';
@@ -153,15 +154,14 @@ export class MessageSenderService {
 
       // Sempre usar valores válidos para data e nome_do_contato (NUNCA NÚMERO)
       const nowIso = new Date().toISOString();
-      // Usar null para nome_do_contato fora de mensagens do cliente!
       const messageData: RawMessage = {
+        id: Date.now().toString(),
         session_id: formattedNumber,
         message: text,
         read_at: nowIso,
         nome_do_contato: nomeDoContato,
         mensagemtype: 'conversation',
         tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
-        id: Date.now().toString(),
         sender: senderType,
         timestamp: nowIso,
         content: text,
@@ -317,13 +317,13 @@ export class MessageSenderService {
       });
 
       const messageData: RawMessage = {
+        id: Date.now().toString(),
         session_id: formattedNumber,
         message: `data:${mimeType};base64,${base64Content}`,
         read_at: nowIso,
         nome_do_contato: nomeDoContato,
         mensagemtype: mediaType,
         tipo_remetente: senderType === "agent" ? 'USUARIO_INTERNO' : 'CLIENTE',
-        id: Date.now().toString(),
         sender: senderType,
         timestamp: nowIso,
         content: `data:${mimeType};base64,${base64Content}`,
