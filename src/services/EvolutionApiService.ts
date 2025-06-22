@@ -88,27 +88,21 @@ export class EvolutionApiService {
       console.log('📋 [EVOLUTION_API_SERVICE] Raw response:', data);
 
       let instances: InstanceInfo[] = [];
+      
+      // Processar resposta da API Evolution corretamente
       if (Array.isArray(data)) {
         instances = data.map(item => ({
-          instanceName: item.instanceName || item.instance?.instanceName,
-          status: item.status || item.instance?.state || 'close',
-          profileName: item.profileName || item.instance?.profileName,
-          connectionStatus: item.status || item.instance?.state || 'close',
-          serverUrl: item.serverUrl || this.getBaseUrl(),
-          integration: item.integration || 'WHATSAPP-BAILEYS'
-        }));
-      } else if (data && Array.isArray(data.instances)) {
-        instances = data.instances.map(item => ({
-          instanceName: item.instanceName || item.instance?.instanceName,
-          status: item.status || item.instance?.state || 'close',
-          profileName: item.profileName || item.instance?.profileName,
-          connectionStatus: item.status || item.instance?.state || 'close',
+          instanceName: item.instance?.instanceName || item.instanceName,
+          status: item.instance?.state || item.state || 'close',
+          profileName: item.instance?.profileName || item.profileName,
+          connectionStatus: item.instance?.state || item.state || 'close',
           serverUrl: item.serverUrl || this.getBaseUrl(),
           integration: item.integration || 'WHATSAPP-BAILEYS'
         }));
       } else if (data && typeof data === 'object') {
+        // Se a resposta for um objeto, iterar sobre as propriedades
         instances = Object.entries(data).map(([key, value]: [string, any]) => ({
-          instanceName: key,
+          instanceName: value?.instance?.instanceName || value?.instanceName || key,
           status: value?.instance?.state || value?.state || 'close',
           profileName: value?.instance?.profileName || value?.profileName,
           connectionStatus: value?.instance?.state || value?.state || 'close',
@@ -173,28 +167,31 @@ export class EvolutionApiService {
     try {
       console.log('📱 [EVOLUTION_API_SERVICE] Getting QR Code for:', instanceName);
       
-      // URL corrigida conforme curl fornecido
       const qrResponse = await fetch(`${this.getBaseUrl()}/instance/connect/${instanceName}`, {
         method: 'GET',
         headers: this.getHeaders(),
       });
 
       if (!qrResponse.ok) {
-        throw new Error(`Erro ao obter QR Code: ${qrResponse.status}`);
+        const errorText = await qrResponse.text();
+        console.error('❌ [EVOLUTION_API_SERVICE] QR Error response:', errorText);
+        throw new Error(`Erro ao obter QR Code: ${qrResponse.status} - ${errorText}`);
       }
 
       const qrData = await qrResponse.json();
+      console.log('📱 [EVOLUTION_API_SERVICE] QR Response data:', qrData);
       
       let qrCode = null;
       if (qrData?.base64) {
-        qrCode = qrData.base64;
+        qrCode = qrData.base64.startsWith('data:') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`;
       } else if (qrData?.qrcode?.base64) {
-        qrCode = qrData.qrcode.base64;
+        qrCode = qrData.qrcode.base64.startsWith('data:') ? qrData.qrcode.base64 : `data:image/png;base64,${qrData.qrcode.base64}`;
       } else if (qrData?.qrCode) {
-        qrCode = qrData.qrCode;
+        qrCode = qrData.qrCode.startsWith('data:') ? qrData.qrCode : `data:image/png;base64,${qrData.qrCode}`;
       }
 
       if (!qrCode) {
+        console.error('❌ [EVOLUTION_API_SERVICE] No QR code found in response:', qrData);
         throw new Error('QR Code não disponível na resposta da API');
       }
 
@@ -217,24 +214,31 @@ export class EvolutionApiService {
     try {
       console.log('🗑️ [EVOLUTION_API_SERVICE] Deleting instance:', instanceName);
       
-      // URL corrigida conforme curl fornecido
       const response = await fetch(`${this.getBaseUrl()}/instance/delete/${instanceName}`, {
         method: 'DELETE',
         headers: this.getHeaders(),
       });
 
+      console.log('🗑️ [EVOLUTION_API_SERVICE] Delete response status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ [EVOLUTION_API_SERVICE] Delete error:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       let data = {};
-      if (response.status !== 204) {
+      const contentType = response.headers.get('content-type');
+      
+      if (response.status !== 204 && contentType?.includes('application/json')) {
         try {
           data = await response.json();
         } catch (e) {
+          console.log('No JSON response, assuming success');
           data = { message: 'Instância removida com sucesso' };
         }
+      } else {
+        data = { message: 'Instância removida com sucesso' };
       }
 
       console.log('✅ [EVOLUTION_API_SERVICE] Instance deleted successfully');
@@ -286,7 +290,6 @@ export class EvolutionApiService {
     try {
       console.log('🔍 [EVOLUTION_API_SERVICE] Getting connection status for:', this.config.instanceName);
       
-      // URL corrigida conforme curl fornecido
       const response = await fetch(`${this.getBaseUrl()}/instance/connectionState/${this.config.instanceName}`, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -314,55 +317,16 @@ export class EvolutionApiService {
     }
   }
 
-  async getWebhook(): Promise<ApiResponse> {
-    try {
-      console.log('🔗 [EVOLUTION_API_SERVICE] Getting webhook for:', this.config.instanceName);
-      
-      const response = await fetch(`${this.getBaseUrl()}/webhook/find/${this.config.instanceName}`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ [EVOLUTION_API_SERVICE] Webhook retrieved successfully');
-      
-      return {
-        success: true,
-        webhook: data
-      };
-    } catch (error) {
-      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get webhook:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Erro ao obter webhook'
-      };
-    }
-  }
-
   async setWebhook(webhookUrl?: string, events?: string[]): Promise<ApiResponse> {
     try {
       console.log('🔗 [EVOLUTION_API_SERVICE] Setting webhook for:', this.config.instanceName);
       
       const defaultWebhookUrl = webhookUrl || 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
+      
+      // Eventos mínimos conforme solicitado: Webhook, Base64, GROUPS_UPSERT, MESSAGES_UPSERT
       const defaultEvents = events || [
         'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'MESSAGES_DELETE',
-        'SEND_MESSAGE',
-        'CONTACTS_UPDATE',
-        'CONTACTS_UPSERT',
-        'PRESENCE_UPDATE',
-        'CHATS_UPDATE',
-        'CHATS_UPSERT',
-        'CHATS_DELETE',
-        'GROUPS_UPSERT',
-        'GROUP_PARTICIPANTS_UPDATE',
-        'CALL',
-        'NEW_JWT_TOKEN'
+        'GROUPS_UPSERT'
       ];
       
       const response = await fetch(`${this.getBaseUrl()}/webhook/set/${this.config.instanceName}`, {
@@ -371,6 +335,8 @@ export class EvolutionApiService {
         body: JSON.stringify({
           url: defaultWebhookUrl,
           enabled: true,
+          webhookByEvents: false,  // Webhook Base64 format
+          webhookBase64: true,     // Base64 format for media
           events: defaultEvents
         }),
       });

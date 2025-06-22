@@ -153,10 +153,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           ...prev,
           instances: result.instances.map(instance => ({
             instanceName: instance.instanceName,
-            status: instance.status || 'unknown',
+            status: instance.status || 'close',
             profileName: instance.profileName
           }))
         }));
+        
+        console.log('✅ [EVOLUTION_SETTINGS] Instances loaded:', result.instances);
       }
     } catch (error) {
       console.error('Error loading instances:', error);
@@ -212,6 +214,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   };
 
   const generateQRCode = async (instanceName: string) => {
+    console.log('🔄 [QR_CODE] Generating QR Code for:', instanceName);
+    
     setQrCodeModal({
       isOpen: true,
       qrCode: '',
@@ -229,15 +233,18 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       const result = await service.getQRCodeForInstance(instanceName);
       
       if (result.success && result.qrCode) {
+        console.log('✅ [QR_CODE] QR Code generated successfully');
         setQrCodeModal(prev => ({
           ...prev,
           qrCode: result.qrCode!,
           loading: false
         }));
       } else {
+        console.error('❌ [QR_CODE] Failed to generate:', result.error);
         throw new Error(result.error);
       }
     } catch (error) {
+      console.error('❌ [QR_CODE] Exception:', error);
       toast({
         title: "Erro",
         description: `Erro ao gerar QR Code: ${error}`,
@@ -490,62 +497,64 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                   <p className="text-gray-500 text-sm">Nenhuma instância encontrada</p>
                 ) : (
                   <div className="space-y-2">
-                    {apiConnection.instances.map((instance) => (
-                      <div 
-                        key={instance.instanceName}
-                        className={cn(
-                          "flex items-center justify-between p-3 border rounded-lg",
-                          isDarkMode ? "border-[#3f3f46]" : "border-gray-200"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            instance.status === 'open' ? "bg-green-500" : "bg-red-500"
-                          )} />
-                          <div>
-                            <p className="font-medium">{instance.instanceName}</p>
-                            <p className="text-sm text-gray-500">
-                              Status: {instance.status} {instance.profileName && `• ${instance.profileName}`}
-                            </p>
+                    {apiConnection.instances
+                      .filter(instance => instance.status === 'open') // Only show connected instances
+                      .map((instance) => (
+                        <div 
+                          key={instance.instanceName}
+                          className={cn(
+                            "flex items-center justify-between p-3 border rounded-lg",
+                            isDarkMode ? "border-[#3f3f46]" : "border-gray-200"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              instance.status === 'open' ? "bg-green-500" : "bg-red-500"
+                            )} />
+                            <div>
+                              <p className="font-medium">{instance.instanceName}</p>
+                              <p className="text-sm text-gray-500">
+                                Status: {instance.status} {instance.profileName && `• ${instance.profileName}`}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => generateQRCode(instance.instanceName)}
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => logoutInstance(instance.instanceName)}
+                              disabled={loggingOutInstance === instance.instanceName}
+                            >
+                              {loggingOutInstance === instance.instanceName ? (
+                                <RotateCcw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <LogOut className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteInstance(instance.instanceName)}
+                              disabled={deletingInstance === instance.instanceName}
+                            >
+                              {deletingInstance === instance.instanceName ? (
+                                <RotateCcw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </div>
                         </div>
-                        
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => generateQRCode(instance.instanceName)}
-                          >
-                            <QrCode className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => logoutInstance(instance.instanceName)}
-                            disabled={loggingOutInstance === instance.instanceName}
-                          >
-                            {loggingOutInstance === instance.instanceName ? (
-                              <RotateCcw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <LogOut className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => deleteInstance(instance.instanceName)}
-                            disabled={deletingInstance === instance.instanceName}
-                          >
-                            {deletingInstance === instance.instanceName ? (
-                              <RotateCcw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
@@ -596,11 +605,13 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                       <SelectValue placeholder="Selecione uma instância" />
                     </SelectTrigger>
                     <SelectContent>
-                      {apiConnection.instances.map((instance) => (
-                        <SelectItem key={instance.instanceName} value={instance.instanceName}>
-                          {instance.instanceName} ({instance.status})
-                        </SelectItem>
-                      ))}
+                      {apiConnection.instances
+                        .filter(instance => instance.status === 'open') // Only show connected instances
+                        .map((instance) => (
+                          <SelectItem key={instance.instanceName} value={instance.instanceName}>
+                            {instance.instanceName} ({instance.status})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
