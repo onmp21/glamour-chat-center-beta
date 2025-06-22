@@ -12,6 +12,16 @@ interface ApiResponse {
   instances?: any[];
   qrCode?: string;
   connected?: boolean;
+  webhook?: any;
+}
+
+export interface InstanceInfo {
+  instanceName: string;
+  status?: string;
+  profileName?: string;
+  connectionStatus?: string;
+  serverUrl?: string;
+  integration?: string;
 }
 
 export class EvolutionApiService {
@@ -79,17 +89,34 @@ export class EvolutionApiService {
       console.log('📋 [EVOLUTION_API_SERVICE] Raw response:', data);
 
       // Processar a resposta baseada na estrutura da API Evolution
-      let instances = [];
+      let instances: InstanceInfo[] = [];
       if (Array.isArray(data)) {
-        instances = data;
+        instances = data.map(item => ({
+          instanceName: item.instanceName || item.instance?.instanceName,
+          status: item.status || item.instance?.state || 'close',
+          profileName: item.profileName || item.instance?.profileName,
+          connectionStatus: item.status || item.instance?.state || 'close',
+          serverUrl: item.serverUrl || this.getBaseUrl(),
+          integration: item.integration || 'WHATSAPP-BAILEYS'
+        }));
       } else if (data && Array.isArray(data.instances)) {
-        instances = data.instances;
+        instances = data.instances.map(item => ({
+          instanceName: item.instanceName || item.instance?.instanceName,
+          status: item.status || item.instance?.state || 'close',
+          profileName: item.profileName || item.instance?.profileName,
+          connectionStatus: item.status || item.instance?.state || 'close',
+          serverUrl: item.serverUrl || this.getBaseUrl(),
+          integration: item.integration || 'WHATSAPP-BAILEYS'
+        }));
       } else if (data && typeof data === 'object') {
         // Se a resposta é um objeto com instâncias como propriedades
         instances = Object.entries(data).map(([key, value]: [string, any]) => ({
           instanceName: key,
           status: value?.instance?.state || value?.state || 'close',
-          profileName: value?.instance?.profileName || value?.profileName
+          profileName: value?.instance?.profileName || value?.profileName,
+          connectionStatus: value?.instance?.state || value?.state || 'close',
+          serverUrl: this.getBaseUrl(),
+          integration: 'WHATSAPP-BAILEYS'
         }));
       }
 
@@ -149,27 +176,7 @@ export class EvolutionApiService {
     try {
       console.log('📱 [EVOLUTION_API_SERVICE] Getting QR Code for:', instanceName);
       
-      // Primeiro, verificar se a instância existe e seu status
-      const statusResponse = await fetch(`${this.getBaseUrl()}/instance/connect/${instanceName}`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
-
-      if (!statusResponse.ok) {
-        throw new Error(`Instância não encontrada ou não disponível: ${statusResponse.status}`);
-      }
-
-      const statusData = await statusResponse.json();
-      
-      // Se já está conectada, retornar sucesso
-      if (statusData?.instance?.state === 'open') {
-        return {
-          success: true,
-          connected: true
-        };
-      }
-
-      // Buscar QR Code
+      // Usar endpoint correto para QR Code
       const qrResponse = await fetch(`${this.getBaseUrl()}/instance/connect/${instanceName}`, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -186,6 +193,8 @@ export class EvolutionApiService {
         qrCode = qrData.base64;
       } else if (qrData?.qrcode?.base64) {
         qrCode = qrData.qrcode.base64;
+      } else if (qrData?.qrCode) {
+        qrCode = qrData.qrCode;
       }
 
       if (!qrCode) {
@@ -211,6 +220,7 @@ export class EvolutionApiService {
     try {
       console.log('🗑️ [EVOLUTION_API_SERVICE] Deleting instance:', instanceName);
       
+      // Usar endpoint correto para deletar instância
       const response = await fetch(`${this.getBaseUrl()}/instance/delete/${instanceName}`, {
         method: 'DELETE',
         headers: this.getHeaders(),
@@ -277,34 +287,64 @@ export class EvolutionApiService {
     }
   }
 
-  async setWebhookForChannel(channelName: string): Promise<ApiResponse> {
+  async getWebhook(): Promise<ApiResponse> {
     try {
-      console.log('🔗 [EVOLUTION_API_SERVICE] Setting webhook for channel:', channelName);
+      console.log('🔗 [EVOLUTION_API_SERVICE] Getting webhook for:', this.config.instanceName);
       
-      const webhookUrl = `${window.location.origin}/api/webhook/${this.config.instanceName}`;
+      const response = await fetch(`${this.getBaseUrl()}/webhook/find/${this.config.instanceName}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [EVOLUTION_API_SERVICE] Webhook retrieved successfully');
+      
+      return {
+        success: true,
+        webhook: data
+      };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get webhook:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro ao obter webhook'
+      };
+    }
+  }
+
+  async setWebhook(webhookUrl?: string, events?: string[]): Promise<ApiResponse> {
+    try {
+      console.log('🔗 [EVOLUTION_API_SERVICE] Setting webhook for:', this.config.instanceName);
+      
+      const defaultWebhookUrl = webhookUrl || 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
+      const defaultEvents = events || [
+        'MESSAGES_UPSERT',
+        'MESSAGES_UPDATE',
+        'MESSAGES_DELETE',
+        'SEND_MESSAGE',
+        'CONTACTS_UPDATE',
+        'CONTACTS_UPSERT',
+        'PRESENCE_UPDATE',
+        'CHATS_UPDATE',
+        'CHATS_UPSERT',
+        'CHATS_DELETE',
+        'GROUPS_UPSERT',
+        'GROUP_PARTICIPANTS_UPDATE',
+        'CALL',
+        'NEW_JWT_TOKEN'
+      ];
       
       const response = await fetch(`${this.getBaseUrl()}/webhook/set/${this.config.instanceName}`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({
-          url: webhookUrl,
+          url: defaultWebhookUrl,
           enabled: true,
-          events: [
-            'MESSAGES_UPSERT',
-            'MESSAGES_UPDATE',
-            'MESSAGES_DELETE',
-            'SEND_MESSAGE',
-            'CONTACTS_UPDATE',
-            'CONTACTS_UPSERT',
-            'PRESENCE_UPDATE',
-            'CHATS_UPDATE',
-            'CHATS_UPSERT',
-            'CHATS_DELETE',
-            'GROUPS_UPSERT',
-            'GROUP_PARTICIPANTS_UPDATE',
-            'CALL',
-            'NEW_JWT_TOKEN'
-          ]
+          events: defaultEvents
         }),
       });
 
@@ -327,5 +367,40 @@ export class EvolutionApiService {
         error: error instanceof Error ? error.message : 'Erro ao configurar webhook'
       };
     }
+  }
+
+  async getConnectionStatus(): Promise<ApiResponse> {
+    try {
+      console.log('🔍 [EVOLUTION_API_SERVICE] Getting connection status for:', this.config.instanceName);
+      
+      const response = await fetch(`${this.getBaseUrl()}/instance/connectionState/${this.config.instanceName}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [EVOLUTION_API_SERVICE] Connection status retrieved:', data);
+      
+      return {
+        success: true,
+        connected: data?.instance?.state === 'open',
+        data
+      };
+    } catch (error) {
+      console.error('❌ [EVOLUTION_API_SERVICE] Failed to get connection status:', error);
+      return {
+        success: false,
+        connected: false,
+        error: error instanceof Error ? error.message : 'Erro ao verificar status'
+      };
+    }
+  }
+
+  async setWebhookForChannel(channelName: string): Promise<ApiResponse> {
+    return this.setWebhook();
   }
 }
