@@ -1,20 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { MediaProcessor, MediaResult } from '@/services/MediaProcessor';
-import { MediaDownloadService } from '@/services/MediaDownloadService';
-import { AudioPlayerFixed } from './AudioPlayerFixed';
-import { MediaOverlay } from './MediaOverlay';
-import { AlertCircle, Download, Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { Download, FileText, Play, Volume2, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface MediaRendererFixedProps {
   content: string;
   messageType?: string;
-  messageId: string;
+  messageId?: string;
   isDarkMode?: boolean;
   fileName?: string;
-  balloonColor?: 'sent' | 'received';
 }
 
 export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
@@ -22,357 +17,221 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   messageType,
   messageId,
   isDarkMode = false,
-  fileName,
-  balloonColor = 'received'
+  fileName
 }) => {
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [processedResult, setProcessedResult] = useState<MediaResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const { toast } = useToast();
+  const [mediaError, setMediaError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [mediaUrl, setMediaUrl] = useState<string>('');
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    
-    console.log("🖼️ [MediaRendererFixed] Processing media:", { 
-      content: content?.substring(0, 100), 
-      messageType, 
-      messageId 
+    console.log('🎯 [MEDIA_RENDERER_FIXED] Processing content:', {
+      messageId,
+      messageType,
+      contentLength: content?.length || 0,
+      isStorageUrl: content?.includes('supabase.co/storage'),
+      isDataUrl: content?.startsWith('data:')
     });
-    
-    MediaProcessor.processAsync(content, messageType).then(result => {
-      if (mounted) {
-        console.log("🖼️ [MediaRendererFixed] Processing result:", result);
-        setProcessedResult(result);
-        setLoading(false);
-      }
-    });
-    
-    return () => { mounted = false };
-  }, [content, messageType]);
 
-  const handleDownload = async (mediaUrl: string, fileName?: string) => {
-    if (!MediaDownloadService.isDownloadableMedia(mediaUrl)) {
-      toast({
-        title: "Erro",
-        description: "Mídia não disponível para download",
-        variant: "destructive"
-      });
+    setIsLoading(true);
+    setMediaError(false);
+
+    // PRIORIDADE 1: URL do Supabase Storage (novo sistema)
+    if (content && (content.startsWith('http') || content.includes('supabase.co/storage'))) {
+      console.log('✅ [MEDIA_RENDERER_FIXED] Using Storage URL directly');
+      setMediaUrl(content);
+      setIsLoading(false);
       return;
     }
 
-    setDownloading(true);
+    // PRIORIDADE 2: Data URL base64 (sistema antigo - compatibilidade)
+    if (content && content.startsWith('data:')) {
+      console.log('✅ [MEDIA_RENDERER_FIXED] Using Data URL (base64)');
+      setMediaUrl(content);
+      setIsLoading(false);
+      return;
+    }
+
+    // PRIORIDADE 3: Base64 puro (precisa processar)
+    if (content && content.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(content.replace(/\s/g, ''))) {
+      console.log('🔄 [MEDIA_RENDERER_FIXED] Processing raw base64');
+      try {
+        // Detectar MIME type baseado no messageType ou conteúdo
+        let mimeType = 'application/octet-stream';
+        
+        if (messageType) {
+          switch (messageType.toLowerCase()) {
+            case 'image': mimeType = 'image/jpeg'; break;
+            case 'audio': mimeType = 'audio/mpeg'; break;
+            case 'video': mimeType = 'video/mp4'; break;
+            case 'document': 
+            case 'file': mimeType = 'application/pdf'; break;
+          }
+        } else {
+          // Auto-detectar baseado no início do base64
+          if (content.startsWith('/9j/')) mimeType = 'image/jpeg';
+          else if (content.startsWith('iVBORw')) mimeType = 'image/png';
+          else if (content.startsWith('SUQz') || content.startsWith('//uQ')) mimeType = 'audio/mpeg';
+          else if (content.startsWith('AAAAGG')) mimeType = 'video/mp4';
+          else if (content.startsWith('JVBERi')) mimeType = 'application/pdf';
+        }
+
+        const dataUrl = `data:${mimeType};base64,${content}`;
+        setMediaUrl(dataUrl);
+        console.log('✅ [MEDIA_RENDERER_FIXED] Base64 processed successfully');
+      } catch (error) {
+        console.error('❌ [MEDIA_RENDERER_FIXED] Error processing base64:', error);
+        setMediaError(true);
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    // Caso não seja mídia reconhecível
+    console.log('⚠️ [MEDIA_RENDERER_FIXED] Content not recognized as media');
+    setMediaError(true);
+    setIsLoading(false);
+  }, [content, messageType, messageId]);
+
+  const getMediaType = () => {
+    if (messageType) return messageType.toLowerCase();
+    
+    // Auto-detectar baseado na URL ou conteúdo
+    if (mediaUrl.includes('image') || mediaUrl.includes('data:image') || 
+        mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/i)) return 'image';
+    if (mediaUrl.includes('audio') || mediaUrl.includes('data:audio') || 
+        mediaUrl.match(/\.(mp3|ogg|wav|m4a)($|\?)/i)) return 'audio';
+    if (mediaUrl.includes('video') || mediaUrl.includes('data:video') || 
+        mediaUrl.match(/\.(mp4|avi|mov|wmv)($|\?)/i)) return 'video';
+    if (mediaUrl.includes('document') || mediaUrl.includes('application/pdf') || 
+        mediaUrl.match(/\.(pdf|doc|docx|txt)($|\?)/i)) return 'document';
+    
+    return 'file';
+  };
+
+  const handleDownload = () => {
     try {
-      await MediaDownloadService.downloadMedia(mediaUrl, fileName);
-      toast({
-        title: "Sucesso",
-        description: "Download iniciado com sucesso",
-      });
+      const link = document.createElement('a');
+      link.href = mediaUrl;
+      link.download = fileName || `media_${messageId || Date.now()}`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
-      console.error('❌ [MEDIA_RENDERER] Erro no download:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao baixar mídia",
-        variant: "destructive"
-      });
-    } finally {
-      setDownloading(false);
+      console.error('❌ [MEDIA_RENDERER_FIXED] Download error:', error);
     }
   };
 
-  // Estado de erro
-  const renderError = () => (
-    <div className={cn(
-      "flex flex-col items-center justify-center min-h-[80px] p-4 rounded-lg border max-w-[300px]",
-      isDarkMode ? "bg-destructive/20 border-destructive/50" : "bg-red-50 border-red-200"
-    )}>
-      <AlertCircle className="text-destructive mb-2" size={24} />
-      <div className={cn(
-        "text-sm font-medium text-center",
-        isDarkMode ? "text-destructive-foreground" : "text-red-600"
-      )}>
-        Erro ao carregar mídia
-      </div>
-      <div className={cn(
-        "text-xs text-center mt-1",
-        isDarkMode ? "text-destructive-foreground/80" : "text-red-500"
-      )}>
-        {(processedResult && processedResult.error) || 'Formato não suportado'}
-      </div>
-    </div>
-  );
-
-  if (loading || !processedResult) {
+  if (isLoading) {
     return (
       <div className={cn(
-        "flex flex-col items-center justify-center min-h-[80px] p-4 rounded-lg border max-w-[300px]",
-        isDarkMode ? "bg-muted border-border" : "bg-gray-100 border-gray-200"
+        "flex items-center justify-center p-4 rounded-lg border-2 border-dashed",
+        isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-300 bg-gray-100"
       )}>
-        <div className="animate-spin w-6 h-6 rounded-full border-4 border-primary border-t-transparent" />
-        <div className="mt-2 text-xs text-muted-foreground">Carregando mídia…</div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <span className="ml-2 text-sm text-gray-500">Carregando mídia...</span>
       </div>
     );
   }
 
-  if (!processedResult.isProcessed || !processedResult.url) {
-    console.warn("[MediaRendererFixed] Failed to process media for message:", messageId, processedResult);
-    return renderError();
-  }
-
-  const { url, mimeType, type, size } = processedResult;
-
-  // Renderizar áudio
-  if (type === 'audio') {
+  if (mediaError || !mediaUrl) {
     return (
-      <div className="max-w-[300px] relative">
-        <AudioPlayerFixed
-          audioSrc={url}
-          isDarkMode={isDarkMode}
-          balloonColor={balloonColor}
-        />
-        {MediaDownloadService.isDownloadableMedia(url) && (
-          <button
-            onClick={() => handleDownload(url, `audio_${messageId}.mp3`)}
-            disabled={downloading}
-            className={cn(
-              "absolute top-2 right-2 p-1 rounded-full transition-colors",
-              "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
-              downloading && "opacity-50 cursor-not-allowed"
-            )}
-            title="Baixar áudio"
-          >
-            <Download size={14} className="text-foreground" />
-          </button>
-        )}
+      <div className={cn(
+        "flex items-center p-3 rounded-lg border",
+        isDarkMode ? "border-red-700 bg-red-900/20" : "border-red-200 bg-red-50"
+      )}>
+        <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+        <span className="text-sm text-red-600">Erro ao carregar mídia</span>
       </div>
     );
   }
 
-  // Renderizar imagem
-  if (type === 'image') {
-    return (
-      <>
-        <div className="relative max-w-[300px]">
-          <img 
-            src={url} 
-            alt="Imagem enviada" 
-            className="chat-message-media cursor-pointer max-w-full max-h-[400px] object-contain rounded-lg"
-            onClick={() => setIsOverlayOpen(true)}
-            onError={(e) => {
-              console.error('❌ [IMAGE] Erro ao carregar:', messageId, e);
-            }}
-            onLoad={() => {
-              console.log('✅ [IMAGE] Carregada:', messageId);
-            }}
+  const mediaType = getMediaType();
+
+  // Renderizar baseado no tipo de mídia
+  switch (mediaType) {
+    case 'image':
+      return (
+        <div className="relative group">
+          <img
+            src={mediaUrl}
+            alt="Imagem"
+            className="max-w-xs max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+            onError={() => setMediaError(true)}
+            onClick={() => window.open(mediaUrl, '_blank')}
+            loading="lazy"
           />
-          
-          <div className="absolute top-2 right-2 flex gap-1">
-            {size && (
-              <div className={cn(
-                "px-2 py-1 rounded text-xs",
-                "bg-background/50 text-foreground backdrop-blur-sm"
-              )}>
-                {size}
-              </div>
-            )}
-            
-            {MediaDownloadService.isDownloadableMedia(url) && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload(url, `image_${messageId}.jpg`);
-                }}
-                disabled={downloading}
-                className={cn(
-                  "p-1 rounded transition-colors",
-                  "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
-                  downloading && "opacity-50 cursor-not-allowed"
-                )}
-                title="Baixar imagem"
-              >
-                <Download size={14} className="text-foreground" />
-              </button>
-            )}
-          </div>
-        </div>
-        
-        <MediaOverlay
-          isOpen={isOverlayOpen}
-          onClose={() => setIsOverlayOpen(false)}
-          mediaUrl={url}
-          mediaType="image"
-          isDarkMode={isDarkMode}
-        />
-      </>
-    );
-  }
-
-  // Renderizar sticker
-  if (type === 'sticker') {
-    return (
-      <div className="relative max-w-[200px]">
-        <img 
-          src={url} 
-          alt="Sticker" 
-          className="chat-message-media cursor-pointer max-w-full max-h-[200px] object-contain"
-          onClick={() => setIsOverlayOpen(true)}
-          onError={(e) => {
-            console.error('❌ [STICKER] Erro ao carregar:', messageId, e);
-          }}
-          onLoad={() => {
-            console.log('✅ [STICKER] Carregado:', messageId);
-          }}
-        />
-        
-        {MediaDownloadService.isDownloadableMedia(url) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDownload(url, `sticker_${messageId}.webp`);
-            }}
-            disabled={downloading}
-            className={cn(
-              "absolute top-2 right-2 p-1 rounded transition-colors",
-              "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
-              downloading && "opacity-50 cursor-not-allowed"
-            )}
-            title="Baixar sticker"
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleDownload}
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <Download size={14} className="text-foreground" />
-          </button>
-        )}
-        
-        <MediaOverlay
-          isOpen={isOverlayOpen}
-          onClose={() => setIsOverlayOpen(false)}
-          mediaUrl={url}
-          mediaType="image"
-          isDarkMode={isDarkMode}
-        />
-      </div>
-    );
-  }
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      );
 
-  // Renderizar vídeo
-  if (type === 'video') {
-    return (
-      <>
-        <div className="relative max-w-[300px]">
-          <video 
-            controls 
+    case 'audio':
+      return (
+        <div className={cn(
+          "flex items-center space-x-3 p-3 rounded-lg border",
+          isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-200 bg-gray-50"
+        )}>
+          <Volume2 className="h-5 w-5 text-blue-500" />
+          <div className="flex-1">
+            <audio controls className="w-full">
+              <source src={mediaUrl} />
+              Seu navegador não suporta o elemento de áudio.
+            </audio>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+
+    case 'video':
+      return (
+        <div className="relative group">
+          <video
+            controls
+            className="max-w-xs max-h-64 rounded-lg"
             preload="metadata"
-            className="chat-message-media max-w-full max-h-[400px] rounded-lg"
-            onError={(e) => {
-              console.error('❌ [VIDEO] Erro ao carregar:', messageId, e);
-            }}
-            onLoadedMetadata={() => {
-              console.log('✅ [VIDEO] Metadata carregada:', messageId);
-            }}
           >
-            <source src={url} type={mimeType} />
-            Seu navegador não suporta vídeo.
+            <source src={mediaUrl} />
+            Seu navegador não suporta o elemento de vídeo.
           </video>
-          
-          <div className="absolute bottom-2 right-2 flex gap-1">
-            {size && (
-              <div className={cn(
-                "px-2 py-1 rounded text-xs",
-                "bg-background/50 text-foreground backdrop-blur-sm"
-              )}>
-                {size}
-              </div>
-            )}
-            
-            {MediaDownloadService.isDownloadableMedia(url) && (
-              <button
-                onClick={() => handleDownload(url, `video_${messageId}.mp4`)}
-                disabled={downloading}
-                className={cn(
-                  "p-1 rounded transition-colors",
-                  "bg-background/50 hover:bg-background/80 backdrop-blur-sm",
-                  downloading && "opacity-50 cursor-not-allowed"
-                )}
-                title="Baixar vídeo"
-              >
-                <Download size={14} className="text-foreground" />
-              </button>
-            )}
-          </div>
-        </div>
-        
-        <MediaOverlay
-          isOpen={isOverlayOpen}
-          onClose={() => setIsOverlayOpen(false)}
-          mediaUrl={url}
-          mediaType="video"
-          isDarkMode={isDarkMode}
-        />
-      </>
-    );
-  }
-
-  // Documentos e outros tipos
-  return (
-    <div 
-      className={cn(
-        "flex items-center p-3 rounded-lg border max-w-[300px] transition-colors",
-        isDarkMode ? "bg-card hover:bg-card/80 border-border" : "bg-gray-100 hover:bg-gray-200 border-gray-300"
-      )}
-    >
-      <div className="text-2xl mr-3">
-        {MediaProcessor.getMediaIcon(type || 'document')}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className={cn(
-          "font-medium text-sm truncate",
-          isDarkMode ? "text-foreground" : "text-gray-900"
-        )}>
-          {fileName || 'Documento'}
-        </div>
-        <div className={cn(
-          "text-xs",
-          isDarkMode ? "text-muted-foreground" : "text-gray-500"
-        )}>
-          {mimeType}
-        </div>
-        {size && (
-          <div className={cn(
-            "text-xs mt-1",
-            isDarkMode ? "text-muted-foreground/80" : "text-gray-400"
-          )}>
-            {size}
-          </div>
-        )}
-      </div>
-      
-      <div className="flex gap-1">
-        <button
-          onClick={() => window.open(url, '_blank')}
-          className={cn(
-            "p-2 rounded transition-colors",
-            "hover:bg-background/20"
-          )}
-          title="Abrir"
-        >
-          <Play size={16} className="text-muted-foreground" />
-        </button>
-        
-        {MediaDownloadService.isDownloadableMedia(url) && (
-          <button
-            onClick={() => handleDownload(url, fileName)}
-            disabled={downloading}
-            className={cn(
-              "p-2 rounded transition-colors",
-              "hover:bg-background/20",
-              downloading && "opacity-50 cursor-not-allowed"
-            )}
-            title="Baixar"
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleDownload}
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <Download size={16} className="text-muted-foreground" />
-          </button>
-        )}
-      </div>
-    </div>
-  );
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+
+    case 'document':
+    case 'file':
+    default:
+      return (
+        <div className={cn(
+          "flex items-center space-x-3 p-3 rounded-lg border cursor-pointer hover:bg-opacity-80",
+          isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-200 bg-gray-50"
+        )} onClick={handleDownload}>
+          <FileText className="h-5 w-5 text-blue-500" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {fileName || 'Documento'}
+            </p>
+            <p className="text-xs text-gray-500">
+              Clique para baixar
+            </p>
+          </div>
+          <Download className="h-4 w-4 text-gray-400" />
+        </div>
+      );
+  }
 };

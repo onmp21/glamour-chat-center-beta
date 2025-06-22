@@ -27,30 +27,60 @@ export class ChannelMessagePersistence {
 
     const tableName = tableMapping[channelId] || tableMapping[await ChannelUuidResolver.getChannelUuid(channelId) || ''] || 'yelena_ai_conversas';
     if (!tableName) {
-      console.error(`[saveMessageToChannel] No table mapping found for channel: ${channelId}`);
+      console.error(`[CHANNEL_MESSAGE_PERSISTENCE] No table mapping found for channel: ${channelId}`);
       throw new Error('Canal não encontrado para salvar mensagens');
     }
 
-    // Construir a mensagem para o banco
+    // Construir a mensagem para o banco - PRIORIZAR media_url
     const dbMessage: any = {
       session_id: message.session_id,
-      message: message.message, // SEPARADO do media_base64
+      message: message.message,
       read_at: message.read_at,
       nome_do_contato: message.nome_do_contato || message.Nome_do_contato || "Atendente",
-      mensagemtype: (
-        message.mensagemtype === "conversation" && message.media_base64
-          ? "file"
-          : message.mensagemtype || "text"
-      ),
+      mensagemtype: message.mensagemtype || "text",
       tipo_remetente: message.tipo_remetente,
     };
 
-    // NOVO: processar sempre o base64 corretamente
-    if (message.media_base64 && typeof message.media_base64 === "string" && message.media_base64.trim() !== "") {
+    // NOVA LÓGICA: Priorizar media_url sobre media_base64
+    if (message.media_url && typeof message.media_url === "string" && message.media_url.trim() !== "") {
+      // Se temos media_url, usar ela diretamente
+      dbMessage.media_url = message.media_url.trim();
+      
+      // Definir tipo de mensagem baseado na URL se não especificado
+      if (dbMessage.mensagemtype === "text" || !dbMessage.mensagemtype) {
+        const url = message.media_url.toLowerCase();
+        if (url.includes('image') || url.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+          dbMessage.mensagemtype = "image";
+        } else if (url.includes('audio') || url.match(/\.(mp3|ogg|wav|m4a)$/)) {
+          dbMessage.mensagemtype = "audio";
+        } else if (url.includes('video') || url.match(/\.(mp4|avi|mov|wmv)$/)) {
+          dbMessage.mensagemtype = "video";
+        } else if (url.includes('document') || url.match(/\.(pdf|doc|docx|txt)$/)) {
+          dbMessage.mensagemtype = "document";
+        } else {
+          dbMessage.mensagemtype = "file";
+        }
+      }
+
+      // Placeholder para mensagem se não houver caption
+      if (!dbMessage.message || dbMessage.message.trim() === "") {
+        switch (dbMessage.mensagemtype) {
+          case "image": dbMessage.message = "[Imagem]"; break;
+          case "audio": dbMessage.message = "[Áudio]"; break;
+          case "video": dbMessage.message = "[Vídeo]"; break;
+          case "document": dbMessage.message = "[Documento]"; break;
+          default: dbMessage.message = "[Mídia]";
+        }
+      }
+
+      console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Using media_url: ${message.media_url}. Type: ${dbMessage.mensagemtype}`);
+
+    } else if (message.media_base64 && typeof message.media_base64 === "string" && message.media_base64.trim() !== "") {
+      // Fallback para base64 (compatibilidade com sistema antigo)
       let base64 = message.media_base64.trim();
-      // Garantir prefixo data:
+      
+      // Garantir prefixo data: se necessário
       if (!base64.startsWith("data:")) {
-        // Inferir o mimeType
         let type = (dbMessage.mensagemtype || "").toLowerCase();
         let mime = "application/octet-stream";
         if (type === "image") mime = "image/jpeg";
@@ -59,30 +89,45 @@ export class ChannelMessagePersistence {
         else if (type === "document" || type === "file") mime = "application/pdf";
         base64 = `data:${mime};base64,${base64}`;
       }
+      
       dbMessage.media_base64 = base64;
-      // Se não houver mensagem (caption), usa placeholder padrão
-      if ((!dbMessage.message || dbMessage.message.trim() === "")
-        && ["image", "audio", "video", "document", "file"].includes(dbMessage.mensagemtype)) {
-        if (dbMessage.mensagemtype === "image") dbMessage.message = "[Imagem]";
-        else if (dbMessage.mensagemtype === "audio") dbMessage.message = "[Áudio]";
-        else if (dbMessage.mensagemtype === "video") dbMessage.message = "[Vídeo]";
-        else if (dbMessage.mensagemtype === "document" || dbMessage.mensagemtype === "file") dbMessage.message = "[Documento]";
-        else dbMessage.message = "[Mídia]";
+      
+      // Placeholder para mensagem se não houver caption
+      if (!dbMessage.message || dbMessage.message.trim() === "") {
+        switch (dbMessage.mensagemtype) {
+          case "image": dbMessage.message = "[Imagem]"; break;
+          case "audio": dbMessage.message = "[Áudio]"; break;
+          case "video": dbMessage.message = "[Vídeo]"; break;
+          case "document": dbMessage.message = "[Documento]"; break;
+          default: dbMessage.message = "[Mídia]";
+        }
       }
-      console.log(`[saveMessageToChannel:REFORMULADO] media_base64 está presente. Tipo: ${dbMessage.mensagemtype}. Tamanho: ${(base64 || '').length}. Caption: ${dbMessage.message}`);
+
+      console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Using fallback media_base64. Type: ${dbMessage.mensagemtype}. Size: ${base64.length}`);
     } else {
+      // Mensagem apenas de texto
+      dbMessage.media_url = null;
       dbMessage.media_base64 = null;
+      console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Text-only message: ${dbMessage.message}`);
     }
 
-    console.log(`[saveMessageToChannel:REFORMULADO] Salvando mensagem:`, dbMessage);
+    console.log(`[CHANNEL_MESSAGE_PERSISTENCE] Saving to ${tableName}:`, {
+      session_id: dbMessage.session_id,
+      message: dbMessage.message,
+      mensagemtype: dbMessage.mensagemtype,
+      has_media_url: !!dbMessage.media_url,
+      has_media_base64: !!dbMessage.media_base64
+    });
 
     const { error } = await (supabase as any)
       .from(tableName)
       .insert(dbMessage);
 
     if (error) {
-      console.error(`[saveMessageToChannel] Error saving message to ${tableName}:`, error);
+      console.error(`[CHANNEL_MESSAGE_PERSISTENCE] Error saving message to ${tableName}:`, error);
       throw error;
     }
+
+    console.log(`✅ [CHANNEL_MESSAGE_PERSISTENCE] Message saved successfully to ${tableName}`);
   }
 }

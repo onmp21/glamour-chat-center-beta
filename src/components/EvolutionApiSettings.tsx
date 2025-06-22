@@ -690,8 +690,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
               <div>
                 <Label htmlFor="selectChannel">Selecionar Canal Interno</Label>
                 <Select
-                  onValueChange={setSelectedChannelForMapping}
                   value={selectedChannelForMapping}
+                  onValueChange={setSelectedChannelForMapping}
                 >
                   <SelectTrigger className={cn(
                     isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-white border-gray-300"
@@ -712,8 +712,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
               <div>
                 <Label htmlFor="selectInstance">Selecionar Instância Evolution</Label>
                 <Select
-                  onValueChange={setSelectedInstanceForMapping}
                   value={selectedInstanceForMapping}
+                  onValueChange={setSelectedInstanceForMapping}
                   disabled={apiConnection.instances.length === 0}
                 >
                   <SelectTrigger className={cn(
