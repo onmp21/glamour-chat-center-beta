@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,7 +87,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
   const loadChannelMappings = async () => {
     try {
-      const mappings = await channelMappingService.getAllChannelMappings();
+      const mappings = await channelMappingService.getAllMappings();
       setChannelMappings(mappings);
     } catch (error) {
       console.error('Error loading channel mappings:', error);
@@ -322,12 +321,14 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
     setLinkingChannel(true);
     try {
-      await channelMappingService.createChannelMapping({
-        channelId: selectedChannelForMapping,
-        channelName: availableChannels.find(c => c.id === selectedChannelForMapping)?.name || '',
-        instanceName: selectedInstanceForMapping,
-        baseUrl: apiConnection.baseUrl,
-        apiKey: apiConnection.apiKey
+      await channelMappingService.createMapping({
+        channel_id: selectedChannelForMapping,
+        channel_name: availableChannels.find(c => c.id === selectedChannelForMapping)?.name || '',
+        instance_id: selectedInstanceForMapping,
+        instance_name: selectedInstanceForMapping,
+        base_url: apiConnection.baseUrl,
+        api_key: apiConnection.apiKey,
+        is_active: true
       });
 
       toast({
@@ -351,7 +352,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
   const unlinkChannel = async (mappingId: string) => {
     try {
-      await channelMappingService.deleteChannelMapping(mappingId);
+      await channelMappingService.deleteMapping(mappingId);
       toast({
         title: "Canal desvinculado",
         description: "Canal desvinculado da instância"
@@ -629,8 +630,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                         )}
                       >
                         <div>
-                          <p className="font-medium">{mapping.channelName}</p>
-                          <p className="text-sm text-gray-500">→ {mapping.instanceName}</p>
+                          <p className="font-medium">{mapping.channel_name}</p>
+                          <p className="text-sm text-gray-500">→ {mapping.instance_name}</p>
                         </div>
                         <Button
                           variant="outline"
