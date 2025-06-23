@@ -1,432 +1,486 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { RefreshCw, Plus, Wifi, WifiOff, Settings, Trash2, Eye, EyeOff, Copy, QrCode, Webhook } from 'lucide-react';
-import { EvolutionApiService, InstanceInfo } from '@/services/EvolutionApiService';
-import { N8nMessagingService } from '@/services/N8nMessagingService';
-import { DeleteInstanceModal } from '@/components/modals/DeleteInstanceModal';
+import {
+  RotateCcw,
+  Plus,
+  QrCode,
+  Trash2,
+} from 'lucide-react';
+import { EvolutionApiService } from '@/services/EvolutionApiService';
+
+interface ApiConnection {
+  baseUrl: string;
+  apiKey: string;
+  isValidated: boolean;
+}
+
+interface InstanceInfo {
+  instanceName: string;
+  status?: string;
+  profileName?: string;
+  connectionStatus?: 'connected' | 'disconnected' | 'connecting' | 'unknown';
+}
+
+interface QrCodeModal {
+  isOpen: boolean;
+  qrCode: string;
+  instanceName: string;
+  loading: boolean;
+}
 
 interface InstanceManagerProps {
-  isDarkMode: boolean;
-  apiConfig: {
-    baseUrl: string;
-    apiKey: string;
-  };
-  onInstanceSelect?: (instanceName: string) => void;
+  isDarkMode?: boolean;
 }
 
 export const InstanceManager: React.FC<InstanceManagerProps> = ({
-  isDarkMode,
-  apiConfig,
-  onInstanceSelect
+  isDarkMode = false
 }) => {
   const { toast } = useToast();
-  const [instances, setInstances] = useState<InstanceInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedInstance, setSelectedInstance] = useState<string | null>(null);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [qrCodeModal, setQrCodeModal] = useState<{ instanceName: string; qrCode: string } | null>(null);
-  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; instanceName: string }>({ isOpen: false, instanceName: '' });
-  const [webhookStatus, setWebhookStatus] = useState<{ [key: string]: boolean }>({});
 
-  const loadInstances = async () => {
-    if (!apiConfig.baseUrl || !apiConfig.apiKey) {
+  const [apiConnection, setApiConnection] = useState<ApiConnection>({
+    baseUrl: '',
+    apiKey: '',
+    isValidated: false
+  });
+
+  const [instances, setInstances] = useState<InstanceInfo[]>([]);
+  const [validatingApi, setValidatingApi] = useState(false);
+  const [creatingInstance, setCreatingInstance] = useState(false);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [newInstanceName, setNewInstanceName] = useState('');
+  const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
+  const [loadingQR, setLoadingQR] = useState<string | null>(null);
+  
+  const [qrCodeModal, setQrCodeModal] = useState<QrCodeModal>({
+    isOpen: false,
+    qrCode: '',
+    instanceName: '',
+    loading: false
+  });
+
+  const validateApiConnection = async () => {
+    if (!apiConnection.baseUrl || !apiConnection.apiKey) {
       toast({
-        title: "Configuração incompleta",
-        description: "Configure a URL base e API Key primeiro",
+        title: "Erro",
+        description: "Por favor, preencha URL e API Key",
         variant: "destructive"
       });
       return;
     }
 
-    setLoading(true);
+    setValidatingApi(true);
     try {
       const service = new EvolutionApiService({
-        baseUrl: apiConfig.baseUrl,
-        apiKey: apiConfig.apiKey,
-        instanceName: 'temp'
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName: ''
+      });
+
+      const result = await service.validateConnection();
+      
+      if (result.success) {
+        setApiConnection(prev => ({ ...prev, isValidated: true }));
+        toast({
+          title: "Conexão validada",
+          description: "API Evolution conectada com sucesso"
+        });
+        await loadInstances();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast({
+        title: "Erro de conexão",
+        description: `${error}`,
+        variant: "destructive"
+      });
+    } finally {
+      setValidatingApi(false);
+    }
+  };
+
+  const loadInstances = async () => {
+    if (!apiConnection.isValidated) return;
+
+    setLoadingInstances(true);
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName: ''
       });
 
       const result = await service.listInstances();
       
       if (result.success && result.instances) {
         setInstances(result.instances);
-        console.log('📋 [INSTANCE_MANAGER] Instâncias carregadas:', result.instances.length);
-        
-        toast({
-          title: "Instâncias carregadas",
-          description: `${result.instances.length} instância(s) encontrada(s)`,
-        });
-      } else {
-        throw new Error(result.error || 'Erro ao carregar instâncias');
       }
     } catch (error) {
-      console.error('❌ [INSTANCE_MANAGER] Erro:', error);
+      console.error('Error loading instances:', error);
       toast({
         title: "Erro",
-        description: `Erro ao carregar instâncias: ${error}`,
+        description: "Erro ao carregar instâncias",
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setLoadingInstances(false);
     }
   };
 
-  const validateN8nWebhook = async () => {
+  const createInstance = async () => {
+    if (!newInstanceName.trim()) {
+      toast({
+        title: "Erro",
+        description: "Digite um nome para a instância",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingInstance(true);
     try {
-      const result = await N8nMessagingService.validateWebhook();
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName: newInstanceName
+      });
+
+      const result = await service.createInstanceSimple(newInstanceName);
+      
       if (result.success) {
+        setNewInstanceName('');
         toast({
-          title: "Webhook N8N",
-          description: "Webhook N8N está funcionando corretamente",
+          title: "Instância criada",
+          description: `Instância ${newInstanceName} criada com sucesso`
         });
+        await loadInstances();
       } else {
-        toast({
-          title: "Erro no Webhook N8N",
-          description: result.error || "Webhook N8N não está acessível",
-          variant: "destructive"
-        });
+        throw new Error(result.error);
       }
     } catch (error) {
       toast({
         title: "Erro",
-        description: "Erro ao validar webhook N8N",
+        description: `Erro ao criar instância: ${error}`,
         variant: "destructive"
       });
+    } finally {
+      setCreatingInstance(false);
     }
   };
 
-  useEffect(() => {
-    if (apiConfig.baseUrl && apiConfig.apiKey) {
-      loadInstances();
-    }
-  }, [apiConfig.baseUrl, apiConfig.apiKey]);
+  const generateQRCode = async (instanceName: string) => {
+    setLoadingQR(instanceName);
+    setQrCodeModal({
+      isOpen: true,
+      qrCode: '',
+      instanceName,
+      loading: true
+    });
 
-  const getStatusColor = (state: string) => {
-    switch (state) {
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName
+      });
+
+      const result = await service.getQRCodeForInstance(instanceName);
+
+      if (result.success && result.qrCode) {
+        setQrCodeModal(prev => ({
+          ...prev,
+          qrCode: result.qrCode,
+          loading: false
+        }));
+      } else {
+        throw new Error(result.error || 'QR Code não disponível');
+      }
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao gerar QR Code: ${error}`,
+        variant: "destructive"
+      });
+      setQrCodeModal(prev => ({ ...prev, loading: false }));
+    } finally {
+      setLoadingQR(null);
+    }
+  };
+
+  const deleteInstance = async (instanceName: string) => {
+    setDeletingInstance(instanceName);
+    try {
+      const service = new EvolutionApiService({
+        baseUrl: apiConnection.baseUrl,
+        apiKey: apiConnection.apiKey,
+        instanceName
+      });
+
+      const result = await service.deleteInstance(instanceName);
+
+      if (result.success) {
+        toast({
+          title: "Instância excluída",
+          description: `Instância ${instanceName} excluída com sucesso`
+        });
+        await loadInstances();
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error deleting instance:', error);
+      toast({
+        title: "Erro",
+        description: `Erro ao excluir instância: ${error}`,
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingInstance(null);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'open':
-        return 'bg-green-500';
-      case 'connecting':
-      case 'qr':
-        return 'bg-yellow-500';
+      case 'connected':
+        return 'text-green-600';
       case 'close':
-        return 'bg-red-500';
-      case 'unknown':
+      case 'closed':
+      case 'disconnected':
+        return 'text-red-600';
+      case 'connecting':
+        return 'text-yellow-600';
       default:
-        return 'bg-gray-500';
+        return 'text-gray-600';
     }
   };
 
-  const getStatusText = (state: string) => {
-    switch (state) {
+  const getStatusLabel = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'open':
+      case 'connected':
         return 'Conectado';
+      case 'close':
+      case 'closed':
+        return 'Desconectado';
       case 'connecting':
         return 'Conectando';
-      case 'qr':
-        return 'QR Code';
-      case 'close':
-        return 'Desconectado';
-      case 'unknown':
       default:
         return 'Desconhecido';
     }
   };
 
-  const handleInstanceSelect = (instanceName: string) => {
-    setSelectedInstance(instanceName);
-    onInstanceSelect?.(instanceName);
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado",
-      description: "Texto copiado para a área de transferência",
-    });
-  };
-
-  const generateQRCode = async (instanceName: string) => {
-    try {
-      const service = new EvolutionApiService({
-        baseUrl: apiConfig.baseUrl,
-        apiKey: apiConfig.apiKey,
-        instanceName
-      });
-
-      const result = await service.getQRCodeForInstance(instanceName);
-      
-      if (result.success && result.qrCode) {
-        setQrCodeModal({ instanceName, qrCode: result.qrCode });
-      } else {
-        toast({
-          title: "Erro",
-          description: result.error || "Erro ao gerar QR Code",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao gerar QR Code",
-        variant: "destructive"
-      });
+  useEffect(() => {
+    if (apiConnection.isValidated) {
+      loadInstances();
     }
-  };
-
-  const deleteInstance = async (instanceName: string) => {
-    try {
-      const service = new EvolutionApiService({
-        baseUrl: apiConfig.baseUrl,
-        apiKey: apiConfig.apiKey,
-        instanceName
-      });
-
-      const result = await service.deleteInstance(instanceName);
-      
-      if (result.success) {
-        toast({
-          title: "Sucesso",
-          description: "Instância deletada com sucesso",
-        });
-        loadInstances(); // Recarregar lista
-      } else {
-        toast({
-          title: "Erro",
-          description: result.error || "Erro ao deletar instância",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao deletar instância",
-        variant: "destructive"
-      });
-    }
-  };
+  }, [apiConnection.isValidated]);
 
   return (
-    <div className="space-y-6">
-      {/* Header com controles */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Gerenciador de Instâncias</h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Gerencie suas instâncias da Evolution API com webhooks N8N
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={validateN8nWebhook}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Webhook className="h-4 w-4" />
-            Validar N8N
-          </Button>
-          <Button
-            onClick={loadInstances}
-            disabled={loading}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            Atualizar
-          </Button>
-        </div>
+    <div className={cn("space-y-6", isDarkMode ? "text-white" : "text-gray-900")}>
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold">Gerenciador de Instâncias</h2>
+        <p className="text-gray-500">
+          Gerencie suas instâncias da API Evolution
+        </p>
       </div>
 
-      {/* Status do Webhook N8N */}
-      <Card className={cn(
-        "border-2",
-        isDarkMode ? "bg-[#18181b] border-gray-800" : "bg-white border-gray-200"
-      )}>
+      <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Webhook className="h-5 w-5 text-[#b5103c]" />
-            Status do Sistema N8N
-          </CardTitle>
+          <CardTitle>Conexão com API</CardTitle>
           <CardDescription>
-            Sistema de webhooks migrado para N8N para melhor performance
+            Configure a URL base e API Key para conectar com a API Evolution
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-              ✅ Sistema N8N Ativo
-            </Badge>
-            <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-              🔄 Webhooks Automáticos
-            </Badge>
-            <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-              📤 Envio Universal
-            </Badge>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="base-url">URL Base da API</Label>
+            <Input
+              id="base-url"
+              placeholder="https://evolution.estudioonmp.com"
+              value={apiConnection.baseUrl}
+              onChange={(e) => setApiConnection(prev => ({ ...prev, baseUrl: e.target.value, isValidated: false }))}
+              className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
+            />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="api-key">API Key</Label>
+            <Input
+              id="api-key"
+              type="password"
+              placeholder="Sua API Key"
+              value={apiConnection.apiKey}
+              onChange={(e) => setApiConnection(prev => ({ ...prev, apiKey: e.target.value, isValidated: false }))}
+              className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
+            />
+          </div>
+
+          <Button
+            onClick={validateApiConnection}
+            disabled={validatingApi || !apiConnection.baseUrl || !apiConnection.apiKey}
+            className="flex items-center gap-2"
+          >
+            {validatingApi ? (
+              <RotateCcw className="h-4 w-4 animate-spin" />
+            ) : (
+              <></>
+            )}
+            {validatingApi ? 'Validando...' : 'Validar Conexão'}
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Lista de instâncias */}
-      <div className="grid gap-4">
-        {instances.length === 0 && !loading ? (
-          <Card className={cn(
-            "text-center py-8",
-            isDarkMode ? "bg-[#18181b] border-gray-800" : "bg-white border-gray-200"
-          )}>
-            <CardContent>
-              <p className="text-gray-500 dark:text-gray-400">
-                Nenhuma instância encontrada
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          instances.map((instance) => (
-            <Card
-              key={instance.instanceName}
-              className={cn(
-                "cursor-pointer transition-all hover:shadow-md",
-                selectedInstance === instance.instanceName && "ring-2 ring-[#b5103c]",
-                isDarkMode ? "bg-[#18181b] border-gray-800 hover:bg-[#27272a]" : "bg-white border-gray-200 hover:bg-gray-50"
-              )}
-              onClick={() => handleInstanceSelect(instance.instanceName)}
-            >
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {(instance.connectionStatus || 'unknown') === 'open' ? (
-                        <Wifi className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <WifiOff className="h-5 w-5 text-red-500" />
-                      )}
-                      {instance.instanceName}
-                    </CardTitle>
-                    <CardDescription>
-                      {instance.profileName || 'Sem nome de perfil'}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={cn(
-                        "text-white",
-                        getStatusColor(instance.connectionStatus || 'unknown')
-                      )}
-                    >
-                      {getStatusText(instance.connectionStatus || 'unknown')}
-                    </Badge>
-                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                      N8N
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Servidor:</span>
-                      <p className="text-gray-600 dark:text-gray-400 truncate">
-                        {instance.serverUrl}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Integração:</span>
-                      <p className="text-gray-600 dark:text-gray-400">
-                        {instance.integration}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          generateQRCode(instance.instanceName);
-                        }}
-                      >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard(instance.instanceName);
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteModal({ isOpen: true, instanceName: instance.instanceName });
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-        {/* Modal de QR Code */}
-        {qrCodeModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className={cn(
-              "bg-white dark:bg-[#18181b] p-6 rounded-lg max-w-md w-full mx-4",
-              "border border-gray-200 dark:border-gray-800"
-            )}>
-              <h3 className="text-lg font-semibold mb-4">
-                QR Code - {qrCodeModal.instanceName}
-              </h3>
-              <div className="flex justify-center mb-4">
-                {qrCodeModal.qrCode ? (
-                  <img
-                    src={qrCodeModal.qrCode.startsWith('data:') ? qrCodeModal.qrCode : `data:image/png;base64,${qrCodeModal.qrCode}`}
-                    alt="QR Code"
-                    className="max-w-full h-auto border border-gray-300 rounded"
-                  />
-                ) : (
-                  <div className="w-64 h-64 flex items-center justify-center border border-gray-300 rounded bg-gray-100">
-                    <p className="text-gray-500">QR Code não disponível</p>
-                  </div>
-                )}
-              </div>
+      {/* Criar nova instância */}
+      {apiConnection.isValidated && (
+        <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
+          <CardHeader>
+            <CardTitle>Criar Instância</CardTitle>
+            <CardDescription>
+              Crie uma nova instância WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nome da nova instância"
+                value={newInstanceName}
+                onChange={(e) => setNewInstanceName(e.target.value)}
+                className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
+              />
               <Button
-                onClick={() => setQrCodeModal(null)}
-                className="w-full"
+                onClick={createInstance}
+                disabled={creatingInstance || !newInstanceName.trim()}
               >
-                Fechar
+                {creatingInstance ? (
+                  <RotateCcw className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-2" />
+                )}
+                Criar
               </Button>
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Modal de confirmação de exclusão */}
-      <DeleteInstanceModal
-        isOpen={deleteModal.isOpen}
-        instanceName={deleteModal.instanceName}
-        onClose={() => setDeleteModal({ isOpen: false, instanceName: '' })}
-        onConfirm={() => {
-          deleteInstance(deleteModal.instanceName);
-          setDeleteModal({ isOpen: false, instanceName: '' });
-        }}
-      />
+      {/* Lista de instâncias */}
+      {instances.length > 0 && (
+        <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
+          <CardHeader>
+            <CardTitle>Instâncias WhatsApp</CardTitle>
+            <CardDescription>
+              Gerencie suas instâncias do WhatsApp
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="space-y-4">
+              {instances.map((instance) => (
+                <div
+                  key={instance.instanceName}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-lg border",
+                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <p className="font-medium">{instance.instanceName}</p>
+                      {instance.profileName && (
+                        <p className="text-sm text-gray-500">{instance.profileName}</p>
+                      )}
+                    </div>
+                    <div className={cn("text-sm font-medium", getStatusColor(instance.status))}>
+                      {getStatusLabel(instance.status)}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => generateQRCode(instance.instanceName)}
+                      variant="outline"
+                      size="sm"
+                      disabled={loadingQR === instance.instanceName}
+                    >
+                      {loadingQR === instance.instanceName ? (
+                        <RotateCcw className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <QrCode className="h-4 w-4 mr-1" />
+                      )}
+                      QR Code
+                    </Button>
+
+                    <Button
+                      onClick={() => deleteInstance(instance.instanceName)}
+                      variant="outline"
+                      size="sm"
+                      disabled={deletingInstance === instance.instanceName}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      {deletingInstance === instance.instanceName ? (
+                        <RotateCcw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal do QR Code */}
+      <Dialog open={qrCodeModal.isOpen} onOpenChange={(open) => setQrCodeModal(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Conectar WhatsApp - {qrCodeModal.instanceName}
+            </DialogTitle>
+            <DialogDescription>
+              Escaneie o QR Code com seu WhatsApp para conectar a instância
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center space-y-4 p-4">
+            {qrCodeModal.loading ? (
+              <div className="flex items-center space-x-2">
+                <RotateCcw className="h-4 w-4 animate-spin" />
+                <span>Gerando QR Code...</span>
+              </div>
+            ) : qrCodeModal.qrCode ? (
+              <>
+                <img 
+                  src={qrCodeModal.qrCode} 
+                  alt="QR Code WhatsApp" 
+                  className="w-64 h-64 border border-gray-300 rounded-lg"
+                />
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-gray-600">Escaneie com seu WhatsApp</p>
+                  <p className="text-xs text-gray-500">Instância: {qrCodeModal.instanceName}</p>
+                  <p className="text-xs text-gray-400">QR Code expira em alguns minutos</p>
+                </div>
+              </>
+            ) : (
+              <p className="text-red-500">Erro ao carregar QR Code</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
-
