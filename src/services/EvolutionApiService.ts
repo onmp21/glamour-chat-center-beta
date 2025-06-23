@@ -1,4 +1,3 @@
-
 interface EvolutionApiConfig {
   baseUrl: string;
   apiKey: string;
@@ -89,7 +88,6 @@ export class EvolutionApiService {
 
       let instances: InstanceInfo[] = [];
       
-      // Processar resposta da API Evolution corretamente
       if (Array.isArray(data)) {
         instances = data.map(item => ({
           instanceName: item.instance?.instanceName || item.instanceName,
@@ -100,7 +98,6 @@ export class EvolutionApiService {
           integration: item.integration || 'WHATSAPP-BAILEYS'
         }));
       } else if (data && typeof data === 'object') {
-        // Se a resposta for um objeto, iterar sobre as propriedades
         instances = Object.entries(data).map(([key, value]: [string, any]) => ({
           instanceName: value?.instance?.instanceName || value?.instanceName || key,
           status: value?.instance?.state || value?.state || 'close',
@@ -181,6 +178,23 @@ export class EvolutionApiService {
     try {
       console.log('📱 [EVOLUTION_API_SERVICE] Getting QR Code for:', instanceName);
       
+      // Primeiro, verificar se a instância existe
+      const listResponse = await this.listInstances();
+      if (!listResponse.success || !listResponse.instances) {
+        throw new Error('Erro ao verificar instâncias existentes');
+      }
+
+      const instanceExists = listResponse.instances.some(inst => inst.instanceName === instanceName);
+      if (!instanceExists) {
+        console.log('⚠️ [EVOLUTION_API_SERVICE] Instance does not exist, creating it first...');
+        const createResult = await this.createInstanceSimple(instanceName);
+        if (!createResult.success) {
+          throw new Error(`Erro ao criar instância: ${createResult.error}`);
+        }
+        // Aguardar um pouco para a instância ser criada
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
       const qrResponse = await fetch(`${this.getBaseUrl()}/instance/connect/${instanceName}`, {
         method: 'GET',
         headers: this.getHeaders(),
@@ -198,7 +212,6 @@ export class EvolutionApiService {
       // Processar base64 apenas para QR code
       let qrCode = null;
       if (qrData?.base64) {
-        // Se já tem data: prefix, usar direto, senão adicionar
         qrCode = qrData.base64.startsWith('data:') ? qrData.base64 : `data:image/png;base64,${qrData.base64}`;
       } else if (qrData?.qrcode?.base64) {
         qrCode = qrData.qrcode.base64.startsWith('data:') ? qrData.qrcode.base64 : `data:image/png;base64,${qrData.qrcode.base64}`;
@@ -370,7 +383,6 @@ export class EvolutionApiService {
       
       const defaultWebhookUrl = webhookUrl || 'https://n8n.estudioonmp.com/webhook/3a0b2487-21d0-43c7-bc7f-07404879df5434232';
       
-      // Eventos conforme solicitado: Webhook Base64, GROUPS_UPSERT, MESSAGES_UPSERT
       const defaultEvents = events || [
         'MESSAGES_UPSERT',
         'GROUPS_UPSERT'
@@ -382,8 +394,8 @@ export class EvolutionApiService {
         body: JSON.stringify({
           url: defaultWebhookUrl,
           enabled: true,
-          webhookByEvents: false,  // Webhook Base64 format
-          webhookBase64: true,     // Base64 format for media
+          webhookByEvents: false,
+          webhookBase64: true,
           events: defaultEvents
         }),
       });
