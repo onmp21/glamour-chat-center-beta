@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,32 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import {
-  Settings,
-  Wifi,
-  WifiOff,
-  CheckCircle,
-  RotateCcw,
-  Plus,
-  QrCode,
-  Trash2,
-  LogOut,
-  Link,
-  Unlink
-} from 'lucide-react';
+import { Settings, Wifi, WifiOff, CheckCircle, RotateCcw, Plus, QrCode, Trash2, LogOut, Link, Unlink } from 'lucide-react';
 import { EvolutionApiService } from '@/services/EvolutionApiService';
 import { useInternalChannels } from '@/hooks/useInternalChannels';
 import { supabase } from '@/integrations/supabase/client';
-
 interface ApiConnection {
   baseUrl: string;
   apiKey: string;
@@ -43,14 +23,12 @@ interface ApiConnection {
     connectionStatus: 'connected' | 'disconnected' | 'connecting' | 'unknown';
   }>;
 }
-
 interface QrCodeModal {
   isOpen: boolean;
   qrCode: string;
   instanceName: string;
   loading: boolean;
 }
-
 interface ApiInstanceFromDb {
   id: string;
   instance_name: string;
@@ -59,44 +37,41 @@ interface ApiInstanceFromDb {
   created_at: string;
   updated_at: string;
 }
-
 interface EvolutionApiSettingsProps {
   isDarkMode?: boolean;
   channelId?: string;
 }
-
-export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({ 
+export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   isDarkMode = false,
   channelId = "default"
 }) => {
-  const { toast } = useToast();
-  const { channels: availableChannels } = useInternalChannels();
-
+  const {
+    toast
+  } = useToast();
+  const {
+    channels: availableChannels
+  } = useInternalChannels();
   const [apiConnection, setApiConnection] = useState<ApiConnection>({
     baseUrl: '',
     apiKey: '',
     isValidated: false,
     instances: []
   });
-
   const [validatingApi, setValidatingApi] = useState(false);
   const [creatingInstance, setCreatingInstance] = useState(false);
   const [loadingInstances, setLoadingInstances] = useState(false);
   const [newInstanceName, setNewInstanceName] = useState('');
   const [deletingInstance, setDeletingInstance] = useState<string | null>(null);
   const [loggingOutInstance, setLoggingOutInstance] = useState<string | null>(null);
-  
   const [qrCodeModal, setQrCodeModal] = useState<QrCodeModal>({
     isOpen: false,
     qrCode: '',
     instanceName: '',
     loading: false
   });
-
   const [selectedChannelForMapping, setSelectedChannelForMapping] = useState('');
   const [selectedInstanceForMapping, setSelectedInstanceForMapping] = useState('');
   const [linkingChannel, setLinkingChannel] = useState(false);
-
   const [savedApiInstances, setSavedApiInstances] = useState<ApiInstanceFromDb[]>([]);
   const [selectedApiInstance, setSelectedApiInstance] = useState<string>('');
 
@@ -104,21 +79,20 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
   useEffect(() => {
     loadSavedApiInstances();
   }, []);
-
   const loadSavedApiInstances = async () => {
     try {
-      const { data, error } = await supabase
-        .from('api_instances')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('api_instances').select('*').order('created_at', {
+        ascending: false
+      });
       if (error) {
         console.error('Error loading API instances:', error);
         return;
       }
-
       setSavedApiInstances(data || []);
-      
+
       // Se tem instâncias salvas, usar a primeira por padrão
       if (data && data.length > 0 && !selectedApiInstance) {
         const firstInstance = data[0];
@@ -133,7 +107,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       console.error('Error loading API instances:', error);
     }
   };
-
   const saveApiInstance = async () => {
     if (!apiConnection.baseUrl || !apiConnection.apiKey) {
       toast({
@@ -143,29 +116,23 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
       return;
     }
-
     try {
       const instanceName = apiConnection.baseUrl.split('://')[1]?.split('.')[0] || 'evolution-api';
-      
-      const { data, error } = await supabase
-        .from('api_instances')
-        .insert({
-          instance_name: instanceName,
-          base_url: apiConnection.baseUrl,
-          api_key: apiConnection.apiKey
-        })
-        .select()
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from('api_instances').insert({
+        instance_name: instanceName,
+        base_url: apiConnection.baseUrl,
+        api_key: apiConnection.apiKey
+      }).select().single();
       if (error) {
         throw error;
       }
-
       toast({
         title: "Sucesso",
         description: "Configuração da API salva com sucesso"
       });
-
       await loadSavedApiInstances();
       setSelectedApiInstance(data.id);
     } catch (error) {
@@ -177,7 +144,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
     }
   };
-
   const handleApiInstanceChange = (instanceId: string) => {
     const instance = savedApiInstances.find(inst => inst.id === instanceId);
     if (instance) {
@@ -191,7 +157,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       }));
     }
   };
-
   const validateApiConnection = async () => {
     if (!apiConnection.baseUrl || !apiConnection.apiKey) {
       toast({
@@ -201,7 +166,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
       return;
     }
-
     setValidatingApi(true);
     try {
       const service = new EvolutionApiService({
@@ -209,11 +173,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         apiKey: apiConnection.apiKey,
         instanceName: ''
       });
-
       const result = await service.validateConnection();
-      
       if (result.success) {
-        setApiConnection(prev => ({ ...prev, isValidated: true }));
+        setApiConnection(prev => ({
+          ...prev,
+          isValidated: true
+        }));
         toast({
           title: "Conexão validada",
           description: "API Evolution conectada com sucesso"
@@ -232,10 +197,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       setValidatingApi(false);
     }
   };
-
   const loadInstances = async () => {
     if (!apiConnection.isValidated) return;
-
     setLoadingInstances(true);
     try {
       const service = new EvolutionApiService({
@@ -243,9 +206,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         apiKey: apiConnection.apiKey,
         instanceName: ''
       });
-
       const result = await service.listInstances();
-      
       if (result.success && result.instances) {
         setApiConnection(prev => ({
           ...prev,
@@ -256,7 +217,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
             connectionStatus: instance.connectionStatus || 'unknown'
           }))
         }));
-        
         console.log('✅ [EVOLUTION_SETTINGS] Instances loaded:', result.instances);
       }
     } catch (error) {
@@ -270,7 +230,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       setLoadingInstances(false);
     }
   };
-
   const createInstance = async () => {
     if (!newInstanceName.trim()) {
       toast({
@@ -280,7 +239,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
       return;
     }
-
     setCreatingInstance(true);
     try {
       const service = new EvolutionApiService({
@@ -288,9 +246,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         apiKey: apiConnection.apiKey,
         instanceName: newInstanceName
       });
-
       const result = await service.createInstanceSimple(newInstanceName);
-      
       if (result.success) {
         setNewInstanceName('');
         toast({
@@ -311,7 +267,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       setCreatingInstance(false);
     }
   };
-
   const generateQRCode = async (instanceName: string) => {
     setQrCodeModal({
       isOpen: true,
@@ -319,16 +274,13 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       instanceName,
       loading: true
     });
-
     try {
       const service = new EvolutionApiService({
         baseUrl: apiConnection.baseUrl,
         apiKey: apiConnection.apiKey,
         instanceName
       });
-
       const result = await service.getQRCodeForInstance(instanceName);
-
       if (result.success && result.qrCode) {
         setQrCodeModal(prev => ({
           ...prev,
@@ -345,10 +297,12 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         description: `Erro ao gerar QR Code: ${error}`,
         variant: "destructive"
       });
-      setQrCodeModal(prev => ({ ...prev, loading: false }));
+      setQrCodeModal(prev => ({
+        ...prev,
+        loading: false
+      }));
     }
   };
-
   const deleteInstance = async (instanceName: string) => {
     setDeletingInstance(instanceName);
     try {
@@ -357,9 +311,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         apiKey: apiConnection.apiKey,
         instanceName
       });
-
       const result = await service.deleteInstance(instanceName);
-
       if (result.success) {
         toast({
           title: "Instância excluída",
@@ -380,7 +332,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       setDeletingInstance(null);
     }
   };
-
   const setWebhookForChannel = async () => {
     if (!selectedChannelForMapping || !selectedInstanceForMapping) {
       toast({
@@ -390,7 +341,6 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       });
       return;
     }
-
     setLinkingChannel(true);
     try {
       const service = new EvolutionApiService({
@@ -398,9 +348,7 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         apiKey: apiConnection.apiKey,
         instanceName: selectedInstanceForMapping
       });
-
       const result = await service.setWebhook();
-
       if (result.success) {
         toast({
           title: "Webhook configurado",
@@ -422,27 +370,40 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
       setLinkingChannel(false);
     }
   };
-
   const getStatusBadge = (connectionStatus: 'connected' | 'disconnected' | 'connecting' | 'unknown') => {
     const config = {
-      connected: { variant: 'default' as const, icon: Wifi, label: 'Conectado' },
-      disconnected: { variant: 'destructive' as const, icon: WifiOff, label: 'Desconectado' },
-      connecting: { variant: 'secondary' as const, icon: RotateCcw, label: 'Conectando' },
-      unknown: { variant: 'secondary' as const, icon: WifiOff, label: 'Desconhecido' }
+      connected: {
+        variant: 'default' as const,
+        icon: Wifi,
+        label: 'Conectado'
+      },
+      disconnected: {
+        variant: 'destructive' as const,
+        icon: WifiOff,
+        label: 'Desconectado'
+      },
+      connecting: {
+        variant: 'secondary' as const,
+        icon: RotateCcw,
+        label: 'Conectando'
+      },
+      unknown: {
+        variant: 'secondary' as const,
+        icon: WifiOff,
+        label: 'Desconhecido'
+      }
     };
-
-    const { variant, icon: Icon, label } = config[connectionStatus];
-
-    return (
-      <Badge variant={variant} className="flex items-center gap-1">
+    const {
+      variant,
+      icon: Icon,
+      label
+    } = config[connectionStatus];
+    return <Badge variant={variant} className="flex items-center gap-1">
         <Icon size={12} />
         {label}
-      </Badge>
-    );
+      </Badge>;
   };
-
-  return (
-    <div className={cn("space-y-6", isDarkMode ? "text-white" : "text-gray-900")}>
+  return <div className={cn("space-y-6", isDarkMode ? "text-white" : "text-gray-900")}>
       <div className="flex items-center gap-2 mb-6">
         <Settings className="h-6 w-6" />
         <h2 className="text-2xl font-bold">Configuração da API Evolution</h2>
@@ -450,34 +411,8 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
 
       {/* Seleção de configuração salva */}
       <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Configurações Salvas
-          </CardTitle>
-          <CardDescription>
-            Selecione uma configuração existente ou crie uma nova
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {savedApiInstances.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="saved-instances">Configurações Disponíveis</Label>
-              <Select value={selectedApiInstance} onValueChange={handleApiInstanceChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma configuração" />
-                </SelectTrigger>
-                <SelectContent>
-                  {savedApiInstances.map((instance) => (
-                    <SelectItem key={instance.id} value={instance.id}>
-                      {instance.instance_name} - {instance.base_url}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </CardContent>
+        
+        
       </Card>
 
       {/* Configuração da API */}
@@ -491,76 +426,47 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="base-url">URL Base da API</Label>
-            <Input
-              id="base-url"
-              placeholder="https://evolution.estudioonmp.com"
-              value={apiConnection.baseUrl}
-              onChange={(e) => setApiConnection(prev => ({ ...prev, baseUrl: e.target.value, isValidated: false }))}
-              className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
-            />
+            <Input id="base-url" placeholder="https://evolution.estudioonmp.com" value={apiConnection.baseUrl} onChange={e => setApiConnection(prev => ({
+            ...prev,
+            baseUrl: e.target.value,
+            isValidated: false
+          }))} className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="api-key">API Key</Label>
-            <Input
-              id="api-key"
-              type="password"
-              placeholder="Sua API Key"
-              value={apiConnection.apiKey}
-              onChange={(e) => setApiConnection(prev => ({ ...prev, apiKey: e.target.value, isValidated: false }))}
-              className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
-            />
+            <Input id="api-key" type="password" placeholder="Sua API Key" value={apiConnection.apiKey} onChange={e => setApiConnection(prev => ({
+            ...prev,
+            apiKey: e.target.value,
+            isValidated: false
+          }))} className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""} />
           </div>
 
           <div className="flex gap-2">
-            <Button
-              onClick={validateApiConnection}
-              disabled={validatingApi || !apiConnection.baseUrl || !apiConnection.apiKey}
-              className="flex items-center gap-2"
-            >
-              {validatingApi ? (
-                <RotateCcw className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle className="h-4 w-4" />
-              )}
+            <Button onClick={validateApiConnection} disabled={validatingApi || !apiConnection.baseUrl || !apiConnection.apiKey} className="flex items-center gap-2">
+              {validatingApi ? <RotateCcw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
               {validatingApi ? 'Validando...' : 'Validar Conexão'}
             </Button>
 
-            <Button
-              onClick={saveApiInstance}
-              variant="outline"
-              disabled={!apiConnection.baseUrl || !apiConnection.apiKey}
-            >
+            <Button onClick={saveApiInstance} variant="outline" disabled={!apiConnection.baseUrl || !apiConnection.apiKey}>
               Salvar Configuração
             </Button>
           </div>
 
-          {apiConnection.isValidated && (
-            <div className="flex items-center gap-2 text-green-600">
+          {apiConnection.isValidated && <div className="flex items-center gap-2 text-green-600">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm font-medium">Conexão validada com sucesso</span>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
 
       {/* Gerenciamento de Instâncias */}
-      {apiConnection.isValidated && (
-        <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
+      {apiConnection.isValidated && <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Instâncias WhatsApp</span>
-              <Button
-                onClick={loadInstances}
-                variant="outline"
-                size="sm"
-                disabled={loadingInstances}
-              >
-                {loadingInstances ? (
-                  <RotateCcw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="h-4 w-4" />
-                )}
+              <Button onClick={loadInstances} variant="outline" size="sm" disabled={loadingInstances}>
+                {loadingInstances ? <RotateCcw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                 Atualizar
               </Button>
             </CardTitle>
@@ -571,85 +477,45 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
           <CardContent className="space-y-4">
             {/* Criar nova instância */}
             <div className="flex gap-2">
-              <Input
-                placeholder="Nome da nova instância"
-                value={newInstanceName}
-                onChange={(e) => setNewInstanceName(e.target.value)}
-                className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""}
-              />
-              <Button
-                onClick={createInstance}
-                disabled={creatingInstance || !newInstanceName.trim()}
-              >
-                {creatingInstance ? (
-                  <RotateCcw className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
+              <Input placeholder="Nome da nova instância" value={newInstanceName} onChange={e => setNewInstanceName(e.target.value)} className={isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : ""} />
+              <Button onClick={createInstance} disabled={creatingInstance || !newInstanceName.trim()}>
+                {creatingInstance ? <RotateCcw className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 Criar
               </Button>
             </div>
 
             {/* Lista de instâncias */}
             <div className="space-y-2">
-              {apiConnection.instances.map((instance) => (
-                <div
-                  key={instance.instanceName}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border",
-                    isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200"
-                  )}
-                >
+              {apiConnection.instances.map(instance => <div key={instance.instanceName} className={cn("flex items-center justify-between p-3 rounded-lg border", isDarkMode ? "bg-[#27272a] border-[#3f3f46]" : "bg-gray-50 border-gray-200")}>
                   <div className="flex items-center gap-3">
                     <div>
                       <p className="font-medium">{instance.instanceName}</p>
-                      {instance.profileName && (
-                        <p className="text-sm text-gray-500">{instance.profileName}</p>
-                      )}
+                      {instance.profileName && <p className="text-sm text-gray-500">{instance.profileName}</p>}
                     </div>
                     {getStatusBadge(instance.connectionStatus)}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Button
-                      onClick={() => generateQRCode(instance.instanceName)}
-                      variant="outline"
-                      size="sm"
-                    >
+                    <Button onClick={() => generateQRCode(instance.instanceName)} variant="outline" size="sm">
                       <QrCode className="h-4 w-4 mr-1" />
                       QR Code
                     </Button>
 
-                    <Button
-                      onClick={() => deleteInstance(instance.instanceName)}
-                      variant="outline"
-                      size="sm"
-                      disabled={deletingInstance === instance.instanceName}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      {deletingInstance === instance.instanceName ? (
-                        <RotateCcw className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
+                    <Button onClick={() => deleteInstance(instance.instanceName)} variant="outline" size="sm" disabled={deletingInstance === instance.instanceName} className="text-red-600 hover:text-red-700">
+                      {deletingInstance === instance.instanceName ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                     </Button>
                   </div>
-                </div>
-              ))}
+                </div>)}
 
-              {apiConnection.instances.length === 0 && (
-                <p className="text-center text-gray-500 py-4">
+              {apiConnection.instances.length === 0 && <p className="text-center text-gray-500 py-4">
                   Nenhuma instância encontrada. Crie uma nova instância para começar.
-                </p>
-              )}
+                </p>}
             </div>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Configuração de Webhook */}
-      {apiConnection.isValidated && apiConnection.instances.length > 0 && (
-        <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
+      {apiConnection.isValidated && apiConnection.instances.length > 0 && <Card className={isDarkMode ? "bg-[#18181b] border-[#27272a]" : ""}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link className="h-5 w-5" />
@@ -668,11 +534,9 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                     <SelectValue placeholder="Selecione um canal" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableChannels.map((channel) => (
-                      <SelectItem key={channel.id} value={channel.id}>
+                    {availableChannels.map(channel => <SelectItem key={channel.id} value={channel.id}>
                         {channel.name}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -684,34 +548,26 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
                     <SelectValue placeholder="Selecione uma instância" />
                   </SelectTrigger>
                   <SelectContent>
-                    {apiConnection.instances.map((instance) => (
-                      <SelectItem key={instance.instanceName} value={instance.instanceName}>
+                    {apiConnection.instances.map(instance => <SelectItem key={instance.instanceName} value={instance.instanceName}>
                         {instance.instanceName}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <Button
-              onClick={setWebhookForChannel}
-              disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping}
-              className="w-full"
-            >
-              {linkingChannel ? (
-                <RotateCcw className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Link className="h-4 w-4 mr-2" />
-              )}
+            <Button onClick={setWebhookForChannel} disabled={linkingChannel || !selectedChannelForMapping || !selectedInstanceForMapping} className="w-full">
+              {linkingChannel ? <RotateCcw className="h-4 w-4 animate-spin mr-2" /> : <Link className="h-4 w-4 mr-2" />}
               {linkingChannel ? 'Configurando...' : 'Configurar Webhook'}
             </Button>
           </CardContent>
-        </Card>
-      )}
+        </Card>}
 
       {/* Modal do QR Code */}
-      <Dialog open={qrCodeModal.isOpen} onOpenChange={(open) => setQrCodeModal(prev => ({ ...prev, isOpen: open }))}>
+      <Dialog open={qrCodeModal.isOpen} onOpenChange={open => setQrCodeModal(prev => ({
+      ...prev,
+      isOpen: open
+    }))}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -723,30 +579,19 @@ export const EvolutionApiSettings: React.FC<EvolutionApiSettingsProps> = ({
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center space-y-4 p-4">
-            {qrCodeModal.loading ? (
-              <div className="flex items-center space-x-2">
+            {qrCodeModal.loading ? <div className="flex items-center space-x-2">
                 <RotateCcw className="h-4 w-4 animate-spin" />
                 <span>Gerando QR Code...</span>
-              </div>
-            ) : qrCodeModal.qrCode ? (
-              <>
-                <img 
-                  src={qrCodeModal.qrCode} 
-                  alt="QR Code WhatsApp" 
-                  className="w-64 h-64 border border-gray-300 rounded-lg"
-                />
+              </div> : qrCodeModal.qrCode ? <>
+                <img src={qrCodeModal.qrCode} alt="QR Code WhatsApp" className="w-64 h-64 border border-gray-300 rounded-lg" />
                 <div className="text-center space-y-2">
                   <p className="text-sm text-gray-600">Escaneie com seu WhatsApp</p>
                   <p className="text-xs text-gray-500">Instância: {qrCodeModal.instanceName}</p>
                   <p className="text-xs text-gray-400">QR Code expira em alguns minutos</p>
                 </div>
-              </>
-            ) : (
-              <p className="text-red-500">Erro ao carregar QR Code</p>
-            )}
+              </> : <p className="text-red-500">Erro ao carregar QR Code</p>}
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 };
