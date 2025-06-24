@@ -115,17 +115,20 @@ export class MessageServiceV2 {
         throw new Error('No data returned from insert operation');
       }
 
+      // Type assertion to tell TypeScript this is the correct type
+      const insertedRecord = data as any;
+
       return {
-        id: data.id.toString(),
-        content: data.message,
-        message: data.message,
-        timestamp: data.read_at,
-        sender: data.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
-        tipo_remetente: data.tipo_remetente,
-        session_id: data.session_id,
-        nome_do_contato: data.nome_do_contato,
-        mensagemtype: data.mensagemtype,
-        is_read: data.is_read
+        id: insertedRecord.id.toString(),
+        content: insertedRecord.message,
+        message: insertedRecord.message,
+        timestamp: insertedRecord.read_at,
+        sender: insertedRecord.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
+        tipo_remetente: insertedRecord.tipo_remetente,
+        session_id: insertedRecord.session_id,
+        nome_do_contato: insertedRecord.nome_do_contato,
+        mensagemtype: insertedRecord.mensagemtype,
+        is_read: insertedRecord.is_read
       };
     } catch (error) {
       console.error(`❌ [MESSAGE_SERVICE_V2] Error saving message:`, error);
