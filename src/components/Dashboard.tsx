@@ -30,7 +30,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setSelectedChannelId(null);
   };
 
-  // Calcular estatísticas de exames
+  // Calcular estatísticas de exames usando apenas dados já carregados - SEM POLLING
   const examStats = {
     totalExams: exams.length,
     examsThisMonth: exams.filter(exam => {
@@ -79,7 +79,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Conteúdo */}
+        {/* Conteúdo - TODOS OS COMPONENTES USAM APENAS REALTIME */}
         <div className="flex-1 p-6 pt-0 space-y-6 overflow-auto">
           <div className="space-y-6">
             <ConversationStatsCards 

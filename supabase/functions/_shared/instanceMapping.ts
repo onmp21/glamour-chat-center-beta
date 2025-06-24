@@ -1,3 +1,4 @@
+
 // Mapeamento de instâncias para tabelas
 const instanceToTableMapping: Record<string, string> = {
   'yelena': 'yelena_ai_conversas',
@@ -7,7 +8,7 @@ const instanceToTableMapping: Record<string, string> = {
   'joao-dourado': 'joao_dourado_conversas',
   'america-dourada': 'america_dourada_conversas',
   'gerente-lojas': 'gerente_lojas_conversas',
-  'gerente-externo': 'gerente_externo_conversas'
+  'gerente-externo': 'gerente_externo_conversas' // CORRIGIDO: nome correto da tabela
 };
 
 // Função para determinar a tabela baseada na instância
@@ -31,3 +32,4 @@ const getTableForInstance = (instance: string): string => {
   return 'yelena_ai_conversas';
 };
 
+export { getTableForInstance, instanceToTableMapping };

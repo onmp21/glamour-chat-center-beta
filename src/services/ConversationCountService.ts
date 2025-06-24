@@ -4,13 +4,13 @@ import { getTableNameForChannel } from '@/utils/channelMapping';
 
 export class ConversationCountService {
   private static cache: Map<string, { count: number; timestamp: number }> = new Map();
-  private static readonly CACHE_DURATION = 60000; // 1 minuto
+  private static readonly CACHE_DURATION = 30000; // 30 segundos - cache mínimo apenas para evitar múltiplas chamadas simultâneas
 
   static async getConversationCount(channelId: string): Promise<number> {
     const cacheKey = `count-${channelId}`;
     const cached = this.cache.get(cacheKey);
     
-    // Cache reduzido para realtime
+    // Cache muito reduzido - realtime deve atualizar rapidamente
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
       console.log(`📊 [COUNT_SERVICE] Cache hit for ${channelId}: ${cached.count}`);
       return cached.count;
@@ -20,22 +20,25 @@ export class ConversationCountService {
       const tableName = await getTableNameForChannel(channelId);
       console.log(`🔢 [COUNT_SERVICE] Counting conversations for ${channelId} in ${tableName}`);
       
-      // Query otimizada - só conta session_ids únicos
+      // Query otimizada - contar session_ids únicos
       const { data, error } = await supabase
         .from(tableName as any)
-        .select('session_id', { count: 'exact', head: true });
+        .select('session_id')
+        .order('read_at', { ascending: false });
 
       if (error) {
         console.error(`❌ [COUNT_SERVICE] Error counting for ${channelId}:`, error);
         return 0;
       }
 
-      const count = data?.length || 0;
+      // Contar conversas únicas
+      const uniqueSessions = new Set(data?.map(row => row.session_id) || []);
+      const count = uniqueSessions.size;
       
-      // Cache o resultado por tempo reduzido
+      // Cache o resultado por tempo mínimo
       this.cache.set(cacheKey, { count, timestamp: Date.now() });
       
-      console.log(`✅ [COUNT_SERVICE] Found ${count} conversations for ${channelId}`);
+      console.log(`✅ [COUNT_SERVICE] Found ${count} unique conversations for ${channelId}`);
       return count;
     } catch (error) {
       console.error(`❌ [COUNT_SERVICE] Error in getConversationCount for ${channelId}:`, error);
@@ -47,7 +50,7 @@ export class ConversationCountService {
     const cacheKey = `unread-${channelId}`;
     const cached = this.cache.get(cacheKey);
     
-    // Cache reduzido para realtime
+    // Cache muito reduzido - realtime deve atualizar rapidamente
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
       return cached.count;
     }
