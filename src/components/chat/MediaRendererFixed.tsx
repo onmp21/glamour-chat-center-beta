@@ -1,72 +1,60 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Download, FileText, AlertCircle } from 'lucide-react';
+import { Download, FileText, Image, Volume2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isValidMediaUrl, getMediaTypeFromUrl, getMimeTypeFromUrl } from '@/utils/mediaUtils';
 
 interface MediaRendererFixedProps {
   content: string;
   messageType?: string;
-  messageId?: string;
+  messageId: string;
   isDarkMode?: boolean;
   fileName?: string;
+  className?: string;
 }
 
 export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
   content,
-  messageType,
+  messageType = 'text',
   messageId,
   isDarkMode = false,
-  fileName
+  fileName,
+  className
 }) => {
-  const [mediaError, setMediaError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [mediaUrl, setMediaUrl] = useState<string>('');
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    console.log('🎯 [MEDIA_RENDERER_FIXED] Processing content:', {
-      messageId,
-      messageType,
-      contentLength: content?.length || 0,
-      isStorageUrl: content?.includes('supabase.co/storage'),
-      isDataUrl: content?.startsWith('data:'),
-      isHttpUrl: content?.startsWith('http')
-    });
+  console.log('🎨 [MEDIA_RENDERER_FIXED] Rendering:', {
+    messageId,
+    messageType,
+    contentType: typeof content,
+    contentLength: content?.length || 0,
+    isValidUrl: isValidMediaUrl(content)
+  });
 
-    setIsLoading(true);
-    setMediaError(false);
+  // Verificar se é uma URL de mídia válida
+  if (!isValidMediaUrl(content)) {
+    console.log('❌ [MEDIA_RENDERER_FIXED] Invalid media URL:', content);
+    return (
+      <div className={cn(
+        "p-3 border rounded-lg text-center",
+        isDarkMode ? "bg-gray-800 border-gray-600 text-gray-300" : "bg-gray-100 border-gray-300 text-gray-600"
+      )}>
+        <FileText className="h-8 w-8 mx-auto mb-2" />
+        <p className="text-sm">Mídia indisponível</p>
+      </div>
+    );
+  }
 
-    // PRIORIDADE ÚNICA: URL do Supabase Storage ou HTTP URLs
-    if (content && (content.startsWith('http') || content.includes('supabase.co/storage'))) {
-      console.log('✅ [MEDIA_RENDERER_FIXED] Using Storage/HTTP URL directly');
-      setMediaUrl(content);
-      setIsLoading(false);
-      return;
-    }
+  const mediaType = getMediaTypeFromUrl(content);
+  const mimeType = getMimeTypeFromUrl(content);
 
-    // Se não é URL válida, considerar erro
-    console.log('⚠️ [MEDIA_RENDERER_FIXED] Content not recognized as valid media URL');
-    setMediaError(true);
-    setIsLoading(false);
-  }, [content, messageType, messageId]);
-
-  const getMediaType = () => {
-    if (messageType) return messageType.toLowerCase();
-    
-    // Auto-detectar baseado na URL
-    if (mediaUrl.includes('image') || mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)($|\?)/i)) return 'image';
-    if (mediaUrl.includes('audio') || mediaUrl.match(/\.(mp3|ogg|wav|m4a)($|\?)/i)) return 'audio';
-    if (mediaUrl.includes('video') || mediaUrl.match(/\.(mp4|avi|mov|wmv)($|\?)/i)) return 'video';
-    if (mediaUrl.includes('document') || mediaUrl.match(/\.(pdf|doc|docx|txt)($|\?)/i)) return 'document';
-    
-    return 'file';
-  };
-
+  // Função para download
   const handleDownload = () => {
     try {
       const link = document.createElement('a');
-      link.href = mediaUrl;
-      link.download = fileName || `media_${messageId || Date.now()}`;
+      link.href = content;
+      link.download = fileName || `media_${messageId}`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
@@ -76,115 +64,137 @@ export const MediaRendererFixed: React.FC<MediaRendererFixedProps> = ({
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className={cn(
-        "flex items-center justify-center p-4 rounded-lg border-2 border-dashed",
-        isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-300 bg-gray-100"
-      )}>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        <span className="ml-2 text-sm text-gray-500">Carregando mídia...</span>
-      </div>
-    );
-  }
-
-  if (mediaError || !mediaUrl) {
-    return (
-      <div className={cn(
-        "flex items-center p-3 rounded-lg border",
-        isDarkMode ? "border-red-700 bg-red-900/20" : "border-red-200 bg-red-50"
-      )}>
-        <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-        <span className="text-sm text-red-600">URL de mídia inválida ou não encontrada</span>
-      </div>
-    );
-  }
-
-  const mediaType = getMediaType();
-
   // Renderizar baseado no tipo de mídia
-  switch (mediaType) {
-    case 'image':
-      return (
-        <div className="relative group">
-          <img
-            src={mediaUrl}
-            alt="Imagem"
-            className="max-w-xs max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-            onError={() => setMediaError(true)}
-            onClick={() => window.open(mediaUrl, '_blank')}
-            loading="lazy"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleDownload}
-            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
-      );
-
-    case 'audio':
+  const renderMediaContent = () => {
+    if (loadError) {
       return (
         <div className={cn(
-          "flex items-center space-x-3 p-3 rounded-lg border",
-          isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-200 bg-gray-50"
+          "p-4 border rounded-lg text-center",
+          isDarkMode ? "bg-gray-800 border-gray-600 text-gray-300" : "bg-gray-100 border-gray-300 text-gray-600"
         )}>
-          <div className="flex-1">
-            <audio controls className="w-full">
-              <source src={mediaUrl} />
-              Seu navegador não suporta o elemento de áudio.
-            </audio>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
-      );
-
-    case 'video':
-      return (
-        <div className="relative group">
-          <video
-            controls
-            className="max-w-xs max-h-64 rounded-lg"
-            preload="metadata"
-          >
-            <source src={mediaUrl} />
-            Seu navegador não suporta o elemento de vídeo.
-          </video>
+          <FileText className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-sm">Erro ao carregar mídia</p>
           <Button
-            variant="secondary"
-            size="sm"
             onClick={handleDownload}
-            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            variant="outline"
+            size="sm"
+            className="mt-2"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-4 w-4 mr-2" />
+            Download
           </Button>
         </div>
       );
+    }
 
-    case 'document':
-    case 'file':
-    default:
-      return (
-        <div className={cn(
-          "flex items-center space-x-3 p-3 rounded-lg border cursor-pointer hover:bg-opacity-80",
-          isDarkMode ? "border-gray-600 bg-gray-800" : "border-gray-200 bg-gray-50"
-        )} onClick={handleDownload}>
-          <FileText className="h-5 w-5 text-blue-500" />
-          <div className="flex-1">
-            <p className="text-sm font-medium">
-              {fileName || 'Documento'}
-            </p>
-            <p className="text-xs text-gray-500">
-              Clique para baixar
-            </p>
+    switch (mediaType) {
+      case 'image':
+        return (
+          <div className="relative group">
+            <img
+              src={content}
+              alt={fileName || 'Imagem'}
+              className="max-w-full max-h-64 rounded-lg object-contain"
+              onError={() => setLoadError(true)}
+              loading="lazy"
+            />
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                onClick={handleDownload}
+                variant="secondary"
+                size="sm"
+                className="h-8 w-8 p-0"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <Download className="h-4 w-4 text-gray-400" />
-        </div>
-      );
-  }
+        );
+
+      case 'video':
+        return (
+          <div className="relative group">
+            <video
+              src={content}
+              controls
+              className="max-w-full max-h-64 rounded-lg"
+              onError={() => setLoadError(true)}
+              preload="metadata"
+            >
+              Seu navegador não suporta reprodução de vídeo.
+            </video>
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                onClick={handleDownload}
+                variant="secondary"
+                size="sm"
+                className="h-8 w-8 p-0"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'audio':
+        return (
+          <div className={cn(
+            "p-3 border rounded-lg",
+            isDarkMode ? "bg-gray-800 border-gray-600" : "bg-gray-100 border-gray-300"
+          )}>
+            <div className="flex items-center space-x-3">
+              <Volume2 className="h-6 w-6 text-blue-500" />
+              <div className="flex-1">
+                <audio
+                  src={content}
+                  controls
+                  className="w-full"
+                  onError={() => setLoadError(true)}
+                  preload="metadata"
+                >
+                  Seu navegador não suporta reprodução de áudio.
+                </audio>
+              </div>
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                size="sm"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <div className={cn(
+            "p-4 border rounded-lg",
+            isDarkMode ? "bg-gray-800 border-gray-600 text-gray-300" : "bg-gray-100 border-gray-300 text-gray-600"
+          )}>
+            <div className="flex items-center space-x-3">
+              <FileText className="h-8 w-8 text-blue-500" />
+              <div className="flex-1">
+                <p className="font-medium">{fileName || 'Arquivo'}</p>
+                <p className="text-sm opacity-70">{mimeType}</p>
+              </div>
+              <Button
+                onClick={handleDownload}
+                variant="outline"
+                size="sm"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className={cn("media-renderer", className)}>
+      {renderMediaContent()}
+    </div>
+  );
 };

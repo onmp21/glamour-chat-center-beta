@@ -3,6 +3,7 @@ import React from 'react';
 import { TextMessage } from './TextMessage';
 import { MediaRendererFixed } from '../MediaRendererFixed';
 import { ChatMessage } from '@/types/chat';
+import { isValidMediaUrl } from '@/utils/mediaUtils';
 
 interface MessageContentFixedProps {
   message: ChatMessage;
@@ -12,17 +13,17 @@ interface MessageContentFixedProps {
 export const MessageContentFixed: React.FC<MessageContentFixedProps> = ({
   message,
   isDarkMode
-}) => {  // Verificar se é mídia (priorizando messageType) ou se é uma data URL
+}) => {
+  // Verificar se é mídia baseado no tipo e conteúdo
   const isMediaMessage = 
     (message.messageType && message.messageType !== 'text') ||
-    message.content.startsWith('data:') ||
-    (message.content.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(message.content.replace(/\s/g, '')));
+    isValidMediaUrl(message.content);
   
   console.log('🎯 [MESSAGE_CONTENT_FIXED] Rendering:', {
     messageId: message.id,
     messageType: message.messageType,
     isMediaMessage,
-    contentLength: message.content?.length || 0
+    isValidUrl: isValidMediaUrl(message.content)
   });
   
   if (isMediaMessage) {

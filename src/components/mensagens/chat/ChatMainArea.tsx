@@ -1,9 +1,10 @@
+
 import React, { useState, useRef, useLayoutEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChannelConversation } from '@/types/messages';
 import { ChatInput } from '@/components/mensagens/ChatInput';
 import { Button } from '@/components/ui/button';
-import { Brain, Loader2 } from 'lucide-react';
+import { Brain } from 'lucide-react';
 import { AIResumoOverlay } from '@/components/chat/AIResumoOverlay';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { MediaPlayer } from '@/components/ui/MediaPlayer';
@@ -22,10 +23,12 @@ interface Message {
   mensagemtype?: string;
   media_url?: string;
 }
+
 interface Conversation {
   contactName: string;
   contactNumber: string;
 }
+
 export interface ChatMainAreaProps {
   selectedConv?: ChannelConversation;
   conversationForHeader?: Conversation | null;
@@ -87,6 +90,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     const parts = (name || '').split(' ').filter(Boolean);
     return parts.slice(0, 2).join(' ') || name || 'Cliente';
   };
+  
   // Formatar hora como HH:mm
   const formatHour = (iso: string) => {
     try {
@@ -101,6 +105,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       return '--:--';
     }
   };
+  
   // Canal amigável
   const getChannelDisplayName = (channel: string) => {
     const mapping: Record<string, string> = {
@@ -116,28 +121,27 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
     return mapping[channel] || channel;
   };
 
-  // Função simplificada para detectar se é uma mensagem de mídia
+  // Função para verificar se uma mensagem contém mídia
   const isMediaMessage = (message: Message): boolean => {
-    // Verificar se há media_url válida
-    const hasValidMediaUrl = message.media_url && 
-      message.media_url.trim() !== '' && 
-      (message.media_url.startsWith('http') || message.media_url.includes('supabase.co/storage'));
+    // Verificar se o conteúdo é uma URL de mídia válida
+    const content = message.content || '';
     
-    // Verificar se o tipo de mensagem indica mídia
+    // Verificar se é URL HTTP/HTTPS válida
+    const isValidUrl = content.startsWith('http://') || content.startsWith('https://');
+    
+    // Verificar se o tipo indica mídia
     const isMediaType = message.mensagemtype && 
       ['image', 'audio', 'video', 'document', 'file'].includes(message.mensagemtype);
     
-    // Verificar se há fileUrl válida
-    const hasValidFileUrl = message.fileUrl && 
-      message.fileUrl.trim() !== '' && 
-      (message.fileUrl.startsWith('http') || message.fileUrl.includes('supabase.co/storage'));
+    // Verificar se há media_url válida
+    const hasMediaUrl = message.media_url && 
+      (message.media_url.startsWith('http://') || message.media_url.startsWith('https://'));
     
-    return hasValidMediaUrl || (isMediaType && (hasValidMediaUrl || hasValidFileUrl));
+    return (isValidUrl && isMediaType) || hasMediaUrl;
   };
 
-  // Função para obter o tipo de mídia baseado na URL e tipo
+  // Função para obter o tipo de mídia
   const getMediaType = (message: Message): 'image' | 'video' | 'audio' => {
-    // Priorizar o tipo já definido na mensagem
     if (message.mensagemtype) {
       switch (message.mensagemtype) {
         case 'image': return 'image';
@@ -147,40 +151,34 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       }
     }
     
-    const url = message.media_url || message.fileUrl || '';
-    if (!url) return 'image'; // Default fallback
-    
+    const url = message.media_url || message.content || '';
     const lowerUrl = url.toLowerCase();
     
-    if (lowerUrl.includes('image') || lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)($|\?)/)) {
+    if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)($|\?)/)) {
       return 'image';
     }
-    if (lowerUrl.includes('video') || lowerUrl.match(/\.(mp4|webm|avi|mov)($|\?)/)) {
+    if (lowerUrl.match(/\.(mp4|webm|avi|mov)($|\?)/)) {
       return 'video';
     }
-    if (lowerUrl.includes('audio') || lowerUrl.match(/\.(mp3|wav|ogg|m4a)($|\?)/)) {
+    if (lowerUrl.match(/\.(mp3|wav|ogg|m4a)($|\?)/)) {
       return 'audio';
     }
     
     return 'image'; // Default fallback
   };
 
-  // Função para construir a URL da mídia
+  // Função para obter a URL da mídia
   const getMediaUrl = (message: Message): string | null => {
     // Priorizar media_url se existir e for válida
-    if (message.media_url && message.media_url.trim() !== '') {
-      const mediaUrl = message.media_url.trim();
-      if (mediaUrl.startsWith('http') || mediaUrl.includes('supabase.co/storage')) {
-        return mediaUrl;
-      }
+    if (message.media_url && 
+        (message.media_url.startsWith('http://') || message.media_url.startsWith('https://'))) {
+      return message.media_url;
     }
     
-    // Fallback para fileUrl
-    if (message.fileUrl && message.fileUrl.trim() !== '') {
-      const fileUrl = message.fileUrl.trim();
-      if (fileUrl.startsWith('http') || fileUrl.includes('supabase.co/storage')) {
-        return fileUrl;
-      }
+    // Fallback para content se for URL válida
+    if (message.content && 
+        (message.content.startsWith('http://') || message.content.startsWith('https://'))) {
+      return message.content;
     }
     
     return null;
@@ -218,7 +216,6 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
       
       if (success) {
         console.log('✅ [MARK_RESOLVED] Conversa marcada como resolvida com sucesso');
-        // Chamar callback para atualizar a lista se existir
         if (onMarkAsResolved) {
           onMarkAsResolved();
         }
@@ -235,6 +232,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
         <p className="text-lg">Selecione uma conversa para começar</p>
       </div>;
   }
+
   return (
     <div className={cn("flex-1 flex flex-col h-full", isDarkMode ? "bg-[#09090b]" : "bg-white")}>
       {/* Header */}
@@ -316,7 +314,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                 ? formatHour((message as any).read_at)
                 : formatHour(message.timestamp || new Date().toISOString());
 
-              // Verificar se é uma mensagem de mídia de forma mais segura
+              // Verificar se é uma mensagem de mídia
               const isMedia = isMediaMessage(message);
               const mediaUrl = isMedia ? getMediaUrl(message) : null;
               const mediaType = mediaUrl ? getMediaType(message) : null;
@@ -352,7 +350,7 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                       )}
                     </div>
                     
-                    {/* Renderizar mídia apenas se tivermos URL válida */}
+                    {/* Renderizar mídia se disponível */}
                     {isMedia && mediaUrl && mediaType ? (
                       <div className="mb-2">
                         <MediaPlayer
@@ -365,8 +363,8 @@ export const ChatMainArea: React.FC<ChatMainAreaProps> = ({
                       </div>
                     ) : null}
                     
-                    {/* Sempre renderizar o conteúdo de texto se existir */}
-                    {message.content && message.content.trim() !== '' && (
+                    {/* Renderizar conteúdo de texto se não for mídia ou se for mídia com caption */}
+                    {(!isMedia || (isMedia && message.content && message.content !== mediaUrl)) && (
                       <p className="text-sm whitespace-pre-wrap">
                         {message.content}
                       </p>

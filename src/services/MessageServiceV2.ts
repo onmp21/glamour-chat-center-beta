@@ -1,73 +1,140 @@
 
-import { OptimizedMessageService } from './OptimizedMessageService';
 import { RawMessage, ChannelConversation } from '@/types/messages';
-import { MediaStorageService } from './MediaStorageService';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
+import { supabase } from '@/integrations/supabase/client';
 
 export class MessageServiceV2 {
-  private optimizedService: OptimizedMessageService;
   private channelId: string;
+  private tableName: string;
 
   constructor(channelId: string) {
     this.channelId = channelId;
-    this.optimizedService = OptimizedMessageService.getInstance(channelId);
+    this.tableName = getTableNameForChannelSync(channelId);
   }
 
   async getMessagesByConversation(sessionId: string, limit = 50): Promise<{ data: RawMessage[] }> {
     console.log(`📋 [MESSAGE_SERVICE_V2] Getting messages for conversation ${sessionId}`);
-    return await this.optimizedService.getMessagesByConversation(sessionId, limit);
+    
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('read_at', { ascending: true })
+        .limit(limit);
+
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE_V2] Database error:`, error);
+        return { data: [] };
+      }
+
+      const messages: RawMessage[] = (data || []).map((record: any) => ({
+        id: record.id?.toString() || Math.random().toString(),
+        content: record.message || '',
+        message: record.message || '',
+        timestamp: record.read_at || new Date().toISOString(),
+        sender: record.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
+        tipo_remetente: record.tipo_remetente,
+        session_id: record.session_id,
+        Nome_do_contato: record.nome_do_contato,
+        nome_do_contato: record.nome_do_contato,
+        contactName: record.nome_do_contato,
+        mensagemtype: record.mensagemtype || 'text',
+        media_url: record.media_url,
+        is_read: record.is_read
+      }));
+
+      console.log(`✅ [MESSAGE_SERVICE_V2] Retrieved ${messages.length} messages for conversation ${sessionId}`);
+      return { data: messages };
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE_V2] Error getting messages by conversation:`, error);
+      return { data: [] };
+    }
   }
 
   async getConversations(limit = 20): Promise<ChannelConversation[]> {
-    console.log(`📋 [MESSAGE_SERVICE_V2] Getting conversations with limit ${limit}`);
-    return await this.optimizedService.getConversations(limit);
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .select('*')
+        .order('read_at', { ascending: false })
+        .limit(limit * 10); // Buscar mais para agrupar por sessão
+
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE_V2] Database error:`, error);
+        return [];
+      }
+
+      const conversationsMap = new Map<string, ChannelConversation>();
+      
+      (data || []).forEach((message: any) => {
+        const sessionId = message.session_id;
+        if (!conversationsMap.has(sessionId)) {
+          conversationsMap.set(sessionId, {
+            id: sessionId,
+            contact_name: message.nome_do_contato || message.Nome_do_contato || 'Unknown',
+            contact_phone: this.extractPhoneFromSessionId(sessionId),
+            last_message: message.message,
+            last_message_time: message.read_at || new Date().toISOString(),
+            status: message.is_read ? 'resolved' : 'unread',
+            updated_at: message.read_at || new Date().toISOString(),
+            unread_count: message.is_read ? 0 : 1
+          });
+        }
+      });
+
+      return Array.from(conversationsMap.values()).slice(0, limit);
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE_V2] Error getting conversations:`, error);
+      return [];
+    }
   }
 
   async saveMessage(messageData: Partial<RawMessage>): Promise<RawMessage> {
     console.log(`💾 [MESSAGE_SERVICE_V2] Saving message`);
     
-    // Se a mensagem contém base64, processar automaticamente
-    if (messageData.content && messageData.content.startsWith('data:')) {
-      console.log(`🔄 [MESSAGE_SERVICE_V2] Detected base64 content, processing...`);
-      
-      const uploadResult = await MediaStorageService.uploadBase64ToStorage(messageData.content);
-      
-      if (uploadResult.success) {
-        messageData.content = uploadResult.url!;
-        messageData.media_base64 = uploadResult.url!;
-        console.log(`✅ [MESSAGE_SERVICE_V2] Base64 processed and uploaded to storage`);
-      } else {
-        console.error(`❌ [MESSAGE_SERVICE_V2] Failed to upload base64:`, uploadResult.error);
-      }
-    }
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName as any)
+        .insert({
+          session_id: messageData.session_id,
+          message: messageData.content || messageData.message || '',
+          nome_do_contato: messageData.contactName || messageData.nome_do_contato,
+          mensagemtype: messageData.mensagemtype || 'text',
+          tipo_remetente: messageData.tipo_remetente || 'CONTATO_EXTERNO',
+          media_url: messageData.media_url,
+          is_read: messageData.is_read || false,
+          read_at: messageData.timestamp || new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    // Usar o serviço original para salvar (mantendo compatibilidade)
-    const { MessageService } = await import('./MessageService');
-    const originalService = new MessageService();
-    return await originalService.saveMessage(messageData);
+      if (error) {
+        console.error(`❌ [MESSAGE_SERVICE_V2] Error saving message:`, error);
+        throw error;
+      }
+
+      return {
+        id: data.id.toString(),
+        content: data.message,
+        message: data.message,
+        timestamp: data.read_at,
+        sender: data.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
+        tipo_remetente: data.tipo_remetente,
+        session_id: data.session_id,
+        contactName: data.nome_do_contato,
+        mensagemtype: data.mensagemtype,
+        media_url: data.media_url,
+        is_read: data.is_read
+      };
+    } catch (error) {
+      console.error(`❌ [MESSAGE_SERVICE_V2] Error saving message:`, error);
+      throw error;
+    }
   }
 
-  async migrateBase64(): Promise<void> {
-    console.log(`🔄 [MESSAGE_SERVICE_V2] Starting base64 migration`);
-    
-    const processed = await this.optimizedService.migrateChannelBase64();
-    
-    if (processed > 0) {
-      console.log(`✅ [MESSAGE_SERVICE_V2] Migration completed: ${processed} records processed`);
-    } else {
-      console.log(`ℹ️ [MESSAGE_SERVICE_V2] No base64 records found to migrate`);
-    }
-  }
-
-  async processBackgroundOptimization(): Promise<void> {
-    console.log(`🔄 [MESSAGE_SERVICE_V2] Starting background optimization`);
-    
-    // Executar migração em background sem bloquear a UI
-    setTimeout(async () => {
-      try {
-        await this.migrateBase64();
-      } catch (error) {
-        console.error(`❌ [MESSAGE_SERVICE_V2] Background optimization failed:`, error);
-      }
-    }, 2000); // Aguardar 2 segundos para não afetar o carregamento inicial
+  private extractPhoneFromSessionId(sessionId: string): string {
+    const match = sessionId.match(/(\d+)@/);
+    return match ? match[1] : sessionId;
   }
 }
