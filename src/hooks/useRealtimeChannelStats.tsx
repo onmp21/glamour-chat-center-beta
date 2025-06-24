@@ -33,17 +33,18 @@ export const useRealtimeChannelStats = (channelId: string | null) => {
     try {
       const tableName = getTableNameForChannelSync(channelId);
       
-      // Contar conversas únicas (session_ids únicos)
+      // Contar conversas únicas (session_ids únicos) - query mais específica
       const { data: conversationsData, error: conversationsError } = await supabase
         .from(tableName as any)
         .select('session_id')
-        .order('read_at', { ascending: false });
+        .not('session_id', 'is', null);
 
-      // Contar mensagens não lidas
+      // Contar mensagens não lidas (apenas de contatos externos)
       const { count: unreadCount, error: unreadError } = await supabase
         .from(tableName as any)
         .select('id', { count: 'exact', head: true })
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .neq('tipo_remetente', 'USUARIO_INTERNO');
 
       if (conversationsError || unreadError) {
         console.error('❌ [REALTIME_CHANNEL_STATS] Error:', conversationsError || unreadError);
@@ -55,10 +56,14 @@ export const useRealtimeChannelStats = (channelId: string | null) => {
         return;
       }
 
-      // Contar conversas únicas - check if data exists and is array
+      // Contar conversas únicas - corrigido para evitar contagem duplicada
       let uniqueConversations = 0;
       if (conversationsData && Array.isArray(conversationsData)) {
-        const uniqueSessions = new Set(conversationsData.map((row: any) => row.session_id));
+        const uniqueSessions = new Set(
+          conversationsData
+            .map((row: any) => row.session_id)
+            .filter(sessionId => sessionId && sessionId.trim() !== '')
+        );
         uniqueConversations = uniqueSessions.size;
       }
 

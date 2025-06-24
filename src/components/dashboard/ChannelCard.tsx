@@ -36,7 +36,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   
   const channelIsPinned = isPinned(channelId);
 
-  // Mostrar conversas não lidas no badge, total no texto
+  // Corrigido: usar unreadMessages diretamente para badge
   const unreadCount = unreadMessages;
   const totalCount = totalConversations;
   
@@ -156,7 +156,7 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             {loading ? 'Carregando...' : 'Atualizado em tempo real'}
           </p>
           
-          {/* Texto de contagem total de conversas */}
+          {/* Texto de contagem total de conversas - formatado corretamente */}
           <p className={cn(
             "text-xs font-medium",
             isDarkMode ? "text-gray-400" : "text-gray-600"

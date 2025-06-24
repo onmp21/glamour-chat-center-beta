@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
+import { formatWhatsAppDate } from '@/utils/dateUtils';
 
 interface ConversationCardProps {
   conversation: ChannelConversation;
@@ -77,10 +78,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
               "text-xs flex-shrink-0",
               isDarkMode ? "text-gray-500" : "text-gray-500"
             )}>
-              {conversation.last_message_time && new Date(conversation.last_message_time).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatWhatsAppDate(conversation.last_message_time)}
             </span>
             {/* Só mostrar badge se unread_count > 0 e status não é resolved */}
             {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (

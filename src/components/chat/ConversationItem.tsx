@@ -3,11 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, isToday, isYesterday } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { useAuditLogger } from '@/hooks/useAuditLogger';
+import { formatWhatsAppDate } from '@/utils/dateUtils';
 
 interface ConversationItemProps {
   conversation: ChannelConversation;
@@ -54,20 +53,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const displayName = getDisplayName();
 
-  const formatTime = (timestamp: string | null) => {
-    if (!timestamp) return '';
-    try {
-      const date = new Date(timestamp);
-      // Formato HH:MM como solicitado
-      return format(date, 'HH:mm', {
-        locale: ptBR
-      });
-    } catch {
-      // Fallback em caso de formato inválido
-      return ''; 
-    }
-  };
-
   // Só mostrar badge se for unread (pendente) E se unread_count > 0
   const showUnreadBadge = currentStatus === 'unread' && (conversation.unread_count || 0) > 0;
 
@@ -88,7 +73,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     onClick();
   };
 
-
   return (
     <div 
       onClick={handleClick} 
@@ -105,7 +89,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           </h3>
           <div className="flex items-center space-x-2">
             <span className={cn("text-xs flex-shrink-0", isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")}>
-              {formatTime(conversation.last_message_time)}
+              {formatWhatsAppDate(conversation.last_message_time)}
             </span>
             {/* Só mostrar badge se for unread (pendente) E se unread_count > 0 */}
             {showUnreadBadge && (
