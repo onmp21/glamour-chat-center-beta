@@ -7,13 +7,9 @@ interface SimpleConversationsListWithRealtimeProps {
   activeConversation?: string | null;
   onConversationSelect: (conversationId: string) => void;
   isDarkMode: boolean;
-  enableRealtime?: boolean;
 }
 
-export const SimpleConversationsListWithRealtime: React.FC<SimpleConversationsListWithRealtimeProps> = ({
-  enableRealtime = true,
-  ...props
-}) => {
-  // Usar apenas realtime nativo do Supabase
+export const SimpleConversationsListWithRealtime: React.FC<SimpleConversationsListWithRealtimeProps> = (props) => {
+  // Usar apenas realtime nativo do Supabase - removido polling
   return <RealtimeConversationsList {...props} />;
 };

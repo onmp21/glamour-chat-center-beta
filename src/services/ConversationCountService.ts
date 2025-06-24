@@ -10,13 +10,14 @@ export class ConversationCountService {
     const cacheKey = `count-${channelId}`;
     const cached = this.cache.get(cacheKey);
     
+    // Cache reduzido para realtime
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
       console.log(`📊 [COUNT_SERVICE] Cache hit for ${channelId}: ${cached.count}`);
       return cached.count;
     }
 
     try {
-      const tableName = getTableNameForChannel(channelId);
+      const tableName = await getTableNameForChannel(channelId);
       console.log(`🔢 [COUNT_SERVICE] Counting conversations for ${channelId} in ${tableName}`);
       
       // Query otimizada - só conta session_ids únicos
@@ -29,10 +30,9 @@ export class ConversationCountService {
         return 0;
       }
 
-      // Contar session_ids únicos seria mais preciso, mas count já nos dá uma aproximação
       const count = data?.length || 0;
       
-      // Cache o resultado
+      // Cache o resultado por tempo reduzido
       this.cache.set(cacheKey, { count, timestamp: Date.now() });
       
       console.log(`✅ [COUNT_SERVICE] Found ${count} conversations for ${channelId}`);
@@ -47,12 +47,13 @@ export class ConversationCountService {
     const cacheKey = `unread-${channelId}`;
     const cached = this.cache.get(cacheKey);
     
+    // Cache reduzido para realtime
     if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
       return cached.count;
     }
 
     try {
-      const tableName = getTableNameForChannel(channelId);
+      const tableName = await getTableNameForChannel(channelId);
       
       // Query otimizada - só conta mensagens não lidas
       const { count, error } = await supabase

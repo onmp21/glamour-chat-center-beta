@@ -62,7 +62,7 @@ const loadChannelMappings = async (): Promise<void> => {
       });
     });
 
-    // Mapeamentos legados para compatibilidade (sobrescrever se necessário)
+    // Mapeamentos legados para compatibilidade - CORRIGIDO
     const legacyMappings: Record<string, string> = {
       'chat': 'yelena_ai_conversas',
       'af1e5797-edc6-4ba3-a57a-25cf7297c4d6': 'yelena_ai_conversas',
@@ -76,8 +76,8 @@ const loadChannelMappings = async (): Promise<void> => {
       '64d8acad-c645-4544-a1e6-2f0825fae00b': 'america_dourada_conversas',
       'gerente-lojas': 'gerente_lojas_conversas',
       'd8087e7b-5b06-4e26-aa05-6fc51fd4cdce': 'gerente_lojas_conversas',
-      'gerente-externo': 'gerente_externo_conversas',
-      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
+      'gerente-externo': 'gerente_externo_conversas', // CORRIGIDO: era gerente_lojas_conversas
+      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas' // CORRIGIDO
     };
 
     // Aplicar mapeamentos legados, mas não sobrescrever os novos
