@@ -31,9 +31,12 @@ export class ConversationCountService {
         return 0;
       }
 
-      // Contar conversas únicas
-      const uniqueSessions = new Set(data?.map(row => row.session_id) || []);
-      const count = uniqueSessions.size;
+      // Contar conversas únicas - check if data exists and is array
+      let count = 0;
+      if (data && Array.isArray(data)) {
+        const uniqueSessions = new Set(data.map((row: any) => row.session_id));
+        count = uniqueSessions.size;
+      }
       
       // Cache o resultado por tempo mínimo
       this.cache.set(cacheKey, { count, timestamp: Date.now() });

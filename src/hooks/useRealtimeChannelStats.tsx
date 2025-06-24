@@ -55,8 +55,12 @@ export const useRealtimeChannelStats = (channelId: string | null) => {
         return;
       }
 
-      // Contar conversas únicas
-      const uniqueConversations = new Set(conversationsData?.map(row => row.session_id) || []).size;
+      // Contar conversas únicas - check if data exists and is array
+      let uniqueConversations = 0;
+      if (conversationsData && Array.isArray(conversationsData)) {
+        const uniqueSessions = new Set(conversationsData.map((row: any) => row.session_id));
+        uniqueConversations = uniqueSessions.size;
+      }
 
       if (mountedRef.current) {
         setStats({
