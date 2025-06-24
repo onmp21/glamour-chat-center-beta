@@ -111,6 +111,10 @@ export class MessageServiceV2 {
         throw error;
       }
 
+      if (!data) {
+        throw new Error('No data returned from insert operation');
+      }
+
       return {
         id: data.id.toString(),
         content: data.message,
