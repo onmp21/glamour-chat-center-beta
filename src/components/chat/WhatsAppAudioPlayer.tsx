@@ -1,8 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, AlertCircle, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MediaProcessor } from '@/services/MediaProcessor';
 
 interface WhatsAppAudioPlayerProps {
   audioContent: string;
@@ -26,43 +24,28 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  // Processar áudio na inicialização
+  // Verificar se é URL válida de áudio
   useEffect(() => {
-    console.log('🎵 [WHATSAPP_AUDIO_PLAYER] Processing audio for message:', messageId);
-    
-    // Use processAsync instead of processAudio
-    MediaProcessor.processAsync(audioContent, 'audio').then(result => {
-      if (result.isProcessed && result.url) {
-        console.log('✅ [WHATSAPP_AUDIO_PLAYER] Audio processed successfully:', {
-          messageId,
-          mimeType: result.mimeType,
-          size: result.size
-        });
-        setAudioUrl(result.url);
-        setHasError(false);
-      } else {
-        console.error('❌ [WHATSAPP_AUDIO_PLAYER] Failed to process audio:', result.error);
-        setHasError(true);
-        onError?.();
-      }
-    }).catch(error => {
-      console.error('❌ [WHATSAPP_AUDIO_PLAYER] Processing error:', error);
+    if (!audioContent || (!audioContent.startsWith('http://') && !audioContent.startsWith('https://'))) {
+      console.error('❌ [WHATSAPP_AUDIO_PLAYER] Invalid audio URL:', audioContent);
       setHasError(true);
       onError?.();
-    });
+      return;
+    }
+
+    console.log('🎵 [WHATSAPP_AUDIO_PLAYER] Loading audio for message:', messageId);
   }, [audioContent, messageId, onError]);
 
-  // Configurar eventos do áudio quando URL estiver disponível
+  // Configurar eventos do áudio
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    if (!audio || hasError) return;
 
     let loadTimeout: NodeJS.Timeout;
 
@@ -147,7 +130,7 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [audioUrl, messageId, isLoaded, hasError, onLoadStart, onLoadEnd, onError, volume, isMuted, playbackRate]);
+  }, [audioContent, messageId, isLoaded, hasError, onLoadStart, onLoadEnd, onError, volume, isMuted, playbackRate]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -277,7 +260,7 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
       "whatsapp-audio-player p-3 rounded-lg max-w-[280px] space-y-2",
       isDarkMode ? "bg-[#272728] border border-[#363537]" : "bg-gray-50 border border-gray-200"
     )}>
-      <audio ref={audioRef} src={audioUrl || undefined} preload="metadata" />
+      <audio ref={audioRef} src={audioContent} preload="metadata" />
       
       {/* Linha principal - Controles e tempo */}
       <div className="flex items-center gap-2">
@@ -299,22 +282,15 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
           )}
         </button>
 
-        {/* Barra de progresso - Estilo WhatsApp */}
+        {/* Barra de progresso simples */}
         <div className="flex-1 flex items-center gap-2">
-          <div 
-            ref={progressRef}
-            className="flex-1 bg-gray-300 dark:bg-gray-600 rounded-full h-1 cursor-pointer relative overflow-hidden"
-            onClick={handleProgressClick}
-          >
+          <div className="flex-1 bg-gray-300 dark:bg-gray-600 rounded-full h-1">
             <div 
-              className="bg-[#25d366] h-1 rounded-full transition-all duration-150 relative"
+              className="bg-[#25d366] h-1 rounded-full transition-all duration-150"
               style={{ width: `${progressPercentage}%` }}
-            >
-              <div className="absolute right-0 top-0 w-2 h-2 bg-[#25d366] rounded-full shadow-sm transform -translate-y-0.5 translate-x-1"></div>
-            </div>
+            />
           </div>
           
-          {/* Tempo - Estilo WhatsApp */}
           <div className={cn(
             "text-xs font-mono",
             isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -322,70 +298,6 @@ export const WhatsAppAudioPlayer: React.FC<WhatsAppAudioPlayerProps> = ({
             {formatTime(currentTime)}
           </div>
         </div>
-
-        {/* Controles secundários */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={changePlaybackRate}
-            className={cn(
-              "px-1.5 py-0.5 rounded text-xs font-mono transition-colors",
-              isDarkMode ? "hover:bg-gray-600 text-gray-400" : "hover:bg-gray-200 text-gray-600"
-            )}
-            title="Velocidade de reprodução"
-          >
-            {playbackRate}x
-          </button>
-        </div>
-      </div>
-      
-      {/* Linha de volume - Compacta */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={toggleMute}
-          className={cn(
-            "p-1 rounded-full transition-colors",
-            isDarkMode ? "hover:bg-gray-600 text-gray-400" : "hover:bg-gray-200 text-gray-600"
-          )}
-        >
-          {isMuted || volume === 0 ? (
-            <VolumeX size={12} />
-          ) : (
-            <Volume2 size={12} />
-          )}
-        </button>
-        
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.1"
-          value={isMuted ? 0 : volume}
-          onChange={handleVolumeChange}
-          className={cn(
-            "flex-1 h-1 rounded-lg appearance-none cursor-pointer",
-            "bg-gray-300 dark:bg-gray-600",
-            "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2",
-            "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#25d366] [&::-webkit-slider-thumb]:cursor-pointer"
-          )}
-        />
-        
-        <span className={cn(
-          "text-xs font-mono w-6 text-right",
-          isDarkMode ? "text-gray-400" : "text-gray-500"
-        )}>
-          {Math.round((isMuted ? 0 : volume) * 100)}
-        </span>
-
-        <button
-          onClick={resetAudio}
-          className={cn(
-            "p-1 rounded-full transition-colors",
-            isDarkMode ? "hover:bg-gray-600 text-gray-400" : "hover:bg-gray-200 text-gray-600"
-          )}
-          title="Reiniciar"
-        >
-          <RotateCcw size={12} />
-        </button>
       </div>
     </div>
   );

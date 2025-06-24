@@ -38,9 +38,7 @@ export class MessageServiceV2 {
         session_id: record.session_id,
         Nome_do_contato: record.nome_do_contato,
         nome_do_contato: record.nome_do_contato,
-        contactName: record.nome_do_contato,
         mensagemtype: record.mensagemtype || 'text',
-        media_url: record.media_url,
         is_read: record.is_read
       }));
 
@@ -58,7 +56,7 @@ export class MessageServiceV2 {
         .from(this.tableName as any)
         .select('*')
         .order('read_at', { ascending: false })
-        .limit(limit * 10); // Buscar mais para agrupar por sessão
+        .limit(limit * 10);
 
       if (error) {
         console.error(`❌ [MESSAGE_SERVICE_V2] Database error:`, error);
@@ -99,10 +97,9 @@ export class MessageServiceV2 {
         .insert({
           session_id: messageData.session_id,
           message: messageData.content || messageData.message || '',
-          nome_do_contato: messageData.contactName || messageData.nome_do_contato,
+          nome_do_contato: messageData.nome_do_contato,
           mensagemtype: messageData.mensagemtype || 'text',
           tipo_remetente: messageData.tipo_remetente || 'CONTATO_EXTERNO',
-          media_url: messageData.media_url,
           is_read: messageData.is_read || false,
           read_at: messageData.timestamp || new Date().toISOString()
         })
@@ -122,9 +119,8 @@ export class MessageServiceV2 {
         sender: data.tipo_remetente === 'USUARIO_INTERNO' ? 'agent' : 'user',
         tipo_remetente: data.tipo_remetente,
         session_id: data.session_id,
-        contactName: data.nome_do_contato,
+        nome_do_contato: data.nome_do_contato,
         mensagemtype: data.mensagemtype,
-        media_url: data.media_url,
         is_read: data.is_read
       };
     } catch (error) {

@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MediaProcessor } from '@/services/MediaProcessor';
 
 interface AudioPlayerFixedProps {
   audioSrc: string;
@@ -20,57 +19,37 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [processedAudioSrc, setProcessedAudioSrc] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-
-  // Processar áudio usando MediaProcessor assíncrono
-  useEffect(() => {
-    const processAudio = async () => {
-      if (!audioSrc) return;
-      
-      setLoading(true);
-      try {
-        console.log(`🎵 [AUDIO_PLAYER] Processando áudio:`, audioSrc.substring(0, 50));
-        
-        // USAR MÉTODO ASSÍNCRONO CORRETO
-        const result = await MediaProcessor.processAsync(audioSrc, 'audio');
-        if (result.isProcessed && result.url) {
-          setProcessedAudioSrc(result.url);
-          console.log(`✅ [AUDIO_PLAYER] Áudio processado com sucesso`);
-        } else {
-          console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', result.error);
-          setProcessedAudioSrc(audioSrc); // Fallback para src original
-        }
-      } catch (error) {
-        console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', error);
-        setProcessedAudioSrc(audioSrc); // Fallback para src original
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    processAudio();
-  }, [audioSrc]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !processedAudioSrc) return;
+    if (!audio) return;
 
     const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
+    const updateDuration = () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    };
     const onEnded = () => setIsPlaying(false);
+    const onError = () => {
+      setError(true);
+      setLoading(false);
+    };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
     };
-  }, [processedAudioSrc]);
+  }, [audioSrc]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -117,7 +96,7 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
     );
   }
 
-  if (!processedAudioSrc) {
+  if (error) {
     return (
       <div className={cn(
         "flex items-center space-x-2 p-2 rounded-lg",
@@ -144,7 +123,7 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
           : "bg-white text-gray-900",
       className
     )}>
-      <audio ref={audioRef} src={processedAudioSrc} />
+      <audio ref={audioRef} src={audioSrc} />
       
       <button
         onClick={togglePlayPause}
@@ -156,7 +135,6 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
               ? "bg-gray-600 hover:bg-gray-500 text-white" 
               : "bg-gray-200 hover:bg-gray-300 text-gray-900"
         )}
-        disabled={!processedAudioSrc}
       >
         {isPlaying ? <Pause size={14} /> : <Play size={14} />}
       </button>
@@ -176,33 +154,6 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
                 ? "bg-gray-600" 
                 : "bg-gray-300"
           )}
-          style={{
-            background: `linear-gradient(to right, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.5)' 
-                : isDarkMode 
-                  ? '#9ca3af' 
-                  : '#6b7280'
-            } 0%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.5)' 
-                : isDarkMode 
-                  ? '#9ca3af' 
-                  : '#6b7280'
-            } ${(currentTime / (duration || 1)) * 100}%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.2)' 
-                : isDarkMode 
-                  ? '#4b5563' 
-                  : '#d1d5db'
-            } ${(currentTime / (duration || 1)) * 100}%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.2)' 
-                : isDarkMode 
-                  ? '#4b5563' 
-                  : '#d1d5db'
-            } 100%)`
-          }}
         />
         
         <div className="flex justify-between text-xs opacity-75">
