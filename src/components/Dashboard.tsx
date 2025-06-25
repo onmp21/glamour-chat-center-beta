@@ -8,6 +8,7 @@ import { ChatOverlay } from './mensagens/ChatOverlay';
 import { cn } from '@/lib/utils';
 import { useExams } from '@/hooks/useExams';
 import { BarChart3 } from 'lucide-react';
+import { GlobalRealtimeStatsProvider } from '@/contexts/GlobalRealtimeStatsContext';
 
 interface DashboardProps {
   isDarkMode: boolean;
@@ -48,7 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <>
+    <GlobalRealtimeStatsProvider>
       <div className={cn(
         "h-full flex flex-col",
         isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
@@ -110,6 +111,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onClose={handleCloseOverlay}
         />
       )}
-    </>
+    </GlobalRealtimeStatsProvider>
   );
 };

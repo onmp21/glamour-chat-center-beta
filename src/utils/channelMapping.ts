@@ -1,11 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Cache para mapeamentos
+// Cache para mapeamentos - SEM cache baseado em tempo
 let channelMappingCache: Record<string, string> = {};
 let displayNameCache: Record<string, string> = {};
-let lastCacheUpdate = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // Função para gerar nome da tabela baseado no nome do canal
 const generateTableName = (channelName: string): string => {
@@ -25,7 +23,7 @@ const generateLegacyId = (channelName: string): string => {
     .replace(/^-|-$/g, '');
 };
 
-// Função para carregar mapeamentos do banco
+// Função para carregar mapeamentos do banco - SEM cache temporal
 const loadChannelMappings = async (): Promise<void> => {
   try {
     const { data: channels, error } = await supabase
@@ -87,21 +85,15 @@ const loadChannelMappings = async (): Promise<void> => {
       }
     });
 
-    lastCacheUpdate = Date.now();
     console.log('✅ Mapeamentos de canais carregados:', channelMappingCache);
   } catch (error) {
     console.error('Erro inesperado ao carregar mapeamentos:', error);
   }
 };
 
-// Função para verificar se cache precisa ser atualizado
-const shouldUpdateCache = (): boolean => {
-  return Date.now() - lastCacheUpdate > CACHE_DURATION;
-};
-
 export const getTableNameForChannel = async (channelId: string): Promise<string> => {
-  // Atualizar cache se necessário
-  if (shouldUpdateCache() || Object.keys(channelMappingCache).length === 0) {
+  // Se cache vazio, carregar uma vez
+  if (Object.keys(channelMappingCache).length === 0) {
     await loadChannelMappings();
   }
 
@@ -109,8 +101,8 @@ export const getTableNameForChannel = async (channelId: string): Promise<string>
 };
 
 export const getChannelDisplayName = async (channelId: string): Promise<string> => {
-  // Atualizar cache se necessário
-  if (shouldUpdateCache() || Object.keys(displayNameCache).length === 0) {
+  // Se cache vazio, carregar uma vez
+  if (Object.keys(displayNameCache).length === 0) {
     await loadChannelMappings();
   }
 
@@ -130,7 +122,6 @@ export const getChannelDisplayNameSync = (channelId: string): string => {
 export const invalidateChannelCache = (): void => {
   channelMappingCache = {};
   displayNameCache = {};
-  lastCacheUpdate = 0;
   console.log('🔄 [CHANNEL_MAPPING] Cache invalidado - próxima consulta recarregará do banco');
 };
 

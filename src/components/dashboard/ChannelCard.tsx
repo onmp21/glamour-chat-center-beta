@@ -3,8 +3,8 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Bot, Store, Users, Pin } from 'lucide-react';
-import { useOptimizedChannelStats } from '@/hooks/useOptimizedChannelStats';
 import { useChannelPin } from '@/hooks/useChannelPin';
+import { useGlobalRealtimeStats } from '@/contexts/GlobalRealtimeStatsContext';
 
 interface ChannelCardProps {
   channelId: string;
@@ -21,13 +21,14 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   isDarkMode,
   onClick
 }) => {
-  // Usar hook otimizado sem polling
+  // Usar estatísticas globais - SEM criar nova subscrição
+  const { getChannelStats } = useGlobalRealtimeStats();
   const {
     totalConversations,
     unreadMessages,
     loading,
     error
-  } = useOptimizedChannelStats(channelId);
+  } = getChannelStats(channelId);
   
   const {
     isPinned,

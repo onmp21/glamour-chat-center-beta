@@ -1,10 +1,10 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileNavigation } from '@/components/MobileNavigation';
 import { ContentRenderer } from './ContentRenderer';
 import { useLayout } from './LayoutProvider';
-import { useRealtimeSubscriptionManager } from '@/hooks/useRealtimeSubscriptionManager';
 
 export const MainLayoutContainer: React.FC = () => {
   const {
@@ -18,9 +18,6 @@ export const MainLayoutContainer: React.FC = () => {
   } = useLayout();
 
   const [targetConversationId, setTargetConversationId] = useState<string | null>(null);
-
-  // Usar o hook para gerenciar subscrições de forma segura
-  const { cleanupAllSubscriptions } = useRealtimeSubscriptionManager();
 
   const chatChannels = useMemo(() => [
     'chat', 'canarana', 'souto-soares', 'joao-dourado',
@@ -37,15 +34,6 @@ export const MainLayoutContainer: React.FC = () => {
       setIsSidebarCollapsed(true);
     }
   }, [activeSection, setIsSidebarCollapsed]);
-
-  // Limpeza adicional quando a seção muda
-  useEffect(() => {
-    // Limpar subscrições quando mudar de seção para evitar conflitos
-    if (activeSection === 'mensagens') {
-      console.log('🔄 [MAIN_LAYOUT] Switching to messages section, cleaning up subscriptions');
-      cleanupAllSubscriptions();
-    }
-  }, [activeSection, cleanupAllSubscriptions]);
 
   const handleSectionChange = (section: string) => {
     setActiveSection(section);
@@ -102,4 +90,3 @@ export const MainLayoutContainer: React.FC = () => {
     </div>
   );
 };
-
