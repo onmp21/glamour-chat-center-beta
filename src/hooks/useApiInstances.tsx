@@ -27,11 +27,11 @@ export function useApiInstances() {
     }
   }, []);
 
-  const createInstance = useCallback(async (instanceData: ApiInstance): Promise<ApiInstance | null> => {
+  const createInstance = useCallback(async (instanceData: Omit<ApiInstance, 'id' | 'created_at' | 'updated_at'>): Promise<ApiInstance | null> => {
     try {
       setError(null);
       console.log('🚀 Creating new API instance:', instanceData);
-      const newInstance = await apiInstanceRepository.create(instanceData);
+      const newInstance = await apiInstanceRepository.create(instanceData as ApiInstance);
       console.log('✅ API instance created:', newInstance);
       
       // Immediately refresh instances after creation

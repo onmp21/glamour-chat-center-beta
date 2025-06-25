@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { SimpleMessageHistoryWithRealtime } from './SimpleMessageHistoryWithRealtime';
+import { RealtimeMessageHistory } from './RealtimeMessageHistory';
 
 interface SimpleMessageHistoryProps {
   channelId: string | null;
@@ -9,5 +9,6 @@ interface SimpleMessageHistoryProps {
 }
 
 export const SimpleMessageHistory: React.FC<SimpleMessageHistoryProps> = (props) => {
-  return <SimpleMessageHistoryWithRealtime {...props} enableRealtime={true} />;
+  // Usar apenas realtime nativo do Supabase
+  return <RealtimeMessageHistory {...props} />;
 };

@@ -21,6 +21,7 @@ interface ConversationMessage {
   message: string;
   read_at: string;
   tipo_remetente?: string;
+  is_read?: boolean;
 }
 
 export const useNonRealtimeConversations = (channelId: string | null) => {
@@ -69,11 +70,12 @@ export const useNonRealtimeConversations = (channelId: string | null) => {
       
       const tableName = getTableName(channelId);
 
+      // Aumentar limite significativamente para pegar todas as mensagens
       const queryResult = await supabase
         .from(tableName as any)
-        .select('session_id, nome_do_contato, message, read_at, tipo_remetente')
+        .select('session_id, nome_do_contato, message, read_at, tipo_remetente, is_read')
         .order('read_at', { ascending: false })
-        .limit(200);
+        .limit(1000); // Aumentado de 200 para 1000
 
       if (queryResult.error) {
         console.error('❌ [NON_REALTIME_CONVERSATIONS] Erro na query:', queryResult.error);
@@ -82,11 +84,16 @@ export const useNonRealtimeConversations = (channelId: string | null) => {
       }
 
       const rawData = queryResult.data;
+      console.log(`📋 [NON_REALTIME_CONVERSATIONS] Query executada. Registros recebidos:`, rawData?.length || 0);
+
+      // Melhorar o agrupamento e processamento das conversas
       const conversationsMap = new Map<string, SimpleConversation>();
       
       if (rawData && Array.isArray(rawData)) {
         for (const message of rawData as unknown as ConversationMessage[]) {
           const sessionId = message.session_id;
+          
+          if (!sessionId) continue; // Pular mensagens sem session_id
           
           if (!conversationsMap.has(sessionId)) {
             const phoneNumber = extractPhoneFromSession(sessionId);
@@ -102,17 +109,42 @@ export const useNonRealtimeConversations = (channelId: string | null) => {
               contact_phone: phoneNumber,
               last_message: message.message || '',
               last_message_time: message.read_at || new Date().toISOString(),
-              status: 'unread' as const,
-              unread_count: 0,
+              status: (message.is_read === false) ? 'unread' : 'resolved',
+              unread_count: (message.is_read === false) ? 1 : 0,
               updated_at: message.read_at || new Date().toISOString()
             });
+          } else {
+            // Atualizar conversa existente se a mensagem for mais recente
+            const existing = conversationsMap.get(sessionId)!;
+            
+            // Contar mensagens não lidas
+            if (message.is_read === false) {
+              existing.unread_count++;
+              existing.status = 'unread';
+            }
+            
+            // Manter a mensagem mais recente como última mensagem
+            if (message.read_at && message.read_at > existing.last_message_time) {
+              existing.last_message = message.message || existing.last_message;
+              existing.last_message_time = message.read_at;
+              existing.updated_at = message.read_at;
+            }
           }
         }
       }
 
+      // Converter para array e ordenar por última atividade
       const conversations = Array.from(conversationsMap.values())
         .sort((a, b) => new Date(b.last_message_time).getTime() - new Date(a.last_message_time).getTime());
 
+      console.log(`✅ [NON_REALTIME_CONVERSATIONS] ${conversations.length} conversas únicas processadas`);
+      console.log('🔍 [NON_REALTIME_CONVERSATIONS] Primeiras 5 conversas:', conversations.slice(0, 5).map(c => ({
+        id: c.id,
+        name: c.contact_name,
+        lastMessage: c.last_message.substring(0, 50),
+        unreadCount: c.unread_count
+      })));
+      
       setConversations(conversations);
 
     } catch (err) {

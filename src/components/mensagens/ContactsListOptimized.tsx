@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { OptimizedContact } from '@/services/OptimizedContactService';
 import { useUnifiedContacts } from '@/hooks/useUnifiedContacts';
 import { getChannelDisplayNameSync } from '@/utils/channelMapping';
+import { formatWhatsAppDate } from '@/utils/dateUtils';
 
 interface ContactsListOptimizedProps {
   contacts?: OptimizedContact[];
@@ -16,16 +17,11 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
   onContactClick,
   isDarkMode
 }) => {
-  // Usar hook unificado para carregar contatos de todos os canais (separados por canal)
+  // Usar hook unificado para carregar contatos de todos os canais
   const { contacts: hookContacts, loading, error, loadingProgress } = useUnifiedContacts();
   
   // Usar contatos do hook se não foram passados como prop
   const contacts = propContacts || hookContacts;
-
-  const formatTimeAgo = (tempo: string): string => {
-    if (!tempo) return '';
-    return tempo;
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -164,7 +160,7 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
                 "text-xs",
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               )}>
-                {formatTimeAgo(contact.tempo)}
+                {formatWhatsAppDate(contact.tempo)}
               </span>
               
               <span className={cn(

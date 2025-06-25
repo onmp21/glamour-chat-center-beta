@@ -1,15 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-
-export interface ApiInstance {
-  id?: string;
-  instance_name: string;
-  base_url: string;
-  api_key: string;
-  created_at?: string;
-  updated_at?: string;
-}
+import { ApiInstance } from '@/types/domain/api/ApiInstance';
 
 export function useApiInstances() {
   const [instances, setInstances] = useState<ApiInstance[]>([]);
@@ -30,7 +22,14 @@ export function useApiInstances() {
 
       if (error) throw error;
 
-      setInstances(data || []);
+      // Ensure the data conforms to ApiInstance type
+      const formattedInstances: ApiInstance[] = (data || []).map(instance => ({
+        ...instance,
+        id: instance.id,
+        created_at: instance.created_at,
+      }));
+
+      setInstances(formattedInstances);
       setError(null);
     } catch (err) {
       console.error('Error loading API instances:', err);

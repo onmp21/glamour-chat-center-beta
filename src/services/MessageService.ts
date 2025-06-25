@@ -1,6 +1,6 @@
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { RawMessage, ChannelConversation } from '@/types/messages';
-import { TableName, getTableNameForChannelSync } from '@/utils/channelMapping';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 import { supabase } from '@/integrations/supabase/client.ts';
 
 // Types
@@ -424,4 +424,3 @@ export class MessageService {
 }
 
 export const messageService = new MessageService();
-

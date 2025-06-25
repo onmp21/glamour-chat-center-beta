@@ -3,11 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, isToday, isYesterday } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
 import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
 import { useAuditLogger } from '@/hooks/useAuditLogger';
+import { formatWhatsAppDate } from '@/utils/dateUtils';
 
 interface ConversationItemProps {
   conversation: ChannelConversation;
@@ -35,7 +34,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   // Determinar nome de exibição baseado no canal e contato
   const getDisplayName = () => {
-    
     // Para canal Yelena: sempre Pedro Vila Nova (único)
     if (channelId === 'chat' || channelId === 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6') {
       return 'Pedro Vila Nova';
@@ -54,25 +52,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const displayName = getDisplayName();
 
-  const formatTime = (timestamp: string | null) => {
-    if (!timestamp) return '';
-    try {
-      const date = new Date(timestamp);
-      // Formato HH:MM como solicitado
-      return format(date, 'HH:mm', {
-        locale: ptBR
-      });
-    } catch {
-      // Fallback em caso de formato inválido
-      return ''; 
-    }
-  };
-
-  // Só mostrar badge se for unread (pendente) E se unread_count > 0
+  // Badge apenas se for unread (pendente) E se unread_count > 0
   const showUnreadBadge = currentStatus === 'unread' && (conversation.unread_count || 0) > 0;
 
   const handleClick = async () => {
-    
     logConversationAction('conversation_opened', conversation.id, {
       channel_id: channelId,
       contact_name: displayName,
@@ -87,7 +70,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
     
     onClick();
   };
-
 
   return (
     <div 
@@ -105,9 +87,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           </h3>
           <div className="flex items-center space-x-2">
             <span className={cn("text-xs flex-shrink-0", isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")}>
-              {formatTime(conversation.last_message_time)}
+              {formatWhatsAppDate(conversation.last_message_time)}
             </span>
-            {/* Só mostrar badge se for unread (pendente) E se unread_count > 0 */}
+            {/* Badge apenas se for unread (pendente) E se unread_count > 0 */}
             {showUnreadBadge && (
               <Badge variant="default" className="bg-[#b5103c] hover:bg-[#9d0e34] text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center">
                 •

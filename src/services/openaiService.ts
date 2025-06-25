@@ -1,8 +1,9 @@
+
 import OpenAI from 'openai';
 import { supabase } from '@/integrations/supabase/client.ts';
 import { AIProviderService } from './AIProviderService';
 import { DetailedLogger } from './DetailedLogger';
-import { getTableNameForChannel } from '@/utils/channelMapping';
+import { getTableNameForChannelSync } from '@/utils/channelMapping';
 import { AIProvider, ProviderType } from '@/types/ai-providers';
 
 // Tipos básicos para mensagens e conversas
@@ -140,7 +141,7 @@ export const openaiService = {
     channelId: string,
     conversationId: string
   ): Promise<ConversationMessage[]> {
-    const tableName = getTableNameForChannel(channelId);
+    const tableName = getTableNameForChannelSync(channelId);
     if (!tableName) {
       DetailedLogger.error('OpenAIService', `Nome de tabela inválido para channelId: ${channelId}`);
       return [];

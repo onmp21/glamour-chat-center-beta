@@ -49,10 +49,10 @@ export const useChannelManagement = () => {
     }
   };
 
-  const deleteChannel = async (channelId: string, createBackup: boolean = true) => {
+  const deleteChannel = async (channelId: string) => {
     setLoading(true);
     try {
-      const result = await channelService.deleteChannel(channelId, createBackup);
+      const result = await channelService.deleteChannel(channelId);
       if (result.success) {
         invalidateChannelCache(); // Invalidar cache após excluir canal
         await refetch(); // Recarregar lista de canais

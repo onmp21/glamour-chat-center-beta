@@ -10,7 +10,7 @@ interface SimpleMessage {
   tipo_remetente?: string;
   read_at?: string;
   mensagemtype?: string;
-  media_url?: string;
+  is_read?: boolean;
 }
 
 export const useNonRealtimeMessages = (
@@ -32,13 +32,14 @@ export const useNonRealtimeMessages = (
 
     try {
       const tableName = getTableNameForChannelSync(channelId);
+      console.log(`📋 [NON_REALTIME_MESSAGES] Carregando mensagens da tabela ${tableName} para conversa ${conversationId}`);
       
       const { data, error: queryError } = await supabase
         .from(tableName as any)
-        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype, media_url')
+        .select('id, message, nome_do_contato, tipo_remetente, read_at, mensagemtype, is_read')
         .eq('session_id', conversationId)
         .order('read_at', { ascending: true })
-        .limit(50);
+        .limit(200); // Aumentado para 200 mensagens
 
       if (queryError) {
         console.error('❌ [NON_REALTIME_MESSAGES] Database error:', queryError);
@@ -53,9 +54,10 @@ export const useNonRealtimeMessages = (
         tipo_remetente: record.tipo_remetente,
         read_at: record.read_at,
         mensagemtype: record.mensagemtype,
-        media_url: record.media_url
+        is_read: record.is_read
       }));
 
+      console.log(`✅ [NON_REALTIME_MESSAGES] ${formattedMessages.length} mensagens carregadas para conversa ${conversationId}`);
       setMessages(formattedMessages);
     } catch (err) {
       console.error('❌ [NON_REALTIME_MESSAGES] Error:', err);

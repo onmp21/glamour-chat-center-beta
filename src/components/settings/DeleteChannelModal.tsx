@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -45,7 +44,7 @@ export const DeleteChannelModal: React.FC<DeleteChannelModalProps> = ({
         createBackup
       });
 
-      const result = await deleteChannel(channel.id, createBackup);
+      const result = await deleteChannel(channel.id);
       
       if (result.success) {
         console.log('✅ [DELETE_CHANNEL_MODAL] Channel deleted successfully');

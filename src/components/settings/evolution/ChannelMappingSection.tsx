@@ -22,6 +22,7 @@ interface ChannelMapping {
 }
 
 interface InstanceInfo {
+  id: string;
   instanceName: string;
   profileName?: string;
 }
@@ -132,7 +133,7 @@ export const ChannelMappingSection: React.FC<ChannelMappingSectionProps> = ({
               </SelectTrigger>
               <SelectContent className={cn(isDarkMode ? "bg-[#27272a] border-[#3f3f46] text-white" : "bg-white border-gray-300 text-gray-900")}>
                 {instances.map(instance => (
-                  <SelectItem key={instance.instanceName} value={instance.instanceName}>
+                  <SelectItem key={instance.id} value={instance.id}>
                     {instance.instanceName}
                     {instance.profileName && (
                       <span className="text-xs text-gray-400 ml-1">

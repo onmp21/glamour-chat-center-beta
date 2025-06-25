@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client.ts';
 import { BaseRepository } from './BaseRepository';
 import { RawMessage } from '@/types/messages';
 import { TableName } from '@/utils/channelMapping';
+import { getBrazilianTimestamp } from '@/utils/timestampUtils';
 
 export class MessageRepository extends BaseRepository<RawMessage> {
   constructor(tableName: TableName) {
@@ -18,14 +19,13 @@ export class MessageRepository extends BaseRepository<RawMessage> {
       session_id: row.session_id || '',
       message: row.message || '',
       sender: this.determineSender(row),
-      timestamp: row.read_at || new Date().toISOString(),
+      timestamp: row.read_at || getBrazilianTimestamp(),
       content: row.message || '',
       tipo_remetente: row.tipo_remetente,
       mensagemtype: row.mensagemtype,
       // Mapear ambos os formatos
       Nome_do_contato: contactName,
       nome_do_contato: contactName,
-      media_base64: row.media_base64,
       read_at: row.read_at,
       is_read: row.is_read // Opcional - pode ser undefined
     };
@@ -98,7 +98,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
         ? { Nome_do_contato: contactName || 'Contato Anônimo' }
         : { nome_do_contato: contactName || 'Contato Anônimo' }
       ),
-      read_at: new Date().toISOString(),
+      read_at: getBrazilianTimestamp(),
       mensagemtype: 'conversation',
       tipo_remetente: 'sistema'
     };
@@ -145,7 +145,7 @@ export class MessageRepository extends BaseRepository<RawMessage> {
     try {
       // Tentar atualizar is_read se o campo existir
       const updateData: any = {
-        read_at: new Date().toISOString()
+        read_at: getBrazilianTimestamp()
       };
 
       // Verificar se a tabela tem o campo is_read antes de tentar atualizar

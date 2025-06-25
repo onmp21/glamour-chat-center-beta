@@ -12,6 +12,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { getTableNameForChannelSync } from '@/utils/channelMapping';
+import { getBrazilianTimestamp } from '@/utils/timestampUtils';
 
 interface NewContactModalProps {
   isOpen: boolean;
@@ -102,7 +103,7 @@ export const NewContactModal: React.FC<NewContactModalProps> = ({
           nome_do_contato: user?.name || 'Sistema',
           mensagemtype: 'text',
           is_read: true,
-          read_at: new Date().toISOString()
+          read_at: getBrazilianTimestamp()
         } as any)
         .select()
         .single();

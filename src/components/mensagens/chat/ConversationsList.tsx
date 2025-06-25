@@ -3,7 +3,7 @@ import React from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ConversationCard } from './ConversationCard';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
-import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
+import { useUnifiedConversationStatus } from '@/hooks/useUnifiedConversationStatus';
 
 interface ConversationsListProps {
   channelId: string;
@@ -20,7 +20,7 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
   isDarkMode,
   onConversationSelect
 }) => {
-  const { getConversationStatus } = useConversationStatusEnhanced();
+  const { getConversationStatus } = useUnifiedConversationStatus();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -40,12 +40,32 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({
     }
   };
 
-  // Ordenar conversas por data mais recente no topo
+  // Ordenar conversas APENAS por data mais recente (sem priorização por status)
   const sortedConversations = [...conversations].sort((a, b) => {
-    const dateA = new Date(a.last_message_time || a.updated_at).getTime();
-    const dateB = new Date(b.last_message_time || b.updated_at).getTime();
-    return dateB - dateA; // Mais recente primeiro
+    const timeA = a.last_message_time || a.updated_at;
+    const timeB = b.last_message_time || b.updated_at;
+    
+    if (!timeA && !timeB) return 0;
+    if (!timeA) return 1;
+    if (!timeB) return -1;
+    
+    const dateA = new Date(timeA).getTime();
+    const dateB = new Date(timeB).getTime();
+    
+    if (isNaN(dateA) && isNaN(dateB)) return 0;
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+    
+    return dateB - dateA; // Mais recente primeiro (independente do status)
   });
+
+  console.log('📊 [CONVERSATIONS_LIST] Conversas ordenadas apenas por data:', sortedConversations.map(c => ({
+    id: c.id,
+    contact: c.contact_name,
+    status: getConversationStatus(channelId, c.id),
+    last_message_time: c.last_message_time,
+    unread_count: c.unread_count
+  })));
 
   return (
     <div className="flex-1 overflow-hidden">

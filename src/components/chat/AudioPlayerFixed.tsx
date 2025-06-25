@@ -1,8 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2 } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MediaProcessor } from '@/services/MediaProcessor';
 
 interface AudioPlayerFixedProps {
   audioSrc: string;
@@ -20,57 +19,37 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [processedAudioSrc, setProcessedAudioSrc] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-
-  // Processar áudio usando MediaProcessor assíncrono
-  useEffect(() => {
-    const processAudio = async () => {
-      if (!audioSrc) return;
-      
-      setLoading(true);
-      try {
-        console.log(`🎵 [AUDIO_PLAYER] Processando áudio:`, audioSrc.substring(0, 50));
-        
-        // USAR MÉTODO ASSÍNCRONO CORRETO
-        const result = await MediaProcessor.processAsync(audioSrc, 'audio');
-        if (result.isProcessed && result.url) {
-          setProcessedAudioSrc(result.url);
-          console.log(`✅ [AUDIO_PLAYER] Áudio processado com sucesso`);
-        } else {
-          console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', result.error);
-          setProcessedAudioSrc(audioSrc); // Fallback para src original
-        }
-      } catch (error) {
-        console.error('❌ [AUDIO_PLAYER] Erro ao processar áudio:', error);
-        setProcessedAudioSrc(audioSrc); // Fallback para src original
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    processAudio();
-  }, [audioSrc]);
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !processedAudioSrc) return;
+    if (!audio) return;
 
     const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
+    const updateDuration = () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    };
     const onEnded = () => setIsPlaying(false);
+    const onError = () => {
+      setError(true);
+      setLoading(false);
+    };
 
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
     };
-  }, [processedAudioSrc]);
+  }, [audioSrc]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -103,109 +82,64 @@ export const AudioPlayerFixed: React.FC<AudioPlayerFixedProps> = ({
   if (loading) {
     return (
       <div className={cn(
-        "flex items-center space-x-2 p-2 rounded-lg",
-        balloonColor === 'sent' 
-          ? "bg-[#b5103c] text-white" 
-          : isDarkMode 
-            ? "bg-[#18181b] text-white" 
-            : "bg-white text-gray-900",
+        "flex items-center space-x-2 p-2 rounded-lg min-w-[180px]",
         className
       )}>
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-        <span className="text-sm">Carregando áudio...</span>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current opacity-60"></div>
+        <span className="text-xs opacity-70">Carregando...</span>
       </div>
     );
   }
 
-  if (!processedAudioSrc) {
+  if (error) {
     return (
       <div className={cn(
-        "flex items-center space-x-2 p-2 rounded-lg",
-        balloonColor === 'sent' 
-          ? "bg-[#b5103c] text-white" 
-          : isDarkMode 
-            ? "bg-[#18181b] text-white" 
-            : "bg-white text-gray-900",
+        "flex items-center space-x-2 p-2 rounded-lg min-w-[180px]",
         className
       )}>
-        <Volume2 size={16} />
-        <span className="text-sm">Erro ao carregar áudio</span>
+        <div className="w-4 h-4 rounded-full bg-red-500 opacity-60"></div>
+        <span className="text-xs opacity-70">Erro no áudio</span>
       </div>
     );
   }
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div className={cn(
-      "flex items-center space-x-3 p-2 rounded-lg min-w-[200px]",
-      balloonColor === 'sent' 
-        ? "bg-[#b5103c] text-white" 
-        : isDarkMode 
-          ? "bg-[#18181b] text-white" 
-          : "bg-white text-gray-900",
+      "flex items-center space-x-2 p-2 rounded-lg min-w-[180px] max-w-[240px]",
       className
     )}>
-      <audio ref={audioRef} src={processedAudioSrc} />
+      <audio ref={audioRef} src={audioSrc} />
       
       <button
         onClick={togglePlayPause}
-        className={cn(
-          "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
-          balloonColor === 'sent' 
-            ? "bg-white/20 hover:bg-white/30 text-white" 
-            : isDarkMode 
-              ? "bg-gray-600 hover:bg-gray-500 text-white" 
-              : "bg-gray-200 hover:bg-gray-300 text-gray-900"
-        )}
-        disabled={!processedAudioSrc}
+        className="flex items-center justify-center w-6 h-6 rounded-full transition-all duration-200 hover:scale-110 flex-shrink-0"
+        style={{ 
+          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+          backdropFilter: 'blur(4px)'
+        }}
       >
-        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        {isPlaying ? <Pause size={12} /> : <Play size={12} className="ml-0.5" />}
       </button>
 
-      <div className="flex-1 space-y-1">
-        <input
-          type="range"
-          min="0"
-          max={duration || 0}
-          value={currentTime}
-          onChange={handleSeek}
-          className={cn(
-            "w-full h-1 rounded-lg appearance-none cursor-pointer",
-            balloonColor === 'sent' 
-              ? "bg-white/20" 
-              : isDarkMode 
-                ? "bg-gray-600" 
-                : "bg-gray-300"
-          )}
-          style={{
-            background: `linear-gradient(to right, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.5)' 
-                : isDarkMode 
-                  ? '#9ca3af' 
-                  : '#6b7280'
-            } 0%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.5)' 
-                : isDarkMode 
-                  ? '#9ca3af' 
-                  : '#6b7280'
-            } ${(currentTime / (duration || 1)) * 100}%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.2)' 
-                : isDarkMode 
-                  ? '#4b5563' 
-                  : '#d1d5db'
-            } ${(currentTime / (duration || 1)) * 100}%, ${
-              balloonColor === 'sent' 
-                ? 'rgba(255,255,255,0.2)' 
-                : isDarkMode 
-                  ? '#4b5563' 
-                  : '#d1d5db'
-            } 100%)`
-          }}
-        />
+      <div className="flex-1 min-w-0">
+        <div className="relative h-1 bg-black bg-opacity-10 rounded-full mb-1 overflow-hidden">
+          <div 
+            className="absolute left-0 top-0 h-full bg-white bg-opacity-60 rounded-full transition-all duration-150"
+            style={{ width: `${progress}%` }}
+          />
+          <input
+            type="range"
+            min="0"
+            max={duration || 0}
+            value={currentTime}
+            onChange={handleSeek}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+        </div>
         
-        <div className="flex justify-between text-xs opacity-75">
+        <div className="flex justify-between text-xs opacity-60 leading-none">
           <span>{formatTime(currentTime)}</span>
           <span>{formatTime(duration)}</span>
         </div>

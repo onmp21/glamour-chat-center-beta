@@ -58,12 +58,16 @@ export const ApiInstanceListEnhanced: React.FC<ApiInstanceListEnhancedProps> = (
           </h4>
           
           <div className="grid gap-4">
-            {evolutionInstances.map((evolutionInstance, index) => (
+            {evolutionInstances.map((instance, index) => (
               <EvolutionInstanceCard
-                key={`${evolutionInstance.instanceId}-${index}`}
-                evolutionInstance={evolutionInstance}
-                index={index}
+                key={`${instance.instanceId}-${index}`}
+                instance={instance}
                 isDarkMode={isDarkMode}
+                onShowQRCode={(instanceId) => setQrModal({ isOpen: true, channelId: instanceId })}
+                onRefreshStatus={(instanceId) => {
+                  // Logic to refresh specific instance status
+                  console.log('Refreshing status for:', instanceId);
+                }}
               />
             ))}
           </div>

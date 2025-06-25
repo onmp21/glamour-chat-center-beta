@@ -9,15 +9,13 @@ export class MessageConverter {
     const phone = PhoneExtractor.extractPhoneFromSessionId(rawMessage.session_id);
     const messageType = MessageTypeMapper.mapMessageType(rawMessage.mensagemtype);
     
-    // Usar media_base64 se existir para conteúdo de mídia, senão usar message
-    const content = rawMessage.media_base64 || rawMessage.message;
+    // Usar apenas a coluna message padronizada
+    const content = rawMessage.message;
     
     console.log('🔄 [MESSAGE_CONVERTER] Converting raw message:', {
       id: rawMessage.id,
-      hasMediaBase64: !!rawMessage.media_base64,
       messageType,
       contentLength: content.length,
-      originalMessageLength: rawMessage.message.length,
       Nome_do_contato: rawMessage.Nome_do_contato
     });
 

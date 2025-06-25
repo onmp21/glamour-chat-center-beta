@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { QrCode, Wifi, WifiOff, Settings as SettingsIcon, RefreshCw, AlertCircle } from 'lucide-react';
 import { useEvolutionApiSender } from '@/hooks/useEvolutionApiSender';
 import { EvolutionApiSettings } from '@/components/EvolutionApiSettings';
-import { MediaProcessorUnified } from '@/utils/MediaProcessorUnified';
+import { Base64Utils } from '@/utils/base64Utils';
 
 interface QRCodeManagerFixedProps {
   isDarkMode: boolean;
@@ -64,10 +63,10 @@ export const QRCodeManagerFixed: React.FC<QRCodeManagerFixedProps> = ({
         } else if (result.qrCode) {
           console.log('🔍 [QR_MANAGER_FIXED] Processing QR Code data');
           
-          // Usar o processador unificado para QR Code
-          const processedQR = MediaProcessorUnified.processQRCode(result.qrCode);
+          // Usar o Base64Utils diretamente para QR Code
+          const processedQR = Base64Utils.processQRCode(result.qrCode);
           
-          if (processedQR.success && processedQR.dataUrl) {
+          if (processedQR.isValid && processedQR.dataUrl) {
             setQrCode(processedQR.dataUrl);
             setShowQrCode(true);
             setConnectionStatus('qr');

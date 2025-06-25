@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Settings } from 'lucide-react';
@@ -11,13 +12,13 @@ import { ChannelManagementCompact } from './settings/ChannelManagementCompact';
 import { SystemSection } from './settings/SystemSection';
 import { BackupSection } from './settings/BackupSection';
 import { AIConfigSection } from './settings/AIConfigSection';
-import { EvolutionAPIFullSection } from './settings/EvolutionAPIFullSection';
+import { EvolutionApiSettings } from '@/components/EvolutionApiSettings';
 
 interface UnifiedSettingsProps {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   isMobile?: boolean;
-  initialSection?: string; // NOVO
+  initialSection?: string;
 }
 
 export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
@@ -28,9 +29,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<string>('main');
 
-  // Quando for inicializado, pular para a subseção se for passada
   useEffect(() => {
-    // Só atualiza se inicializando e initialSection for válida
     const SUBSECTIONS = [
       'credentials',
       'notifications',
@@ -45,19 +44,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
     if (initialSection && SUBSECTIONS.includes(initialSection)) {
       setActiveSection(initialSection);
     }
-  // Só rodar na montagem ou se initialSection mudar
   }, [initialSection]);
-
-  // Listagem das principais seções da aba configurações:
-  // 1. credentials: Alterar Credenciais
-  // 2. notifications: Configurações de Notificação
-  // 3. users: Gerenciamento de Usuários
-  // 4. channels: Gerenciar Canais
-  // 5. audit: Histórico de Auditoria
-  // 6. ai: Configurações de IA
-  // 7. evolution: API Evolution
-  // 8. system: Sistema
-  // 9. backup: Backup e Dados
 
   const handleBack = () => {
     if (activeSection === 'main') {
@@ -94,7 +81,6 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
   const renderSection = () => {
     switch (activeSection) {
       case 'users':
-        // Use apenas o componente compacto padronizado (sem títulos internos)
         return <UserManagementCompact isDarkMode={isDarkMode} />;
       case 'audit':
         return <AuditHistoryCompact isDarkMode={isDarkMode} />;
@@ -111,7 +97,7 @@ export const UnifiedSettings: React.FC<UnifiedSettingsProps> = ({
       case 'ai':
         return <AIConfigSection isDarkMode={isDarkMode} />;
       case 'evolution':
-        return <EvolutionAPIFullSection isDarkMode={isDarkMode} />;
+        return <EvolutionApiSettings isDarkMode={isDarkMode} />;
       default:
         return <SettingsGrid isDarkMode={isDarkMode} onSectionChange={setActiveSection} toggleDarkMode={toggleDarkMode} />;
     }

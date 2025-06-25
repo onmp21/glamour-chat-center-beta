@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { useRealConversationStats } from '@/hooks/useRealConversationStats';
+import { useRealConversationStatsRealtime } from '@/hooks/useRealConversationStats';
 import { MessageSquare, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ConversationStatsCardsProps {
@@ -13,7 +12,7 @@ export const ConversationStatsCards: React.FC<ConversationStatsCardsProps> = ({
   isDarkMode,
   onCardClick
 }) => {
-  const { stats, loading } = useRealConversationStats();
+  const { stats, loading } = useRealConversationStatsRealtime();
 
   console.log('📊 [STATS_CARDS] Rendering with stats:', stats);
 

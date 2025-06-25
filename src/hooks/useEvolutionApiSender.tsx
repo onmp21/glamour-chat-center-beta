@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { N8nMessagingService, N8nMessageData } from '@/services/N8nMessagingService';
@@ -134,7 +135,7 @@ export const useEvolutionApiSender = () => {
         instanceName: mapping.instance_name
       });
 
-      const result = await service.getConnectionStatus();
+      const result = await service.getConnectionStatus(mapping.instance_name);
       return result;
     } catch (error) {
       console.error('❌ [N8N_SENDER] Erro ao verificar status:', error);
@@ -151,4 +152,3 @@ export const useEvolutionApiSender = () => {
     sending
   };
 };
-

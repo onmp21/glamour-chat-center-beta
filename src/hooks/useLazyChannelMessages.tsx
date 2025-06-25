@@ -1,14 +1,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { OptimizedMessageService } from '@/services/OptimizedMessageService';
+import { MessageServiceV2 } from '@/services/MessageServiceV2';
 import { RawMessage } from '@/types/messages';
-import { useAuth } from '@/contexts/AuthContext'; // Usar contexto customizado
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useLazyChannelMessages = (channelId: string | null, conversationId: string | null) => {
   const [messages, setMessages] = useState<RawMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated, user } = useAuth(); // Usar contexto customizado
+  const { isAuthenticated, user } = useAuth();
 
   const loadMessages = useCallback(async () => {
     if (!channelId || !conversationId) {
@@ -28,7 +28,7 @@ export const useLazyChannelMessages = (channelId: string | null, conversationId:
       setError(null);
       console.log(`📋 [LAZY_MESSAGES] Loading messages for authenticated user: ${user?.name}, channel: ${channelId}, conversation: ${conversationId}`);
       
-      const messageService = OptimizedMessageService.getInstance(channelId);
+      const messageService = new MessageServiceV2(channelId);
       const result = await messageService.getMessagesByConversation(conversationId, 50);
       
       setMessages(result.data || []);

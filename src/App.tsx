@@ -10,27 +10,34 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ChannelProvider } from './contexts/ChannelContext';
 import { MainLayout } from './components/MainLayout';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   console.log('🚀 [APP] Inicializando aplicação - estrutura corrigida');
   
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-            <TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+          <TooltipProvider>
+            <AuthProvider>
               <ChannelProvider>
                 <MainLayout />
                 <Toaster />
                 <Sonner />
               </ChannelProvider>
-            </TooltipProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </AuthProvider>
+            </AuthProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

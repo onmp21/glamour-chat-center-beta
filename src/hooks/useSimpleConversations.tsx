@@ -40,8 +40,8 @@ export const useSimpleConversations = (channelId: string | null) => {
       'joao-dourado': 'joao_dourado_conversas',
       'america-dourada': 'america_dourada_conversas',
       'gerente-lojas': 'gerente_lojas_conversas',
-      'gerente-externo': 'gerente_externo_conversas',
-      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas'
+      'gerente-externo': 'gerente_externo_conversas', // CORRIGIDO
+      'd2892900-ca8f-4b08-a73f-6b7aa5866ff7': 'gerente_externo_conversas' // CORRIGIDO
     };
     
     const tableName = mapping[channelId] || 'yelena_ai_conversas';

@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { OptimizedConversationService } from '@/services/OptimizedConversationService';
+import { MessageService } from '@/services/MessageService';
 import { ChannelConversation } from '@/types/messages';
 
 export const useLazyConversationsList = (channelId: string | null) => {
@@ -20,7 +20,8 @@ export const useLazyConversationsList = (channelId: string | null) => {
       setError(null);
       console.log(`📋 [LAZY_CONVERSATIONS] Loading conversations for channel: ${channelId}`);
       
-      const conversations = await OptimizedConversationService.getConversationsList(channelId, 20);
+      const messageService = new MessageService(channelId);
+      const conversations = await messageService.getConversations(20);
       setConversations(conversations);
       
       console.log(`✅ [LAZY_CONVERSATIONS] Successfully loaded ${conversations.length} conversations for ${channelId}`);

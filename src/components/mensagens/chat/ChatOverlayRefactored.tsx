@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -36,7 +35,6 @@ export interface SimpleMessage {
   created_at?: string; 
   read_at?: string; 
   mensagemtype?: string; 
-  media_url?: string;
   is_read?: boolean;
   nome_do_contato?: string;
 }
@@ -64,7 +62,7 @@ interface DisplayMessage {
   read: boolean;
   nome_do_contato?: string;
   mensagemtype?: string;
-  message?: string; // Adicionar campo message para compatibilidade com notificações
+  message?: string;
 }
 
 interface ConversationForHeader {
@@ -83,16 +81,17 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isAuthenticated, user } = useAuth();
 
-  // Usar hooks sem realtime para evitar subscriptions
   const {
     conversations: simpleConversations, 
     loading: conversationsLoading,
+    error: conversationsError,
     refreshConversations
   } = useNonRealtimeConversations(channelId);
   
   const {
     messages: simpleMessagesFromHook, 
     loading: messagesLoading,
+    error: messagesError,
     refreshMessages 
   } = useNonRealtimeMessages(channelId, selectedConversation);
 
@@ -103,9 +102,24 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     messagesCount: simpleMessagesFromHook.length,
     conversationsLoading,
     messagesLoading,
+    conversationsError,
+    messagesError,
     isAuthenticated,
     user: user?.name
   });
+
+  // Log detalhado das conversas para debug
+  useEffect(() => {
+    if (simpleConversations.length > 0) {
+      console.log('📋 [CHAT_OVERLAY] Conversas carregadas:', simpleConversations.map(conv => ({
+        id: conv.id,
+        name: conv.contact_name,
+        lastMessage: conv.last_message.substring(0, 30) + '...',
+        unreadCount: conv.unread_count,
+        status: conv.status
+      })));
+    }
+  }, [simpleConversations]);
 
   const conversations: UnifiedConversation[] = simpleConversations.map((conv: SimpleConversation) => ({
     id: conv.id,
@@ -117,14 +131,6 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     unread_count: conv.unread_count,
     updated_at: conv.updated_at
   }));
-
-  useEffect(() => {
-    if (conversations.length > 0 && !selectedConversation) {
-      const firstConversation = conversations[0];
-      console.log('🎯 [CHAT_OVERLAY] Auto-selecting first conversation:', firstConversation.id);
-      setSelectedConversation(firstConversation.id);
-    }
-  }, [conversations, selectedConversation]);
 
   const handleConversationSelect = (conversationId: string) => {
     console.log('📱 [CHAT_OVERLAY] Conversation selected:', conversationId);
@@ -178,18 +184,44 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
 
   const handleMarkAsResolved = async () => {
     if (selectedConversation && channelId) {
-      await updateConversationStatus(channelId, selectedConversation, 'resolved');
-      refreshConversations && (await refreshConversations());
-      refreshMessages && (await refreshMessages());
+      console.log('🔄 [CHAT_OVERLAY] Marcando conversa como resolvida:', selectedConversation);
+      
+      const success = await updateConversationStatus(channelId, selectedConversation, 'resolved');
+      
+      if (success) {
+        console.log('✅ [CHAT_OVERLAY] Conversa marcada como resolvida, atualizando listas');
+        
+        // Forçar refresh das conversas e mensagens
+        if (refreshConversations) {
+          await refreshConversations();
+        }
+        if (refreshMessages) {
+          await refreshMessages();
+        }
+        
+        // Pequeno delay para garantir que o refresh seja processado
+        setTimeout(() => {
+          console.log('🔄 [CHAT_OVERLAY] Refresh completado');
+        }, 500);
+      } else {
+        console.error('❌ [CHAT_OVERLAY] Falha ao marcar conversa como resolvida');
+      }
     }
   };
 
   const displayMessages: DisplayMessage[] = simpleMessagesFromHook.map((msg: SimpleMessage) => {
-    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || msg.tipo_remetente === 'Yelena-ai';
+    const isAgent = msg.tipo_remetente === 'USUARIO_INTERNO' || 
+                   msg.tipo_remetente === 'Yelena-ai' ||
+                   msg.tipo_remetente === 'Andressa-ai' ||
+                   msg.tipo_remetente === 'Gustavo-ai';
+    
+    // Detectar se é mídia baseado no conteúdo da mensagem ou tipo
+    const isMediaMessage = msg.mensagemtype && msg.mensagemtype !== 'text';
+    const messageContent = msg.message || '';
     
     return {
       id: msg.id,
-      content: msg.message || '',
+      content: messageContent,
       timestamp: msg.created_at || msg.read_at || new Date().toISOString(), 
       sender: isAgent ? 'agent' : 'customer', 
       tipo_remetente: msg.tipo_remetente,
@@ -197,25 +229,25 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
             msg.mensagemtype === 'audio' ? 'audio' :
             msg.mensagemtype === 'video' ? 'video' :
             msg.mensagemtype === 'document' || msg.mensagemtype === 'file' ? 'file' : 'text', 
-      fileUrl: msg.media_url || undefined,
-      fileName: msg.message || undefined,
+      fileUrl: isMediaMessage ? messageContent : undefined, // Usar o conteúdo da mensagem como URL se for mídia
+      fileName: isMediaMessage ? 'Arquivo' : undefined,
       read: typeof msg.is_read === 'boolean' ? msg.is_read : true,
       nome_do_contato: msg.nome_do_contato,
       mensagemtype: msg.mensagemtype,
-      message: msg.message // Adicionar campo message para compatibilidade
+      message: msg.message
     };
   });
 
-  // Gerenciar notificações sonoras para novas mensagens externas
   const { resetNotificationState } = useMessageNotificationManager({
-    messages: displayMessages,
-    isOverlayOpen: true, // O overlay está sempre aberto quando este componente está renderizado
-    enabled: true
+    messages: selectedConversation ? displayMessages : [],
+    isOverlayOpen: !!selectedConversation,
+    enabled: !!selectedConversation
   });
 
-  // Reset notification state when conversation changes
   useEffect(() => {
-    resetNotificationState();
+    if (selectedConversation) {
+      resetNotificationState();
+    }
   }, [selectedConversation, resetNotificationState]);
 
   const conversationForHeader: ConversationForHeader | null = selectedConvData ? {
@@ -223,12 +255,33 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
     contactNumber: selectedConvData.contact_phone
   } : null;
 
+  // Mostrar erro se houver problema no carregamento
+  if (conversationsError) {
+    return (
+      <div className={cn("fixed inset-0 z-50 flex items-center justify-center", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
+        <div className="text-center space-y-2">
+          <p className="text-red-500">Erro ao carregar conversas</p>
+          <p className="text-sm text-gray-500">{conversationsError}</p>
+          <button 
+            onClick={() => refreshConversations && refreshConversations()}
+            className="bg-[#b5103c] text-white px-4 py-2 rounded hover:bg-[#9d0e34]"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (conversationsLoading && conversations.length === 0) {
-    return <div className={cn("fixed inset-0 z-50 flex items-center justify-center", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
+    return (
+      <div className={cn("fixed inset-0 z-50 flex items-center justify-center", isDarkMode ? "bg-[#09090b]" : "bg-gray-50")}>
         <div className="text-center space-y-2">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#b5103c]"></div>
+          <p className="text-sm text-gray-500">Carregando conversas...</p>
         </div>
-      </div>;
+      </div>
+    );
   }
 
   return (
@@ -256,9 +309,18 @@ export const ChatOverlayRefactored: React.FC<ChatOverlayRefactoredProps> = ({
           channelId={channelId} 
           onSidebarToggle={setIsSidebarOpen} 
           onMarkAsResolved={handleMarkAsResolved}
-          onSendMessage={handleSendMessage} 
-          onSendFile={onSendFileProp || handleSendFile} 
-          onSendAudio={onSendAudioProp || handleSendAudio} 
+          onSendMessage={async (message: string) => {
+            console.log('💬 [CHAT_OVERLAY] Message sending handled by ChatInput');
+            if (refreshMessages) await refreshMessages();
+          }} 
+          onSendFile={onSendFileProp || (async (file: File, caption?: string) => {
+            console.log('📎 [CHAT_OVERLAY] File sending handled by ChatInput');
+            if (refreshMessages) await refreshMessages();
+          })} 
+          onSendAudio={onSendAudioProp || (async (audioBlob: Blob, duration: number) => {
+            console.log('🎵 [CHAT_OVERLAY] Audio sending handled by ChatInput');
+            if (refreshMessages) await refreshMessages();
+          })} 
         />
       </div>
     </div>

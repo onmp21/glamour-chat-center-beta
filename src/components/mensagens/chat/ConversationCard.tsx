@@ -2,9 +2,9 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { ChannelConversation } from '@/hooks/useChannelConversations';
-import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
+import { useUnifiedConversationStatus } from '@/hooks/useUnifiedConversationStatus';
+import { formatWhatsAppDate } from '@/utils/dateUtils';
 
 interface ConversationCardProps {
   conversation: ChannelConversation;
@@ -27,7 +27,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
   getStatusColor,
   getStatusLabel
 }) => {
-  const { markConversationAsViewed } = useConversationStatusEnhanced();
+  const { markConversationAsViewed } = useUnifiedConversationStatus();
 
   // Truncar mensagem recente para 35 caracteres
   const truncateMessage = (msg: string, max = 35) => {
@@ -47,51 +47,51 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
     onConversationSelect(conversation.id);
   };
 
+  // Badge apenas se for unread (pendente) E se unread_count > 0
+  const showUnreadBadge = status === 'unread' && (conversation.unread_count || 0) > 0;
+
   return (
-    <Card
-      key={conversation.id}
+    <Card 
+      key={conversation.id} 
       className={cn(
-        "cursor-pointer transition-all relative",
-        selectedConversation === conversation.id
+        "cursor-pointer transition-all relative", 
+        selectedConversation === conversation.id 
           ? isDarkMode 
             ? "bg-red-100/10 border-red-400/50" 
-            : "bg-red-50 border-red-200"
+            : "bg-red-50 border-red-200" 
           : isDarkMode 
             ? "bg-[#18181b] border-[#3f3f46] hover:bg-[#27272a]" 
             : "bg-white border-gray-200 hover:bg-gray-50"
-      )}
+      )} 
       onClick={handleConversationClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
           <h4 className={cn(
-            "font-medium text-sm truncate",
-            selectedConversation === conversation.id
+            "font-medium text-sm truncate", 
+            selectedConversation === conversation.id 
               ? "text-red-600" 
-              : (isDarkMode ? "text-white" : "text-gray-900")
+              : isDarkMode 
+                ? "text-white" 
+                : "text-gray-900"
           )}>
             {truncateContactName(conversation.contact_name)}
           </h4>
           <div className="flex items-center gap-2">
             <span className={cn(
-              "text-xs flex-shrink-0",
+              "text-xs flex-shrink-0", 
               isDarkMode ? "text-gray-500" : "text-gray-500"
             )}>
-              {conversation.last_message_time && new Date(conversation.last_message_time).toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              {formatWhatsAppDate(conversation.last_message_time)}
             </span>
-            {/* Só mostrar badge se unread_count > 0 e status não é resolved */}
-            {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (
-              <Badge className="bg-[#b5103c] text-white text-xs">
-                {conversation.unread_count}
-              </Badge>
+            {/* Badge apenas se for unread (pendente) E se unread_count > 0 */}
+            {showUnreadBadge && (
+              <div className="bg-[#b5103c] text-white text-xs rounded-full w-2 h-2 flex-shrink-0"></div>
             )}
           </div>
         </div>
         <p className={cn(
-          "text-xs truncate mb-2",
+          "text-xs truncate mb-2", 
           isDarkMode ? "text-gray-400" : "text-gray-600"
         )}>
           {truncateMessage(conversation.last_message || '')}
@@ -99,7 +99,10 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <div className={cn("w-2 h-2 rounded-full", getStatusColor(status))}></div>
-            <span className={cn("text-xs", isDarkMode ? "text-gray-400" : "text-gray-500")}>
+            <span className={cn(
+              "text-xs", 
+              isDarkMode ? "text-gray-400" : "text-gray-500"
+            )}>
               {getStatusLabel(status)}
             </span>
           </div>

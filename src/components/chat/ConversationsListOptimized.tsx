@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { SimpleConversationsListWithRealtime } from './SimpleConversationsListWithRealtime';
+import { RealtimeConversationsList } from './RealtimeConversationsList';
 
 interface ConversationsListOptimizedProps {
   channelId: string | null;
@@ -10,7 +10,7 @@ interface ConversationsListOptimizedProps {
 }
 
 export const ConversationsListOptimized: React.FC<ConversationsListOptimizedProps> = (props) => {
-  console.log('📋 [CONVERSATIONS_LIST_OPTIMIZED] Rendering with:', props);
-  // Usar apenas polling, sem realtime subscriptions
-  return <SimpleConversationsListWithRealtime {...props} enableRealtime={false} />;
+  console.log('📋 [CONVERSATIONS_LIST_OPTIMIZED] Rendering with realtime only:', props);
+  // Usar apenas realtime nativo do Supabase - removido polling
+  return <RealtimeConversationsList {...props} />;
 };

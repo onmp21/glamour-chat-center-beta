@@ -88,7 +88,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -99,9 +98,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -110,7 +108,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -190,7 +187,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -201,9 +197,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -212,7 +207,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -385,7 +379,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -396,9 +389,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -407,7 +399,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -421,7 +412,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -432,9 +422,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -443,7 +432,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -457,7 +445,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -468,9 +455,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -479,7 +465,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -558,7 +543,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_base64: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -569,9 +553,8 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
-          message: string
+          message?: string
           nome_do_contato?: string | null
           read_at?: string | null
           session_id: string
@@ -580,7 +563,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_base64?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -622,114 +604,6 @@ export type Database = {
           nome_do_contato?: string | null
           read_at?: string | null
           session_id?: string
-          tipo_remetente?: string | null
-        }
-        Relationships: []
-      }
-      teste_conversas_backup_20250619_180343: {
-        Row: {
-          id: number | null
-          is_read: boolean | null
-          media_url: string | null
-          mensagemtype: string | null
-          message: string | null
-          nome_do_contato: string | null
-          read_at: string | null
-          session_id: string | null
-          tipo_remetente: string | null
-        }
-        Insert: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
-          tipo_remetente?: string | null
-        }
-        Update: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
-          tipo_remetente?: string | null
-        }
-        Relationships: []
-      }
-      teste_conversas_backup_20250619_180344: {
-        Row: {
-          id: number | null
-          is_read: boolean | null
-          media_url: string | null
-          mensagemtype: string | null
-          message: string | null
-          nome_do_contato: string | null
-          read_at: string | null
-          session_id: string | null
-          tipo_remetente: string | null
-        }
-        Insert: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
-          tipo_remetente?: string | null
-        }
-        Update: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
-          tipo_remetente?: string | null
-        }
-        Relationships: []
-      }
-      teste_conversas_backup_20250619_180402: {
-        Row: {
-          id: number | null
-          is_read: boolean | null
-          media_url: string | null
-          mensagemtype: string | null
-          message: string | null
-          nome_do_contato: string | null
-          read_at: string | null
-          session_id: string | null
-          tipo_remetente: string | null
-        }
-        Insert: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
-          tipo_remetente?: string | null
-        }
-        Update: {
-          id?: number | null
-          is_read?: boolean | null
-          media_url?: string | null
-          mensagemtype?: string | null
-          message?: string | null
-          nome_do_contato?: string | null
-          read_at?: string | null
-          session_id?: string | null
           tipo_remetente?: string | null
         }
         Relationships: []
@@ -809,7 +683,6 @@ export type Database = {
         Row: {
           id: number
           is_read: boolean | null
-          media_url: string | null
           mensagemtype: string | null
           message: string
           nome_do_contato: string | null
@@ -820,7 +693,6 @@ export type Database = {
         Insert: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null
@@ -831,7 +703,6 @@ export type Database = {
         Update: {
           id?: number
           is_read?: boolean | null
-          media_url?: string | null
           mensagemtype?: string | null
           message?: string
           nome_do_contato?: string | null

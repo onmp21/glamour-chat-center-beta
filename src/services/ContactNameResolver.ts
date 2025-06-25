@@ -1,129 +1,216 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { ContactService } from '@/services/ContactService';
 
-interface Contact {
-  phone_number: string;
-  contact_name: string;
-  channels: string[];
+interface ContactData {
+  phone: string;
+  sessionId: string;
+  name?: string;
+  timestamp: string;
+}
+
+interface ResolvedContact {
+  phone: string;
+  finalName: string;
+  timestamp: string;
 }
 
 export class ContactNameResolver {
-  private static cache = new Map<string, Contact>();
-  private static cacheExpiry = new Map<string, number>();
-  private static readonly CACHE_DURATION = 60000; // 1 minuto
+  private static contactCache = new Map<string, ResolvedContact>();
+  private static pendingContacts = new Map<string, ContactData[]>();
 
-  // CORRIGIDO: Resolver nome do contato priorizando tabela contacts
-  static async resolveName(phoneNumber: string, fallbackName?: string): Promise<string> {
-    if (!phoneNumber) {
-      console.log(`📞 [CONTACT_RESOLVER] Número vazio, usando fallback: ${fallbackName || 'Cliente'}`);
-      return fallbackName || 'Cliente';
-    }
+  /**
+   * Resolve o nome do contato priorizando a tabela contacts
+   * - Primeiro verifica a tabela contacts no banco
+   * - Se não encontrar, usa o nome fornecido
+   * - Se não tem nome, gera um nome baseado no número
+   */
+  static async resolveContactName(
+    phone: string, 
+    sessionId: string, 
+    providedName?: string, 
+    timestamp: string = new Date().toISOString()
+  ): Promise<string> {
+    console.log(`📝 [CONTACT_RESOLVER] Resolving name for phone: ${phone}, provided: ${providedName}`);
 
-    const now = Date.now();
-    const cacheKey = phoneNumber;
-
-    // Verificar cache
-    if (this.cache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
-      const expiry = this.cacheExpiry.get(cacheKey)!;
-      if (now < expiry) {
-        const cachedName = this.cache.get(cacheKey)!.contact_name;
-        console.log(`✅ [CONTACT_RESOLVER] Nome do cache para ${phoneNumber}: ${cachedName}`);
-        return cachedName;
-      }
+    // Verificar se já temos um nome resolvido no cache
+    const cached = this.contactCache.get(phone);
+    if (cached) {
+      console.log(`✅ [CONTACT_RESOLVER] Using cached name: ${cached.finalName} for ${phone}`);
+      return cached.finalName;
     }
 
     try {
-      // CORREÇÃO: Consultar tabela contacts SEMPRE primeiro
-      console.log(`🔍 [CONTACT_RESOLVER] Buscando ${phoneNumber} na tabela contacts`);
-      const { data: contact, error } = await supabase
-        .from('contacts')
-        .select('phone_number, contact_name, channels')
-        .eq('phone_number', phoneNumber)
-        .single();
-
-      if (!error && contact && contact.contact_name) {
-        // Atualizar cache
-        this.cache.set(cacheKey, contact);
-        this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
-        console.log(`🎯 [CONTACT_RESOLVER] Nome encontrado na tabela contacts para ${phoneNumber}: ${contact.contact_name}`);
-        return contact.contact_name;
-      }
-
-      // CORREÇÃO: Se tem fallbackName, salvar na tabela contacts para próximas consultas
-      if (fallbackName && fallbackName.trim() && fallbackName !== 'Cliente') {
-        console.log(`💾 [CONTACT_RESOLVER] Salvando nome ${fallbackName} para ${phoneNumber} na tabela contacts`);
+      // Buscar primeiro na tabela contacts
+      const savedContact = await ContactService.getContactByPhone(phone);
+      if (savedContact && savedContact.contact_name) {
+        const finalName = savedContact.contact_name;
+        const resolved: ResolvedContact = {
+          phone,
+          finalName,
+          timestamp: savedContact.updated_at
+        };
         
-        try {
-          const { error: insertError } = await supabase
-            .from('contacts')
-            .upsert(
-              { 
-                phone_number: phoneNumber, 
-                contact_name: fallbackName.trim(),
-                channels: []
-              },
-              { 
-                onConflict: 'phone_number',
-                ignoreDuplicates: false 
-              }
-            );
-
-          if (!insertError) {
-            // Atualizar cache com o nome salvo
-            const newContact = {
-              phone_number: phoneNumber,
-              contact_name: fallbackName.trim(),
-              channels: []
-            };
-            this.cache.set(cacheKey, newContact);
-            this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
-            console.log(`✅ [CONTACT_RESOLVER] Nome ${fallbackName} salvo com sucesso para ${phoneNumber}`);
-            return fallbackName.trim();
-          } else {
-            console.error(`❌ [CONTACT_RESOLVER] Erro ao salvar contato:`, insertError);
-          }
-        } catch (saveError) {
-          console.error(`❌ [CONTACT_RESOLVER] Erro ao salvar contato:`, saveError);
-        }
+        this.contactCache.set(phone, resolved);
+        console.log(`🎯 [CONTACT_RESOLVER] Name found in database for ${phone}: ${finalName}`);
+        return finalName;
       }
-
-      // Se não encontrou na tabela e não tem fallback válido, usar número
-      const phoneDisplay = phoneNumber.length > 4 ? `...${phoneNumber.slice(-4)}` : phoneNumber;
-      console.log(`📞 [CONTACT_RESOLVER] Nenhum nome encontrado, exibindo número: ${phoneDisplay} para ${phoneNumber}`);
-      return phoneDisplay;
-
-    } catch (err) {
-      console.error('❌ [CONTACT_RESOLVER] Erro na busca:', err);
-      // Em caso de erro, usar fallback ou número
-      if (fallbackName && fallbackName.trim()) {
-        return fallbackName.trim();
-      }
-      return phoneNumber.length > 4 ? `...${phoneNumber.slice(-4)}` : phoneNumber;
+    } catch (error) {
+      console.error(`❌ [CONTACT_RESOLVER] Error fetching contact from database:`, error);
     }
+
+    // Se há nome fornecido da coluna Nome_do_contato, usar e salvar
+    if (providedName && providedName.trim() && 
+        providedName !== 'Unknown' && 
+        providedName !== 'Contato Anônimo' &&
+        !providedName.toLowerCase().includes('sistema') &&
+        !providedName.toLowerCase().includes('bot')) {
+      
+      const finalName = providedName.trim();
+      const resolved: ResolvedContact = {
+        phone,
+        finalName,
+        timestamp
+      };
+      
+      this.contactCache.set(phone, resolved);
+      
+      // Salvar no banco de dados para próximas consultas
+      try {
+        await ContactService.saveContact(phone, finalName);
+        console.log(`💾 [CONTACT_RESOLVER] Contact saved to database: ${phone} -> ${finalName}`);
+      } catch (error) {
+        console.error(`❌ [CONTACT_RESOLVER] Error saving contact to database:`, error);
+      }
+      
+      // Limpar pendências para este contato
+      this.pendingContacts.delete(phone);
+      
+      console.log(`🎯 [CONTACT_RESOLVER] Name resolved and saved for ${phone}: ${finalName}`);
+      return finalName;
+    }
+
+    // Se não há nome válido, gerar nome baseado no número
+    const phoneDisplay = phone.length > 4 ? `Cliente ${phone.slice(-4)}` : `Cliente ${phone}`;
+    console.log(`📞 [CONTACT_RESOLVER] No valid name available, generating: ${phoneDisplay} for ${phone}`);
+    
+    return phoneDisplay;
   }
 
-  // Buscar contato completo com canais
-  static async getContact(phoneNumber: string): Promise<Contact | null> {
-    if (!phoneNumber) return null;
+  /**
+   * Versão síncrona para compatibilidade com código existente
+   */
+  static resolveContactNameSync(
+    phone: string, 
+    sessionId: string, 
+    providedName?: string, 
+    timestamp: string = new Date().toISOString()
+  ): string {
+    // Verificar cache primeiro
+    const cached = this.contactCache.get(phone);
+    if (cached) {
+      return cached.finalName;
+    }
 
+    // Se há nome fornecido válido, usar imediatamente
+    if (providedName && providedName.trim() && 
+        providedName !== 'Unknown' && 
+        providedName !== 'Contato Anônimo' &&
+        !providedName.toLowerCase().includes('sistema') &&
+        !providedName.toLowerCase().includes('bot')) {
+      
+      const finalName = providedName.trim();
+      const resolved: ResolvedContact = {
+        phone,
+        finalName,
+        timestamp
+      };
+      
+      this.contactCache.set(phone, resolved);
+      
+      // Salvar de forma assíncrona
+      ContactService.saveContact(phone, finalName).catch(error => {
+        console.error(`❌ [CONTACT_RESOLVER] Error saving contact async:`, error);
+      });
+      
+      return finalName;
+    }
+
+    // Fallback para nome baseado no número
+    return phone.length > 4 ? `Cliente ${phone.slice(-4)}` : `Cliente ${phone}`;
+  }
+
+  /**
+   * Resolve nome usando apenas o número de telefone fornecido
+   */
+  static async resolveName(phoneNumber: string, originalName?: string): Promise<string> {
+    return this.resolveContactName(phoneNumber, '', originalName);
+  }
+
+  /**
+   * Força a resolução de um nome para um contato específico
+   */
+  static async forceResolveName(phone: string, name: string): Promise<void> {
+    if (!name || !name.trim()) return;
+
+    const finalName = name.trim();
+    const resolved: ResolvedContact = {
+      phone,
+      finalName,
+      timestamp: new Date().toISOString()
+    };
+
+    this.contactCache.set(phone, resolved);
+    this.pendingContacts.delete(phone);
+
+    // Salvar no banco
     try {
-      const { data: contact, error } = await supabase
-        .from('contacts')
-        .select('phone_number, contact_name, channels')
-        .eq('phone_number', phoneNumber)
-        .single();
-
-      return error ? null : contact;
-    } catch (err) {
-      console.error('❌ [CONTACT_RESOLVER] Erro ao buscar contato completo:', err);
-      return null;
+      await ContactService.saveContact(phone, finalName);
+      console.log(`🔧 [CONTACT_RESOLVER] Forced name resolution and saved for ${phone}: ${finalName}`);
+    } catch (error) {
+      console.error(`❌ [CONTACT_RESOLVER] Error force saving contact:`, error);
     }
   }
 
-  // Limpar cache
+  /**
+   * Obter o nome atualmente resolvido para um contato
+   */
+  static getResolvedName(phone: string): string | null {
+    const cached = this.contactCache.get(phone);
+    return cached ? cached.finalName : null;
+  }
+
+  /**
+   * Verificar se um contato está pendente de resolução de nome
+   */
+  static isPending(phone: string): boolean {
+    return this.pendingContacts.has(phone);
+  }
+
+  /**
+   * Obter estatísticas do resolver
+   */
+  static getStats(): { resolved: number; pending: number } {
+    return {
+      resolved: this.contactCache.size,
+      pending: this.pendingContacts.size
+    };
+  }
+
+  /**
+   * Limpar cache (útil para testes)
+   */
   static clearCache(): void {
-    this.cache.clear();
-    this.cacheExpiry.clear();
-    console.log('🧹 [CONTACT_RESOLVER] Cache limpo');
+    this.contactCache.clear();
+    this.pendingContacts.clear();
+    console.log(`🧹 [CONTACT_RESOLVER] Cache cleared`);
+  }
+
+  /**
+   * Processar mensagens pendentes quando um nome é resolvido
+   */
+  static processPendingMessages(phone: string): ContactData[] {
+    const pending = this.pendingContacts.get(phone) || [];
+    this.pendingContacts.delete(phone);
+    return pending;
   }
 }

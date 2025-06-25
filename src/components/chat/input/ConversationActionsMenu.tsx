@@ -4,10 +4,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from '@/components/ui/button';
 import { MoreVertical, MessageSquare, Clock, CheckCircle, RefreshCw, User, Phone, Calendar, Brain, FileText, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useConversationStatusEnhanced } from '@/hooks/useConversationStatusEnhanced';
+import { useUnifiedConversationStatus } from '@/hooks/useUnifiedConversationStatus';
 import { ConversationNotesModal } from './ConversationNotesModal';
 import { ConversationTagsModal } from './ConversationTagsModal';
-import { AIActionsModal } from './AIActionsModal'; // Novo modal para ações de IA
+import { AIActionsModal } from './AIActionsModal';
 import { format } from 'date-fns';
 
 interface ConversationActionsMenuProps {
@@ -33,7 +33,7 @@ export const ConversationActionsMenu: React.FC<ConversationActionsMenuProps> = (
   onStatusChange,
   onRefresh
 }) => {
-  const { updateConversationStatus } = useConversationStatusEnhanced();
+  const { updateConversationStatus } = useUnifiedConversationStatus();
   const [showAIModal, setShowAIModal] = useState(false);
 
   const handleStatusChange = async (newStatus: 'unread' | 'in_progress' | 'resolved') => {

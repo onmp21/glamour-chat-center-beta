@@ -5,24 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, QrCode, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface ApiInstance {
-  id: string;
-  instance_name: string;
-  base_url: string;
-  api_key: string;
-  created_at: string;
-  connection_status?: 'connected' | 'disconnected' | 'connecting';
-  qr_code?: string;
-}
+import { ApiInstanceWithConnection } from '@/types/domain/api/ApiInstance';
 
 interface ApiInstanceCardProps {
-  instance: ApiInstance;
+  instance: ApiInstanceWithConnection;
   checkingStatus: string | null;
   isDarkMode?: boolean;
-  onCheckConnectionStatus: (instance: ApiInstance) => void;
+  onCheckConnectionStatus: (instance: ApiInstanceWithConnection) => void;
   onShowQRCode: (instanceId: string) => void;
-  onDelete: (instance: ApiInstance) => void;
+  onDelete: (instance: ApiInstanceWithConnection) => void;
 }
 
 export const ApiInstanceCard: React.FC<ApiInstanceCardProps> = ({
@@ -33,6 +24,27 @@ export const ApiInstanceCard: React.FC<ApiInstanceCardProps> = ({
   onShowQRCode,
   onDelete
 }) => {
+  const getConnectionStatusLabel = (status: string | undefined) => {
+    switch (status) {
+      case 'connected': return 'Conectado';
+      case 'connecting': return 'Conectando';
+      case 'disconnected': return 'Desconectado';
+      case 'unknown': return 'Desconhecido';
+      default: return 'Desconhecido';
+    }
+  };
+
+  const getConnectionIcon = (status: string | undefined) => {
+    if (status === 'connected') {
+      return <Wifi className="h-3 w-3 mr-1" />;
+    }
+    return <WifiOff className="h-3 w-3 mr-1" />;
+  };
+
+  const getConnectionVariant = (status: string | undefined) => {
+    return status === 'connected' ? 'default' : 'destructive';
+  };
+
   return (
     <Card className={cn(
       "transition-all duration-200",
@@ -45,13 +57,9 @@ export const ApiInstanceCard: React.FC<ApiInstanceCardProps> = ({
           </CardTitle>
           <div className="flex items-center gap-2">
             {instance.connection_status && (
-              <Badge variant={instance.connection_status === 'connected' ? 'default' : 'destructive'}>
-                {instance.connection_status === 'connected' ? (
-                  <Wifi className="h-3 w-3 mr-1" />
-                ) : (
-                  <WifiOff className="h-3 w-3 mr-1" />
-                )}
-                {instance.connection_status === 'connected' ? 'Conectado' : instance.connection_status === 'connecting' ? 'Conectando' : 'Desconectado'}
+              <Badge variant={getConnectionVariant(instance.connection_status)}>
+                {getConnectionIcon(instance.connection_status)}
+                {getConnectionStatusLabel(instance.connection_status)}
               </Badge>
             )}
           </div>

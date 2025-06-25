@@ -32,7 +32,7 @@ export const useConversationStats = (channelId: string) => {
           mensagemtype: msg.mensagemtype,
           tipo_remetente: msg.tipo_remetente,
           nome_do_contato: msg.nome_do_contato,
-          media_base64: msg.media_base64,
+          Nome_do_contato: msg.Nome_do_contato,
           is_read: msg.is_read,
           read_at: msg.read_at,
           sender: msg.tipo_remetente || 'unknown',

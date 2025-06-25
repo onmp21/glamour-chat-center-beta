@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { SimpleMessageHistory } from './SimpleMessageHistory';
+import { InfiniteMessageHistory } from './InfiniteMessageHistory';
 
 interface MessageHistoryProps {
   channelId: string;
@@ -10,6 +10,6 @@ interface MessageHistoryProps {
 }
 
 export const MessageHistory: React.FC<MessageHistoryProps> = (props) => {
-  console.log('📋 [MESSAGE_HISTORY] Rendering with:', props);
-  return <SimpleMessageHistory {...props} />;
+  console.log('📋 [MESSAGE_HISTORY] Rendering with infinite scroll:', props);
+  return <InfiniteMessageHistory {...props} />;
 };

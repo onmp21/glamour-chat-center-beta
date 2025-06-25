@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
 import { MessagesHeader } from './MessagesHeader';
 import { SectionTabs } from './SectionTabs';
-import { ChannelsGrid } from './ChannelsGrid';
+import { ChannelsSection } from '@/components/dashboard/ChannelsSection';
 import { ContactsListOptimized } from './ContactsListOptimized';
 import { NewContactModal } from './NewContactModal';
 import { ChannelSelectorModal } from './ChannelSelectorModal';
@@ -24,7 +24,7 @@ interface MensagensRefactoredProps {
   initialPhone?: string | null;
 }
 
-export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({ 
+export const MensagensRefactored: React.FC<MensagensRefactoredProps> = React.memo(({ 
   isDarkMode, 
   onSectionChange,
   initialChannel = null,
@@ -38,131 +38,41 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
   const [selectedContactChannels, setSelectedContactChannels] = useState<string[]>([]);
   const [selectedContactName, setSelectedContactName] = useState('');
 
-  // Usar dados estáticos dos canais sem polling constante
   const { channels: internalChannels } = useInternalChannels();
   const { getAccessibleChannels } = usePermissions();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Carregar canais apenas uma vez na inicialização
-  const [canaisData, setCanaisData] = useState(() => {
-    if (user?.role === 'admin') {
-      return internalChannels
-        .filter(channel =>
-          channel.isActive &&
-          channel.name &&
-          channel.name.toLowerCase() !== 'pedro'
-        )
-        .map(channel => ({
-          id: channel.legacyId,
-          nome: channel.name,
-          tipo: channel.type === 'general' ? 'IA Assistant' :
-                channel.type === 'store' ? 'Loja' :
-                channel.type === 'manager' ? 'Gerente' : 'Canal',
-          status: 'ativo' as const,
-          conversasNaoLidas: 0,
-          ultimaAtividade: 'Online'
-        }));
-    } else {
-      const accessibleChannels = getAccessibleChannels();
-      return internalChannels
-        .filter(channel =>
-          channel.isActive &&
-          channel.name &&
-          channel.name.toLowerCase() !== 'pedro' &&
-          accessibleChannels.includes(channel.legacyId)
-        )
-        .map(channel => ({
-          id: channel.legacyId,
-          nome: channel.name,
-          tipo: channel.type === 'general' ? 'IA Assistant' :
-                channel.type === 'store' ? 'Loja' :
-                channel.type === 'manager' ? 'Gerente' : 'Canal',
-          status: 'ativo' as const,
-          conversasNaoLidas: 0,
-          ultimaAtividade: 'Online'
-        }));
-    }
-  });
-
-  // Atualizar canais apenas quando há mudanças reais nos dados
+  // Tratar parâmetros iniciais apenas uma vez
   useEffect(() => {
-    if (internalChannels.length > 0) {
-      let newCanaisData = [];
-      if (user?.role === 'admin') {
-        newCanaisData = internalChannels
-          .filter(channel =>
-            channel.isActive &&
-            channel.name &&
-            channel.name.toLowerCase() !== 'pedro'
-          )
-          .map(channel => ({
-            id: channel.legacyId,
-            nome: channel.name,
-            tipo: channel.type === 'general' ? 'IA Assistant' :
-                  channel.type === 'store' ? 'Loja' :
-                  channel.type === 'manager' ? 'Gerente' : 'Canal',
-            status: 'ativo' as const,
-            conversasNaoLidas: 0,
-            ultimaAtividade: 'Online'
-          }));
-      } else {
-        const accessibleChannels = getAccessibleChannels();
-        newCanaisData = internalChannels
-          .filter(channel =>
-            channel.isActive &&
-            channel.name &&
-            channel.name.toLowerCase() !== 'pedro' &&
-            accessibleChannels.includes(channel.legacyId)
-          )
-          .map(channel => ({
-            id: channel.legacyId,
-            nome: channel.name,
-            tipo: channel.type === 'general' ? 'IA Assistant' :
-                  channel.type === 'store' ? 'Loja' :
-                  channel.type === 'manager' ? 'Gerente' : 'Canal',
-            status: 'ativo' as const,
-            conversasNaoLidas: 0,
-            ultimaAtividade: 'Online'
-          }));
-      }
-      
-      // Só atualizar se houve mudança real nos dados
-      if (JSON.stringify(newCanaisData) !== JSON.stringify(canaisData)) {
-        setCanaisData(newCanaisData);
-      }
-    }
-  }, [internalChannels, user?.role, getAccessibleChannels]);
-
-  useEffect(() => {
-    console.log('🔍 [MENSAGENS] Initial params detected:', { channel: initialChannel, phone: initialPhone });
-    
     if (initialChannel && initialPhone) {
-      const mappedInitialChannel = initialChannel;
-      console.log('🚀 [MENSAGENS] Opening ChatOverlay for channel (mapped initialChannel):', mappedInitialChannel);
-      setSelectedChannel(mappedInitialChannel);
+      console.log('🔍 [MENSAGENS] Opening channel from URL:', initialChannel);
+      setSelectedChannel(initialChannel);
     }
   }, [initialChannel, initialPhone]);
 
-  const handleSendFile = async (file: File, caption?: string) => {
-    console.log('File sending handled by ChatOverlayRefactored');
-  };
+  // Callbacks otimizados com useCallback
+  const handleSendFile = useCallback(async (file: File, caption?: string) => {
+    console.log('📎 [MENSAGENS] File sending handled by ChatOverlayRefactored');
+  }, []);
 
-  const handleSendAudio = async (audioBlob: Blob, duration: number) => {
-    console.log('Audio sending handled by ChatOverlayRefactored');
-  };
+  const handleSendAudio = useCallback(async (audioBlob: Blob, duration: number) => {
+    console.log('🎵 [MENSAGENS] Audio sending handled by ChatOverlayRefactored');
+  }, []);
 
-  const handleChannelClick = (channelId: string) => {
+  const handleChannelClick = useCallback((channelId: string) => {
+    console.log('📱 [MENSAGENS] Channel selected:', channelId);
     setSelectedChannel(channelId);
-  };
+  }, []);
 
-  const handleCloseOverlay = () => {
+  const handleCloseOverlay = useCallback(() => {
+    console.log('❌ [MENSAGENS] Closing chat overlay');
     setSelectedChannel(null);
     const newUrl = "/?section=mensagens";
     window.history.replaceState({}, "", newUrl);
-  };
+  }, []);
 
-  const handleNewContact = (contactData: { nome: string; telefone: string; canal: string }) => {
+  const handleNewContact = useCallback((contactData: { nome: string; telefone: string; canal: string }) => {
     console.log('🆕 [NEW_CONTACT] Creating contact:', contactData);
     
     toast({
@@ -171,9 +81,9 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
     });
     
     setSelectedChannel(contactData.canal);
-  };
+  }, [toast]);
 
-  const handleContactClick = (contact: any) => {
+  const handleContactClick = useCallback((contact: any) => {
     console.log('👤 [CONTACT_CLICK] Contact selected:', contact);
     
     if (contact.canais && contact.canais.length === 1) {
@@ -183,17 +93,30 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       setSelectedContactName(contact.nome);
       setIsChannelSelectorOpen(true);
     } else {
-      const firstChannel = canaisData[0]?.id;
-      if (firstChannel) {
-        setSelectedChannel(firstChannel);
+      // Pegar primeiro canal disponível se o contato não tem canais específicos
+      if (internalChannels.length > 0) {
+        const firstChannel = internalChannels.find(ch => ch.isActive && ch.name !== 'Pedro');
+        if (firstChannel) {
+          const nameToId: Record<string, string> = {
+            'Yelena-AI': 'chat',
+            'Canarana': 'canarana',
+            'Souto Soares': 'souto-soares',
+            'João Dourado': 'joao-dourado',
+            'América Dourada': 'america-dourada',
+            'Gerente das Lojas': 'gerente-lojas',
+            'Andressa Gerente Externo': 'gerente-externo'
+          };
+          const legacyId = nameToId[firstChannel.name] || firstChannel.id;
+          setSelectedChannel(legacyId);
+        }
       }
     }
-  };
+  }, [internalChannels]);
 
-  const handleChannelSelect = (channelId: string) => {
+  const handleChannelSelect = useCallback((channelId: string) => {
     setSelectedChannel(channelId);
     setIsChannelSelectorOpen(false);
-  };
+  }, []);
 
   if (selectedChannel) {
     return (
@@ -249,10 +172,10 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       </div>
 
       {activeTab === 'canais' ? (
-        <ChannelsGrid
-          channels={canaisData}
-          onChannelClick={handleChannelClick}
+        <ChannelsSection
           isDarkMode={isDarkMode}
+          onChannelClick={handleChannelClick}
+          showHeader={false}
         />
       ) : (
         <ContactsListOptimized
@@ -278,4 +201,6 @@ export const MensagensRefactored: React.FC<MensagensRefactoredProps> = ({
       />
     </div>
   );
-};
+});
+
+MensagensRefactored.displayName = 'MensagensRefactored';

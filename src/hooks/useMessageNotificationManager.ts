@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from 'react';
 import { useNotificationSound } from './useNotificationSound';
 
@@ -12,14 +13,24 @@ export const useMessageNotificationManager = ({
   isOverlayOpen,
   enabled = true
 }: MessageNotificationManagerProps) => {
-  const { playNotificationSound } = useNotificationSound({ enabled });
+  const { playNotificationSound } = useNotificationSound();
   const previousMessagesCountRef = useRef<number>(0);
   const lastExternalMessageIdRef = useRef<string | null>(null);
+  const isInitializedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Só processar se o overlay estiver aberto e notificações estiverem habilitadas
     if (!isOverlayOpen || !enabled || !messages || messages.length === 0) {
+      // Inicializar contadores sem tocar som
       previousMessagesCountRef.current = messages?.length || 0;
+      return;
+    }
+
+    // Na primeira inicialização, apenas definir os valores sem tocar som
+    if (!isInitializedRef.current) {
+      previousMessagesCountRef.current = messages.length;
+      isInitializedRef.current = true;
+      console.log('🔔 [MESSAGE_NOTIFICATION] Initialized with', messages.length, 'messages');
       return;
     }
 
@@ -62,7 +73,8 @@ export const useMessageNotificationManager = ({
     resetNotificationState: () => {
       previousMessagesCountRef.current = messages?.length || 0;
       lastExternalMessageIdRef.current = null;
+      isInitializedRef.current = false;
+      console.log('🔄 [MESSAGE_NOTIFICATION] State reset');
     }
   };
 };
-

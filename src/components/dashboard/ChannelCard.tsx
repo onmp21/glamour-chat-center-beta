@@ -2,11 +2,10 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Bot, Store, Users, Pin } from 'lucide-react';
-import { useChannelConversationCounts } from '@/hooks/useChannelConversationCounts';
-import { useChannelLastActivity } from '@/hooks/useChannelLastActivity';
 import { useChannelPin } from '@/hooks/useChannelPin';
+import { useGlobalConversationStats } from '@/contexts/GlobalConversationStatsContext';
+import { useChannelLastActivity } from '@/hooks/useChannelLastActivity';
 
 interface ChannelCardProps {
   channelId: string;
@@ -23,26 +22,20 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   isDarkMode,
   onClick
 }) => {
-  const {
-    counts,
-    loading: countsLoading
-  } = useChannelConversationCounts(channelId);
-  const {
-    lastActivityText,
-    loading: activityLoading
-  } = useChannelLastActivity(channelId);
+  // Usar APENAS o contexto global centralizado - sem subscrições duplicadas
+  const { getChannelStats } = useGlobalConversationStats();
+  const stats = getChannelStats(channelId);
+  
   const {
     isPinned,
     togglePin
   } = useChannelPin();
   
-  const loading = countsLoading || activityLoading;
   const channelIsPinned = isPinned(channelId);
 
-  // Mostrar conversas não lidas no badge, total no texto
-  const unreadCount = counts.pending;
-  const totalCount = counts.total;
-  
+  // Hook para obter o tempo da última atividade
+  const { lastActivityText, loading: activityLoading } = useChannelLastActivity(channelId);
+
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
     if (name.includes('Andressa') || name.includes('Gustavo')) return Users;
@@ -56,8 +49,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
     if (name.includes('Souto Soares')) return 'Souto Soares';
     if (name.includes('João Dourado')) return 'João Dourado';
     if (name.includes('América Dourada')) return 'América Dourada';
-    if (name.includes('Andressa') || name.includes('Gerente do Externo')) return 'Andressa Gerente Externo';
-    if (name.includes('Gustavo') || name.includes('Gerente das Lojas')) return 'Gustavo Gerente das Lojas';
+    if (name.includes('Andressa') || name.includes('Gerente do Externo')) return 'Andressa';
+    if (name.includes('Gustavo') || name.includes('Gerente das Lojas')) return 'Gustavo';
     return name;
   };
 
@@ -73,7 +66,15 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   const displayName = getChannelDisplayName(name);
   const displayType = getChannelType(name);
 
-  if (loading) {
+  // Debug log para verificar stats
+  console.log(`🔍 [CHANNEL_CARD] ${channelId} (${displayName}) stats:`, {
+    totalConversations: stats.totalConversations,
+    pendingConversations: stats.pendingConversations,
+    unreadMessages: stats.unreadMessages,
+    loading: stats.loading
+  });
+
+  if (stats.loading) {
     return (
       <Card className={cn(
         "cursor-pointer transition-all hover:shadow-md animate-pulse",
@@ -84,6 +85,10 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
         </CardContent>
       </Card>
     );
+  }
+
+  if (stats.error) {
+    console.error(`❌ [CHANNEL_CARD] Error for ${channelId}:`, stats.error);
   }
 
   return (
@@ -101,13 +106,10 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
               
-              {/* Badge de contagem no canto superior esquerdo do ícone - apenas se houver conversas não lidas (> 0) */}
-              {unreadCount > 0 && (
-                <div className={cn(
-                  "absolute -top-1 -left-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg",
-                  isDarkMode ? "bg-[#b5103c]" : "bg-[#b5103c]"
-                )}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
+              {/* CORRIGIDO: Badge de conversas pendentes - SEMPRE em vermelho quando > 0 */}
+              {stats.pendingConversations > 0 && (
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg">
+                  {stats.pendingConversations > 99 ? '99+' : stats.pendingConversations}
                 </div>
               )}
             </div>
@@ -135,8 +137,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
                 togglePin(channelId);
               }}
               className={cn(
-                "p-1 rounded-md",
-                channelIsPinned && "opacity-100",
+                "p-1 rounded-md transition-opacity",
+                channelIsPinned ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                 isDarkMode ? "hover:bg-zinc-700" : "hover:bg-gray-200"
               )}
             >
@@ -148,20 +150,28 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
         </div>
         
         <div className="flex items-center justify-between">
+          {/* Tempo da última atividade */}
           <p className={cn(
-            "text-xs",
+            "text-xs", 
             isDarkMode ? "text-gray-500" : "text-gray-500"
           )}>
-            {loading ? 'Carregando...' : lastActivityText}
+            {activityLoading ? 'Carregando...' : lastActivityText}
           </p>
           
-          {/* Texto de contagem total de conversas */}
-          <p className={cn(
-            "text-xs font-medium",
-            isDarkMode ? "text-gray-400" : "text-gray-600"
-          )}>
-            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
-          </p>
+          {/* CORRIGIDO: Mostrar total de conversas e destacar pendentes */}
+          <div className="flex items-center gap-2">
+            <p className={cn(
+              "text-xs font-medium",
+              isDarkMode ? "text-gray-400" : "text-gray-600"
+            )}>
+              {stats.totalConversations} {stats.totalConversations === 1 ? 'conversa' : 'conversas'}
+            </p>
+            {stats.pendingConversations > 0 && (
+              <p className="text-xs font-bold text-red-500">
+                ({stats.pendingConversations} pendente{stats.pendingConversations === 1 ? '' : 's'})
+              </p>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

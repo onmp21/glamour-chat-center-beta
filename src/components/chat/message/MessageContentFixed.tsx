@@ -3,35 +3,38 @@ import React from 'react';
 import { TextMessage } from './TextMessage';
 import { MediaRendererFixed } from '../MediaRendererFixed';
 import { ChatMessage } from '@/types/chat';
+import { isMediaMessage } from '@/utils/mediaUtils';
 
 interface MessageContentFixedProps {
   message: ChatMessage;
   isDarkMode: boolean;
+  balloonColor?: 'sent' | 'received';
 }
 
 export const MessageContentFixed: React.FC<MessageContentFixedProps> = ({
   message,
-  isDarkMode
-}) => {  // Verificar se é mídia (priorizando messageType) ou se é uma data URL
-  const isMediaMessage = 
-    (message.messageType && message.messageType !== 'text') ||
-    message.content.startsWith('data:') ||
-    (message.content.length > 100 && /^[A-Za-z0-9+/]*={0,2}$/.test(message.content.replace(/\s/g, '')));
+  isDarkMode,
+  balloonColor = 'received'
+}) => {
+  // Verificar se é mídia baseado no tipo e conteúdo
+  const isMedia = isMediaMessage(message.content, message.messageType);
   
   console.log('🎯 [MESSAGE_CONTENT_FIXED] Rendering:', {
     messageId: message.id,
     messageType: message.messageType,
-    isMediaMessage,
-    contentLength: message.content?.length || 0
+    isMedia,
+    balloonColor,
+    contentPreview: message.content.substring(0, 50)
   });
   
-  if (isMediaMessage) {
+  if (isMedia) {
     return (
       <MediaRendererFixed
         content={message.content}
         messageType={message.messageType}
         messageId={message.id}
         isDarkMode={isDarkMode}
+        balloonColor={balloonColor}
         fileName={message.fileData?.fileName}
       />
     );

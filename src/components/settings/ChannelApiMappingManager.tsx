@@ -196,7 +196,7 @@ export const ChannelApiMappingManager: React.FC = () => {
       <div>
         <h3 className="text-lg font-semibold mb-2">Mapeamento Canal ↔ API Evolution</h3>
         <p className="text-gray-600 mb-4">
-          Vincule cada canal a uma instância específica da API Evolution com conexão WebSocket automática.
+          Vincule cada canal a uma instância específica da API Evolution com conexão realtime automática.
         </p>
 
         {/* Formulário para novo mapeamento */}
@@ -252,7 +252,7 @@ export const ChannelApiMappingManager: React.FC = () => {
               disabled={!selectedChannel || !selectedInstance || saving}
               className="bg-[#b5103c] hover:bg-[#9d0e34] text-white"
             >
-              {saving ? 'Configurando WebSocket...' : 'Salvar Mapeamento'}
+              {saving ? 'Configurando Realtime...' : 'Salvar Mapeamento'}
             </Button>
           </CardContent>
         </Card>

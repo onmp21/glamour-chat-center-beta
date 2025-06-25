@@ -1,12 +1,13 @@
+
 import { useEffect, useRef } from 'react';
 
 interface NotificationSoundProps {
-  enabled: boolean;
+  enabled?: boolean;
   soundUrl?: string;
 }
 
 export const useNotificationSound = ({ 
-  enabled = true, 
+  enabled = false, // Desabilitado por padrão conforme solicitado
   soundUrl = '/sounds/notification-alert-269289.mp3' 
 }: NotificationSoundProps = {}) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -33,6 +34,7 @@ export const useNotificationSound = ({
 
   const playNotificationSound = () => {
     if (!enabled || !audioRef.current) {
+      console.log('🔊 [NOTIFICATION_SOUND] Sound disabled or no audio element');
       return;
     }
 
@@ -66,4 +68,3 @@ export const useNotificationSound = ({
 
   return { playNotificationSound };
 };
-

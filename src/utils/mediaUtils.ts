@@ -1,116 +1,139 @@
 
-export const extractPureBase64 = (mediaContent: string): string => {
-  if (!mediaContent) return '';
+/**
+ * Utilidades para mídia - URLs e detecção de tipos
+ */
+
+export const isValidMediaUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
   
-  // Se já é data URL, extrair apenas o base64
-  if (mediaContent.startsWith('data:')) {
-    const parts = mediaContent.split(',');
-    return parts.length > 1 ? parts[1] : '';
+  // Verificar se a URL contém placeholders não resolvidos
+  if (url.includes('{{ $json.Key }}') || url.includes('{{') || url.includes('}}')) {
+    return false;
   }
   
-  // Se já é base64 puro, retornar como está
-  return mediaContent;
+  // Verificar se é URL HTTP válida
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return true;
+  }
+  
+  // Verificar se é data URL
+  if (url.startsWith('data:')) {
+    return true;
+  }
+  
+  return false;
 };
 
-export const processMediaBase64 = (mediaBase64: string, messageType: string): string => {
-  if (!mediaBase64) return '';
+export const getMediaTypeFromUrl = (url: string): string => {
+  if (!url) return 'unknown';
   
-  // Se já tem prefixo data:, retornar como está
-  if (mediaBase64.startsWith('data:')) {
-    return mediaBase64;
+  const lowerUrl = url.toLowerCase();
+  
+  // Verificar extensões de arquivo
+  if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)($|\?)/)) {
+    return 'image';
+  }
+  if (lowerUrl.match(/\.(mp4|webm|avi|mov)($|\?)/)) {
+    return 'video';
+  }
+  if (lowerUrl.match(/\.(mp3|wav|ogg|m4a|aac)($|\?)/)) {
+    return 'audio';
+  }
+  if (lowerUrl.match(/\.(pdf|doc|docx|txt|xls|xlsx)($|\?)/)) {
+    return 'document';
   }
   
-  // Se é uma URL HTTP, não processar como base64
-  if (mediaBase64.startsWith('http://') || mediaBase64.startsWith('https://')) {
-    console.log('📎 [MEDIA_UTILS] URL detectada, não processando como base64:', mediaBase64.substring(0, 50));
-    return '';
+  // Verificar content-type em data URLs
+  if (url.startsWith('data:')) {
+    if (url.includes('image/')) return 'image';
+    if (url.includes('video/')) return 'video';
+    if (url.includes('audio/')) return 'audio';
+    if (url.includes('application/pdf')) return 'document';
   }
   
-  // Verificar se parece com base64 válido
-  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-  if (!base64Regex.test(mediaBase64)) {
-    console.log('❌ [MEDIA_UTILS] Base64 inválido detectado');
-    return '';
-  }
+  return 'unknown';
+};
+
+export const getMediaTypeFromMessageType = (messageType: string): string => {
+  if (!messageType) return 'text';
   
-  // Determinar MIME type baseado no tipo de mensagem
-  let mimeType = 'application/octet-stream';
+  const type = messageType.toLowerCase();
   
-  switch (messageType) {
+  switch (type) {
     case 'image':
-      mimeType = 'image/jpeg';
-      break;
-    case 'audio':
-      mimeType = 'audio/mpeg';
-      break;
+    case 'imagemessage':
+    case 'mensagem_de_imagem':
+      return 'image';
     case 'video':
-      mimeType = 'video/mp4';
-      break;
+    case 'videomessage':
+    case 'mensagem_de_video':
+      return 'video';
+    case 'audio':
+    case 'audiomessage':
+    case 'mensagem_de_audio':
+    case 'ptt':
+      return 'audio';
     case 'document':
-      mimeType = 'application/pdf';
-      break;
+    case 'documentmessage':
+    case 'mensagem_de_documento':
+    case 'file':
+      return 'document';
+    case 'sticker':
+      return 'image';
+    case 'text':
+    case 'conversation':
+      return 'text';
     default:
-      mimeType = 'application/octet-stream';
+      return 'unknown';
+  }
+};
+
+export const getMimeTypeFromUrl = (url: string): string => {
+  if (!url) return 'application/octet-stream';
+  
+  const lowerUrl = url.toLowerCase();
+  
+  if (lowerUrl.match(/\.jpe?g($|\?)/)) return 'image/jpeg';
+  if (lowerUrl.match(/\.png($|\?)/)) return 'image/png';
+  if (lowerUrl.match(/\.gif($|\?)/)) return 'image/gif';
+  if (lowerUrl.match(/\.webp($|\?)/)) return 'image/webp';
+  if (lowerUrl.match(/\.svg($|\?)/)) return 'image/svg+xml';
+  if (lowerUrl.match(/\.mp4($|\?)/)) return 'video/mp4';
+  if (lowerUrl.match(/\.webm($|\?)/)) return 'video/webm';
+  if (lowerUrl.match(/\.mp3($|\?)/)) return 'audio/mpeg';
+  if (lowerUrl.match(/\.wav($|\?)/)) return 'audio/wav';
+  if (lowerUrl.match(/\.ogg($|\?)/)) return 'audio/ogg';
+  if (lowerUrl.match(/\.pdf($|\?)/)) return 'application/pdf';
+  
+  return 'application/octet-stream';
+};
+
+export const isImageUrl = (url: string): boolean => {
+  return getMediaTypeFromUrl(url) === 'image';
+};
+
+export const isVideoUrl = (url: string): boolean => {
+  return getMediaTypeFromUrl(url) === 'video';
+};
+
+export const isAudioUrl = (url: string): boolean => {
+  return getMediaTypeFromUrl(url) === 'audio';
+};
+
+export const isMediaMessage = (content: string, messageType?: string): boolean => {
+  // Verificar se o tipo de mensagem indica mídia
+  if (messageType) {
+    const mediaType = getMediaTypeFromMessageType(messageType);
+    if (mediaType !== 'text' && mediaType !== 'unknown') {
+      return true;
+    }
   }
   
-  // Tentar detectar MIME type do header base64
-  try {
-    if (mediaBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
-    else if (mediaBase64.startsWith('iVBORw')) mimeType = 'image/png';
-    else if (mediaBase64.startsWith('R0lGO')) mimeType = 'image/gif';
-    else if (mediaBase64.startsWith('UklGR')) mimeType = 'image/webp';
-    else if (mediaBase64.startsWith('JVBERi')) mimeType = 'application/pdf';
-    else if (mediaBase64.startsWith('SUQz') || mediaBase64.startsWith('//uQ')) mimeType = 'audio/mpeg';
-    else if (mediaBase64.startsWith('T2dn')) mimeType = 'audio/ogg';
-    else if (mediaBase64.startsWith('AAAAGG') || mediaBase64.startsWith('AAAAFG')) mimeType = 'video/mp4';
-  } catch (error) {
-    console.warn('⚠️ [MEDIA_UTILS] Erro ao detectar MIME type:', error);
+  // Verificar se o conteúdo é uma URL válida de mídia
+  if (isValidMediaUrl(content)) {
+    const mediaType = getMediaTypeFromUrl(content);
+    return mediaType !== 'unknown' && mediaType !== 'text';
   }
   
-  const dataUrl = `data:${mimeType};base64,${mediaBase64}`;
-  console.log('✅ [MEDIA_UTILS] Base64 processado com sucesso para N8N:', mimeType);
-  
-  return dataUrl;
-};
-
-export const getFileFormatFromMimeType = (mimeType: string): string => {
-  const mimeToFormat: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png', 
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'audio/mpeg': 'mp3',
-    'audio/mp3': 'mp3',
-    'audio/wav': 'wav',
-    'audio/ogg': 'ogg',
-    'video/mp4': 'mp4',
-    'video/webm': 'webm',
-    'application/pdf': 'pdf',
-    'application/msword': 'doc',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx'
-  };
-  
-  return mimeToFormat[mimeType] || 'bin';
-};
-
-export const isValidBase64 = (str: string): boolean => {
-  if (!str || typeof str !== 'string') return false;
-  
-  // Remover data URL prefix se existir
-  const base64Data = str.startsWith('data:') 
-    ? str.split(',')[1] 
-    : str;
-  
-  if (!base64Data) return false;
-  
-  // Verificar padrão base64
-  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-  return base64Regex.test(base64Data);
-};
-
-export const extractMimeTypeFromDataUrl = (dataUrl: string): string => {
-  if (!dataUrl.startsWith('data:')) return 'application/octet-stream';
-  
-  const mimeMatch = dataUrl.match(/^data:([^;]+)/);
-  return mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  return false;
 };

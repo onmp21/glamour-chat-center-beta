@@ -1,23 +1,21 @@
 
 import React from 'react';
-import { useSimpleMessagesWithRealtime } from '@/hooks/useSimpleMessagesWithRealtime';
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 import { cn } from '@/lib/utils';
 import { MessageCircle } from 'lucide-react';
 
-interface SimpleMessageHistoryWithRealtimeProps {
+interface RealtimeMessageHistoryProps {
   channelId: string | null;
   conversationId: string | null;
   isDarkMode: boolean;
-  enableRealtime?: boolean;
 }
 
-export const SimpleMessageHistoryWithRealtime: React.FC<SimpleMessageHistoryWithRealtimeProps> = ({
+export const RealtimeMessageHistory: React.FC<RealtimeMessageHistoryProps> = ({
   channelId,
   conversationId,
-  isDarkMode,
-  enableRealtime = true
+  isDarkMode
 }) => {
-  const { messages, loading, error } = useSimpleMessagesWithRealtime(channelId, conversationId, enableRealtime);
+  const { messages, loading, error } = useRealtimeMessages(channelId, conversationId);
 
   if (loading) {
     return (
