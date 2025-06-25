@@ -34,7 +34,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   // Determinar nome de exibição baseado no canal e contato
   const getDisplayName = () => {
-    
     // Para canal Yelena: sempre Pedro Vila Nova (único)
     if (channelId === 'chat' || channelId === 'af1e5797-edc6-4ba3-a57a-25cf7297c4d6') {
       return 'Pedro Vila Nova';
@@ -53,11 +52,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
 
   const displayName = getDisplayName();
 
-  // Só mostrar badge se for unread (pendente) E se unread_count > 0
+  // Badge apenas se for unread (pendente) E se unread_count > 0
   const showUnreadBadge = currentStatus === 'unread' && (conversation.unread_count || 0) > 0;
 
   const handleClick = async () => {
-    
     logConversationAction('conversation_opened', conversation.id, {
       channel_id: channelId,
       contact_name: displayName,
@@ -91,7 +89,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
             <span className={cn("text-xs flex-shrink-0", isDarkMode ? "text-[#a1a1aa]" : "text-gray-500")}>
               {formatWhatsAppDate(conversation.last_message_time)}
             </span>
-            {/* Só mostrar badge se for unread (pendente) E se unread_count > 0 */}
+            {/* Badge apenas se for unread (pendente) E se unread_count > 0 */}
             {showUnreadBadge && (
               <Badge variant="default" className="bg-[#b5103c] hover:bg-[#9d0e34] text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center">
                 •

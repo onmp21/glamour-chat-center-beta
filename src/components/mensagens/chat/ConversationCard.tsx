@@ -80,7 +80,7 @@ export const ConversationCard: React.FC<ConversationCardProps> = ({
             )}>
               {formatWhatsAppDate(conversation.last_message_time)}
             </span>
-            {/* Só mostrar badge se unread_count > 0 e status não é resolved */}
+            {/* Badge apenas se unread_count > 0 e status não é resolved */}
             {conversation.unread_count && conversation.unread_count > 0 && status !== 'resolved' && (
               <Badge className="bg-[#b5103c] text-white text-xs">
                 {conversation.unread_count}

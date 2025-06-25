@@ -17,7 +17,7 @@ export const ContactsListOptimized: React.FC<ContactsListOptimizedProps> = ({
   onContactClick,
   isDarkMode
 }) => {
-  // Usar hook unificado para carregar contatos de todos os canais (separados por canal)
+  // Usar hook unificado para carregar contatos de todos os canais
   const { contacts: hookContacts, loading, error, loadingProgress } = useUnifiedContacts();
   
   // Usar contatos do hook se não foram passados como prop

@@ -30,7 +30,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setSelectedChannelId(null);
   };
 
-  // Calcular estatísticas de exames usando apenas dados já carregados - SEM POLLING
+  // Calcular estatísticas de exames - SEM POLLING, apenas dados já carregados
   const examStats = {
     totalExams: exams.length,
     examsThisMonth: exams.filter(exam => {
@@ -53,7 +53,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         "h-full flex flex-col",
         isDarkMode ? "bg-[#09090b]" : "bg-gray-50"
       )}>
-        {/* Header padrão */}
+        {/* Header */}
         <div className="p-6">
           <div className="flex items-center gap-4">
             <div className={cn(
@@ -73,7 +73,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 "text-lg",
                 isDarkMode ? "text-[#9ca3af]" : "text-gray-600"
               )}>
-                Gerencie suas conversas e acompanhe métricas importantes
+                Gerencie suas conversas com sistema 100% realtime
               </p>
             </div>
           </div>
@@ -101,6 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+      
       {/* Chat Overlay */}
       {selectedChannelId && (
         <ChatOverlay

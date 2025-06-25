@@ -15,7 +15,7 @@ export const formatWhatsAppDate = (timestamp: string | null): string => {
       return format(date, 'HH:mm', { locale: ptBR });
     }
     
-    // Se for ontem (menos de 48 horas)
+    // Se for ontem ou menos de 48 horas atrás
     if (isYesterday(date) || hoursAgo < 48) {
       return 'ontem';
     }

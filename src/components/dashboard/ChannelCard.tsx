@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Bot, Store, Users, Pin } from 'lucide-react';
-import { useRealtimeChannelStats } from '@/hooks/useRealtimeChannelStats';
+import { useOptimizedChannelStats } from '@/hooks/useOptimizedChannelStats';
 import { useChannelPin } from '@/hooks/useChannelPin';
 
 interface ChannelCardProps {
@@ -21,13 +21,13 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   isDarkMode,
   onClick
 }) => {
-  // Usar apenas realtime - REMOVIDO POLLING
+  // Usar hook otimizado sem polling
   const {
     totalConversations,
     unreadMessages,
     loading,
     error
-  } = useRealtimeChannelStats(channelId);
+  } = useOptimizedChannelStats(channelId);
   
   const {
     isPinned,
@@ -36,10 +36,6 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
   
   const channelIsPinned = isPinned(channelId);
 
-  // Corrigido: usar unreadMessages diretamente para badge
-  const unreadCount = unreadMessages;
-  const totalCount = totalConversations;
-  
   const getChannelIcon = (name: string) => {
     if (name.includes('Yelena') || name.includes('AI')) return Bot;
     if (name.includes('Andressa') || name.includes('Gustavo')) return Users;
@@ -102,13 +98,13 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             )}>
               <IconComponent size={18} className="text-[#b5103c]" />
               
-              {/* Badge de contagem no canto superior esquerdo do ícone - apenas se houver conversas não lidas */}
-              {unreadCount > 0 && (
+              {/* Badge de mensagens não lidas - APENAS se houver mensagens não lidas */}
+              {unreadMessages > 0 && (
                 <div className={cn(
                   "absolute -top-1 -left-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium shadow-lg",
                   "bg-[#b5103c]"
                 )}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
+                  {unreadMessages > 99 ? '99+' : unreadMessages}
                 </div>
               )}
             </div>
@@ -136,8 +132,8 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
                 togglePin(channelId);
               }}
               className={cn(
-                "p-1 rounded-md",
-                channelIsPinned && "opacity-100",
+                "p-1 rounded-md transition-opacity",
+                channelIsPinned ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                 isDarkMode ? "hover:bg-zinc-700" : "hover:bg-gray-200"
               )}
             >
@@ -153,15 +149,15 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
             "text-xs",
             isDarkMode ? "text-gray-500" : "text-gray-500"
           )}>
-            {loading ? 'Carregando...' : 'Atualizado em tempo real'}
+            Tempo real
           </p>
           
-          {/* Texto de contagem total de conversas - formatado corretamente */}
+          {/* Contagem total de conversas - corrigida */}
           <p className={cn(
             "text-xs font-medium",
             isDarkMode ? "text-gray-400" : "text-gray-600"
           )}>
-            {totalCount} {totalCount === 1 ? 'conversa' : 'conversas'}
+            {totalConversations} {totalConversations === 1 ? 'conversa' : 'conversas'}
           </p>
         </div>
       </CardContent>
