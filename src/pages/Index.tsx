@@ -1,16 +1,13 @@
 
 import React from 'react';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { ChannelProvider } from '@/contexts/ChannelContext';
-import { MainLayout } from '@/components/MainLayout';
+import { Dashboard } from '@/components/Dashboard';
+import { useLayout } from '@/components/layout/LayoutProvider';
 
 const Index = () => {
+  const { isDarkMode } = useLayout();
+  
   return (
-    <AuthProvider>
-      <ChannelProvider>
-        <MainLayout />
-      </ChannelProvider>
-    </AuthProvider>
+    <Dashboard isDarkMode={isDarkMode} onSectionSelect={() => {}} />
   );
 };
 
